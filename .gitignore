@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译产物 / 依赖
+node_modules/
+target/
+dist/
+build/
+__pycache__/
+*.pyc
+*.class
+
+# 日志 / 临时文件
+*.log
+*.tmp
+*.bak
+
+# 环境与密钥（务必保密）
+.env
+.env.*
+*.local
+application-local.yml
+application-local.yaml
+application-local.properties
