@@ -30,3 +30,18 @@ __pycache__/
 application-local.yml
 application-local.yaml
 application-local.properties
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+/build/
+/app/build/
+.gradle/
+/local.properties
+captures/
+.cxx/
+.externalNativeBuild/
+*.keystore
+!debug.keystore
