@@ -1,6 +1,7 @@
 package com.smartparking.controller;
 
 import com.smartparking.common.Result;
+import com.smartparking.dto.AuthResponse;
 import com.smartparking.dto.CodeLoginRequest;
 import com.smartparking.dto.LoginRequest;
 import com.smartparking.dto.RegisterRequest;
@@ -40,12 +41,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public Result<User> register(@Valid @RequestBody RegisterRequest request) {
+    public Result<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return userService.register(request.getPhone(), request.getPassword(), request.getCarNo());
     }
 
     @PostMapping("/login")
-    public Result<User> login(@Valid @RequestBody LoginRequest request) {
+    public Result<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return userService.login(request.getPhone(), request.getPassword());
     }
 

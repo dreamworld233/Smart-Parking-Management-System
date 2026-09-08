@@ -2,8 +2,10 @@ package com.smartparking.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.smartparking.common.Result;
+import com.smartparking.dto.AuthResponse;
 import com.smartparking.entity.User;
 import com.smartparking.mapper.UserMapper;
+import com.smartparking.util.JwtUtil;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -11,21 +13,23 @@ import java.time.LocalDateTime;
 
 /**
  * 用户业务：注册 / 密码登录 / 验证码登录。
- * 手机号唯一凭证，密码 BCrypt 加密存储，注册需验证码校验。
+ * 手机号唯一凭证，密码 BCrypt 加密存储。注册/登录成功后签发 JWT。
  */
 @Service
 public class UserService {
 
     private final UserMapper userMapper;
     private final VerificationCodeService codeService;
+    private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public UserService(UserMapper userMapper, VerificationCodeService codeService) {
+    public UserService(UserMapper userMapper, VerificationCodeService codeService, JwtUtil jwtUtil) {
         this.userMapper = userMapper;
         this.codeService = codeService;
+        this.jwtUtil = jwtUtil;
     }
 
-    public Result<User> register(String phone, String password, String carNo) {
+    public Result<AuthResponse> register(String phone, String password, String carNo) {
         Long count = userMapper.selectCount(
                 new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
         if (count != null && count > 0) {
@@ -43,10 +47,10 @@ public class UserService {
 
         userMapper.insert(user);
         user.setPassword(null); // 返回前抹掉密码
-        return Result.success(user);
+        return Result.success(new AuthResponse(jwtUtil.generateToken(phone), user));
     }
 
-    public Result<User> login(String phone, String password) {
+    public Result<AuthResponse> login(String phone, String password) {
         User user = userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
         if (user == null) {
@@ -56,7 +60,7 @@ public class UserService {
             return Result.error(401, "密码错误");
         }
         user.setPassword(null);
-        return Result.success(user);
+        return Result.success(new AuthResponse(jwtUtil.generateToken(phone), user));
     }
 
     public Result<User> loginByCode(String phone, String code) {
