@@ -36,6 +36,8 @@ public class RegisterActivity extends BaseActivity {
         btnRegister = findViewById(R.id.btn_register);
 
         btnRegister.setOnClickListener(v -> doRegister());
+        // 返回登录：finish 回到 LoginActivity（从登录页跳来）
+        findViewById(R.id.btn_back).setOnClickListener(v -> finish());
     }
 
     private void doRegister() {
