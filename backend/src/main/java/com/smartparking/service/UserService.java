@@ -67,13 +67,68 @@ public class UserService {
         if (!codeService.verify(phone, code)) {
             return Result.error(400, "验证码错误或已过期");
         }
-        User user = userMapper.selectOne(
-                new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
+        User user = findByPhone(phone);
         if (user == null) {
             return Result.error(404, "用户不存在，请先注册");
         }
         user.setPassword(null);
         return Result.success(user);
+    }
+
+    /** 按手机号查用户（含密码），供内部使用。 */
+    public User findByPhone(String phone) {
+        return userMapper.selectOne(
+                new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
+    }
+
+    /** 查当前用户资料（抹密码）。 */
+    public Result<User> getProfile(String phone) {
+        User user = findByPhone(phone);
+        if (user == null) {
+            return Result.error(404, "用户不存在");
+        }
+        user.setPassword(null);
+        return Result.success(user);
+    }
+
+    /** 修改昵称 / 头像。 */
+    public Result<User> updateProfile(String phone, String nickname, String avatar) {
+        User user = findByPhone(phone);
+        if (user == null) {
+            return Result.error(404, "用户不存在");
+        }
+        if (nickname != null) {
+            if (nickname.trim().isEmpty()) {
+                return Result.error(400, "昵称不能为空");
+            }
+            user.setNickname(nickname.trim());
+        }
+        if (avatar != null) {
+            user.setAvatar(avatar.trim().isEmpty() ? null : avatar.trim());
+        }
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        user.setPassword(null);
+        return Result.success(user);
+    }
+
+    /** 修改密码：验旧密码正确后再存新密码。 */
+    public Result<Void> changePassword(String phone, String oldPassword, String newPassword) {
+        if (oldPassword == null || oldPassword.isEmpty()
+                || newPassword == null || newPassword.isEmpty()) {
+            return Result.error(400, "密码不能为空");
+        }
+        User user = findByPhone(phone);
+        if (user == null) {
+            return Result.error(404, "用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return Result.error(401, "原密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        return Result.success();
     }
 
     private static String emptyToNull(String s) {
