@@ -9,15 +9,16 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.smartparking.app.R;
 import com.smartparking.app.data.AuthRepository;
-import com.smartparking.app.data.MockAuthRepository;
+import com.smartparking.app.data.RetrofitAuthRepository;
 import com.smartparking.app.model.ApiResponse;
-import com.smartparking.app.model.User;
+import com.smartparking.app.model.AuthResponse;
 import com.smartparking.app.util.TokenManager;
 
 public class LoginActivity extends BaseActivity {
 
     private TextInputEditText etPhone;
     private TextInputEditText etPassword;
+    private MaterialButton btnLogin;
     private AuthRepository repository;
 
     @Override
@@ -25,11 +26,11 @@ public class LoginActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        repository = new MockAuthRepository();
+        repository = new RetrofitAuthRepository();
 
         etPhone = findViewById(R.id.et_phone);
         etPassword = findViewById(R.id.et_password);
-        MaterialButton btnLogin = findViewById(R.id.btn_login);
+        btnLogin = findViewById(R.id.btn_login);
         TextView tvGoRegister = findViewById(R.id.tv_go_register);
 
         btnLogin.setOnClickListener(v -> doLogin());
@@ -50,15 +51,34 @@ public class LoginActivity extends BaseActivity {
             return;
         }
 
-        ApiResponse<User> resp = repository.login(phone, password);
-        if (resp.isSuccess()) {
-            // mock：token 用手机号拼一个占位，接后端后换成真实 JWT
-            TokenManager.save(this, "mock-token-" + phone, phone);
-            Toast.makeText(this, "登录成功", Toast.LENGTH_SHORT).show();
-            startActivity(new Intent(this, HomeActivity.class));
-            finish();
-        } else {
-            Toast.makeText(this, resp.getMessage(), Toast.LENGTH_SHORT).show();
-        }
+        setLoading(true);
+        repository.login(phone, password, new AuthRepository.AuthCallback() {
+            @Override
+            public void onSuccess(ApiResponse<AuthResponse> response) {
+                setLoading(false);
+                if (response.isSuccess()) {
+                    // 存后端签发的真实 JWT
+                    TokenManager.save(LoginActivity.this,
+                            response.getData().getToken(), phone);
+                    Toast.makeText(LoginActivity.this, "登录成功", Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(LoginActivity.this, HomeActivity.class));
+                    finish();
+                } else {
+                    Toast.makeText(LoginActivity.this,
+                            response.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                setLoading(false);
+                Toast.makeText(LoginActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void setLoading(boolean loading) {
+        btnLogin.setEnabled(!loading);
+        btnLogin.setText(loading ? "登录中…" : "登录");
     }
 }

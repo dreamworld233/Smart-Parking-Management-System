@@ -8,9 +8,9 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.smartparking.app.R;
 import com.smartparking.app.data.AuthRepository;
-import com.smartparking.app.data.MockAuthRepository;
+import com.smartparking.app.data.RetrofitAuthRepository;
 import com.smartparking.app.model.ApiResponse;
-import com.smartparking.app.model.User;
+import com.smartparking.app.model.AuthResponse;
 import com.smartparking.app.util.TokenManager;
 
 public class RegisterActivity extends BaseActivity {
@@ -19,6 +19,7 @@ public class RegisterActivity extends BaseActivity {
     private TextInputEditText etPassword;
     private TextInputEditText etConfirm;
     private TextInputEditText etCarNo;
+    private MaterialButton btnRegister;
     private AuthRepository repository;
 
     @Override
@@ -26,13 +27,13 @@ public class RegisterActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_register);
 
-        repository = new MockAuthRepository();
+        repository = new RetrofitAuthRepository();
 
         etPhone = findViewById(R.id.et_phone);
         etPassword = findViewById(R.id.et_password);
         etConfirm = findViewById(R.id.et_confirm);
         etCarNo = findViewById(R.id.et_car_no);
-        MaterialButton btnRegister = findViewById(R.id.btn_register);
+        btnRegister = findViewById(R.id.btn_register);
 
         btnRegister.setOnClickListener(v -> doRegister());
     }
@@ -56,17 +57,36 @@ public class RegisterActivity extends BaseActivity {
             return;
         }
 
-        ApiResponse<User> resp = repository.register(phone, password, carNo);
-        if (resp.isSuccess()) {
-            // 注册成功自动登录，直接进主界面
-            TokenManager.save(this, "mock-token-" + phone, phone);
-            Toast.makeText(this, "注册成功", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(this, HomeActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
-        } else {
-            Toast.makeText(this, resp.getMessage(), Toast.LENGTH_SHORT).show();
-        }
+        setLoading(true);
+        repository.register(phone, password, carNo, new AuthRepository.AuthCallback() {
+            @Override
+            public void onSuccess(ApiResponse<AuthResponse> response) {
+                setLoading(false);
+                if (response.isSuccess()) {
+                    // 注册成功自动登录，存后端签发的 JWT
+                    TokenManager.save(RegisterActivity.this,
+                            response.getData().getToken(), phone);
+                    Toast.makeText(RegisterActivity.this, "注册成功", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(RegisterActivity.this, HomeActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
+                    finish();
+                } else {
+                    Toast.makeText(RegisterActivity.this,
+                            response.getMessage(), Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                setLoading(false);
+                Toast.makeText(RegisterActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void setLoading(boolean loading) {
+        btnRegister.setEnabled(!loading);
+        btnRegister.setText(loading ? "注册中…" : "注册");
     }
 }
