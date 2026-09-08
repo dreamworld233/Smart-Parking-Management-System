@@ -1,3 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SmartParking</string>
+    <string name="app_name">智慧停车</string>
+
+    <!-- 底部导航 -->
+    <string name="tab_home">首页</string>
+    <string name="tab_space">车位</string>
+    <string name="tab_record">记录</string>
+    <string name="tab_mine">我的</string>
+
+    <!-- 占位提示 -->
+    <string name="coming_soon">功能开发中，敬请期待</string>
 </resources>

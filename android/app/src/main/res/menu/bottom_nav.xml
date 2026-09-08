@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/ic_nav_home"
+        android:title="@string/tab_home" />
+    <item
+        android:id="@+id/nav_space"
+        android:icon="@drawable/ic_nav_space"
+        android:title="@string/tab_space" />
+    <item
+        android:id="@+id/nav_record"
+        android:icon="@drawable/ic_nav_record"
+        android:title="@string/tab_record" />
+    <item
+        android:id="@+id/nav_mine"
+        android:icon="@drawable/ic_nav_mine"
+        android:title="@string/tab_mine" />
+</menu>
