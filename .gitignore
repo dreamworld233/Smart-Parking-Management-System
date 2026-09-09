@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# 微信开发者工具
+miniprogram_npm/
+project.private.config.json
+
+# 编译产物
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# 日志
+logs/
+*.log
+
+# 系统
+.DS_Store
+Thumbs.db
