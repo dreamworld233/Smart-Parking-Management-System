@@ -19,3 +19,6 @@ logs/
 # 系统
 .DS_Store
 Thumbs.db
+
+# brainstorming 可视化伴侣产物
+.superpowers/

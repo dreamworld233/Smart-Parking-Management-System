@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>公共停车场预约系统 · UI 稿 v1</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#eef2f7;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:36px 40px 60px;color:#0f172a;-webkit-font-smoothing:antialiased}
+  h1{font-size:23px;font-weight:700;letter-spacing:-.3px}
+  .lead{color:#64748b;font-size:13px;margin-top:7px;line-height:1.7;max-width:1400px}
+  .lead b{color:#2563eb;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(4,375px);gap:40px 26px;justify-content:start;margin-top:32px}
+  figure{width:375px}
+  figcaption{font-size:12.5px;font-weight:600;color:#334155;margin-bottom:10px}
+  figcaption em{font-style:normal;color:#94a3b8;font-weight:400}
+  .phone{width:375px;height:812px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:40px;box-shadow:0 12px 34px rgba(15,23,42,.13);overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .sb{height:46px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 7px;font-size:12px;font-weight:600;flex:none;position:relative;z-index:5}
+  .nav{height:44px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;flex:none;position:relative;z-index:5}
+  .nav .back{color:#2563eb;font-weight:500;font-size:13.5px}
+  .nav .t{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+  .body{flex:1;overflow:hidden;padding:0 14px;position:relative;z-index:3}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px}
+  .card+.card{margin-top:9px}
+  .row{display:flex;justify-content:space-between;align-items:baseline}
+  .muted{color:#64748b}
+  .weak{color:#94a3b8}
+  .ok{color:#16a34a}.warn{color:#d97706}.bad{color:#dc2626}.pri{color:#2563eb}
+  .chip{display:inline-block;border-radius:999px;padding:5px 13px;font-size:11.5px;background:#fff;border:1px solid #e2e8f0;color:#475569}
+  .chip.on{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+  .tag{display:inline-block;border-radius:3px;padding:1px 6px;font-size:10.5px;font-weight:500;background:#dbeafe;color:#1d4ed8}
+  .tag.g{background:#dcfce7;color:#15803d}
+  .tag.r{background:#fee2e2;color:#b91c1c}
+  .tag.n{background:#f1f5f9;color:#475569}
+  .tabbar{height:58px;border-top:1px solid #e2e8f0;background:#fff;display:flex;flex:none;position:relative;z-index:5}
+  .tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;color:#94a3b8}
+  .tabbar div i{font-style:normal;font-size:18px;line-height:1;opacity:.55}
+  .tabbar div.on{color:#2563eb;font-weight:600}
+  .tabbar div.on i{opacity:1}
+  .hdr{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:0 18px 16px;flex:none;position:relative;z-index:5}
+  .hdr .sb{color:#fff;padding-left:6px;padding-right:6px}
+  .btn{background:#2563eb;color:#fff;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:600}
+  .bar{border-top:1px solid #e2e8f0;background:#fff;padding:11px 16px;display:flex;justify-content:space-between;align-items:center;flex:none;position:relative;z-index:5}
+  .map{position:absolute;inset:0;background:#eaefe9;overflow:hidden}
+  .map .g{position:absolute;inset:0;background-image:linear-gradient(#dde5dc 1px,transparent 1px),linear-gradient(90deg,#dde5dc 1px,transparent 1px);background-size:46px 46px}
+  .map .rd{position:absolute;background:#fff}
+  .pin{position:absolute;background:#fff;border:1px solid #cbd5e1;border-radius:11px;padding:3px 8px;font-size:11px;font-weight:700;box-shadow:0 2px 7px rgba(15,23,42,.16);white-space:nowrap}
+  .pin.on{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.45)}
+  .dot{position:absolute;width:15px;height:15px;border-radius:50%;background:#2563eb;border:2.5px solid #fff;box-shadow:0 0 0 7px rgba(37,99,235,.16)}
+  .stat{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px}
+  .stat .k{font-size:10.5px;color:#94a3b8}
+  .stat .v{font-size:21px;font-weight:700;letter-spacing:-.6px;margin-top:2px;font-feature-settings:"tnum"}
+  .bars{display:flex;align-items:flex-end;gap:6px;height:52px}
+  .bars i{flex:1;border-radius:2px;background:#93c5fd;display:block}
+  .bars i.on{background:#2563eb}
+  .bars i.bad{background:#fca5a5}
+  .note{font-size:11px;color:#94a3b8;text-align:center;margin-top:9px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<h1>公共停车场预约系统 · 小程序 UI 稿 v1</h1>
+<p class="lead">
+  依据 2026-09-10 定稿 PM 的需求分析章节设计。视觉方向 = <b>秩序科技蓝</b>；角色 = <b>单小程序首次选身份</b>；首页 = <b>地图铺满 + 底部可上拖面板</b>。
+  车主端 tab 为 <b>3 个（首页 / 订单 / 我的）</b>，遵循 PM FR-U11 的「订单中心」单模块定义；车场端 4 个（看板 / 预约 / 车场 / 我的）。
+  预约路径 = <b>两屏</b>（详情 → 确认），只选到达时刻，窗口 <b>[现在, 现在+2h]</b>；<br>计费 = <b>预支停车费（预留小时数向上取整 × 车场首小时标准价，平台代收转付车场，出场闸机计费时抵扣）+ 平台服务费 ¥2</b>。<br>分层：<b>免费</b> = 搜索 / 智能推荐 / 导航前往；<b>付费</b> = 预约锁位。
+</p>
+
+<div class="grid">
+
+<!-- ================= 1 ================= -->
+<figure>
+  <figcaption>1 · 身份选择 <em>pages/role-select</em></figcaption>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+    <div style="padding:76px 26px 0;text-align:center;flex:1;display:flex;flex-direction:column">
+      <div style="font-size:25px;font-weight:700;letter-spacing:-.5px">选择你的身份</div>
+      <div style="font-size:12.5px;color:#94a3b8;margin-top:9px">可随时在「我的」中切换</div>
+
+      <div style="margin-top:40px;border:2px solid #2563eb;background:#eff6ff;border-radius:14px;padding:24px 20px;text-align:left">
+        <div style="font-size:30px">🚗</div>
+        <div style="font-size:19px;font-weight:700;color:#1d4ed8;margin-top:12px">我是车主</div>
+        <div style="font-size:12.5px;color:#475569;line-height:1.85;margin-top:8px">找车位 · 比价 · 预约锁位<br>车牌识别入场 · 在线缴费</div>
+      </div>
+
+      <div style="margin-top:16px;border:2px solid #e2e8f0;background:#fff;border-radius:14px;padding:24px 20px;text-align:left">
+        <div style="font-size:30px">🏢</div>
+        <div style="font-size:19px;font-weight:700;color:#334155;margin-top:12px">我是车场方</div>
+        <div style="font-size:12.5px;color:#475569;line-height:1.85;margin-top:8px">车位额度 · 收费规则<br>预约看板 · 对账结算</div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div class="btn" style="height:48px;font-size:15px;margin-bottom:26px">进入</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 2 ================= -->
+<figure>
+  <figcaption>2 · 首页（车主端） <em>pages/home</em></figcaption>
+  <div class="phone">
+    <div class="map">
+      <div class="g"></div>
+      <div class="rd" style="left:-12%;top:36%;width:130%;height:13px;transform:rotate(-4deg)"></div>
+      <div class="rd" style="left:-12%;top:71%;width:130%;height:10px;transform:rotate(3deg)"></div>
+      <div class="rd" style="left:33%;top:-10%;width:11px;height:120%;transform:rotate(6deg)"></div>
+      <div class="rd" style="left:70%;top:-10%;width:9px;height:120%"></div>
+      <div class="dot" style="left:44%;top:51%"></div>
+      <div class="pin on" style="left:20%;top:34%">¥6 · 320m</div>
+      <div class="pin" style="left:57%;top:63%">¥5 · 890m</div>
+      <div class="pin" style="left:12%;top:74%"><span class="bad">紧张</span></div>
+    </div>
+
+    <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+
+    <div style="margin:4px 14px 0;background:#fff;border-radius:8px;height:40px;display:flex;align-items:center;padding:0 13px;font-size:13px;color:#94a3b8;box-shadow:0 3px 12px rgba(15,23,42,.15);position:relative;z-index:5">
+      🔍 搜目的地 / 车场
+      <span style="margin-left:auto;color:#2563eb;font-weight:600;font-size:12.5px">地图</span>
+    </div>
+    <div style="margin:9px 14px 0;display:flex;gap:7px;position:relative;z-index:5">
+      <span class="chip on">综合</span><span class="chip">距离</span><span class="chip">价格</span><span class="chip">空位</span>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -6px 24px rgba(15,23,42,.16);padding:9px 16px 0;position:relative;z-index:5">
+      <div style="width:38px;height:4px;border-radius:2px;background:#cbd5e1;margin:0 auto 11px"></div>
+      <div style="font-size:11.5px;color:#94a3b8;margin-bottom:9px">附近 12 个车场 · 已按综合评分排序</div>
+
+      <div class="card" style="border-color:#2563eb;box-shadow:0 2px 9px rgba(37,99,235,.16)">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">万象城地下停车场</div>
+          <div style="font-size:17px;font-weight:700;color:#2563eb;letter-spacing:-.5px">¥6<span style="font-size:10px;font-weight:400">/时</span></div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:5px">步行 320m · 余位 <b class="ok">46</b>/500 · 综合 <b>92</b> 分</div>
+        <div style="margin-top:7px;display:flex;gap:6px">
+          <span class="tag">比周边省 ¥4</span><span class="tag g">空位充足</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">银座商城 P2 停车场</div>
+          <div style="font-size:17px;font-weight:700;color:#2563eb;letter-spacing:-.5px">¥5<span style="font-size:10px;font-weight:400">/时</span></div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:5px">步行 890m · 余位 <b class="ok">112</b>/300 · 综合 <b>88</b> 分</div>
+        <div style="margin-top:7px;display:flex;gap:6px">
+          <span class="tag">单价最低</span><span class="tag n">有充电桩</span>
+        </div>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+
+    <div class="tabbar">
+      <div class="on"><i>◉</i>首页</div><div><i>▤</i>订单</div><div><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 3 ================= -->
+<figure>
+  <figcaption>3 · 搜索（地图搜索 + 智能推荐） <em>pages/search</em></figcaption>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+
+    <div style="padding:2px 14px 11px;flex:none;position:relative;z-index:5;display:flex;align-items:center;gap:9px">
+      <span style="color:#2563eb;font-size:19px;line-height:1">‹</span>
+      <div style="flex:1;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;height:36px;display:flex;align-items:center;padding:0 12px;font-size:13px">
+        🏥 市第一人民医院<span style="color:#2563eb;font-weight:600;margin-left:5px">|</span>
+        <span style="margin-left:auto;color:#94a3b8;font-size:12px">取消</span>
+      </div>
+    </div>
+
+    <div style="height:266px;position:relative;flex:none;overflow:hidden;background:#eaefe9">
+      <div style="position:absolute;inset:0;background-image:linear-gradient(#dde5dc 1px,transparent 1px),linear-gradient(90deg,#dde5dc 1px,transparent 1px);background-size:46px 46px"></div>
+      <div style="position:absolute;left:-12%;top:46%;width:130%;height:12px;background:#fff;transform:rotate(-3deg)"></div>
+      <div style="position:absolute;left:38%;top:-10%;width:10px;height:120%;background:#fff"></div>
+      <div style="position:absolute;left:73%;top:-10%;width:8px;height:120%;background:#fff;transform:rotate(5deg)"></div>
+      <div class="dot" style="position:absolute;left:19%;top:64%"></div>
+      <div class="pin on" style="position:absolute;left:22%;top:26%">★ 推荐 · 齐鲁医院 ¥5</div>
+      <div class="pin" style="position:absolute;left:40%;top:58%">市第一人民医院 ¥4</div>
+      <div class="pin" style="position:absolute;left:58%;top:17%">省中医 ¥4</div>
+    </div>
+
+    <div style="display:flex;gap:7px;padding:11px 14px 9px;flex:none">
+      <span class="chip on">综合推荐</span><span class="chip">距离最近</span><span class="chip">费用最低</span><span class="chip">空位最多</span>
+    </div>
+
+    <div class="body" style="padding-top:0;flex:1;overflow:hidden">
+      <div class="card" style="border-color:#2563eb;box-shadow:0 2px 9px rgba(37,99,235,.15)">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">齐鲁医院地下停车场</div>
+          <div style="font-size:17px;font-weight:700;color:#2563eb;letter-spacing:-.5px">¥5<span style="font-size:10px;font-weight:400">/时</span></div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:5px">840m · 步行 11 分钟 · 余位 <b class="ok">96</b>/420 · 综合 <b>89</b> 分</div>
+        <div style="margin-top:7px;display:flex;gap:6px">
+          <span class="tag">距医院最近</span><span class="tag g">空位充足</span>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:11px">
+          <div style="flex:1;border:1px solid #cbd5e1;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#334155">导航前往</div>
+          <div style="flex:1.2;background:#2563eb;color:#fff;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">预约车位</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">市第一人民医院停车场</div>
+          <div style="font-size:17px;font-weight:700;color:#2563eb;letter-spacing:-.5px">¥4<span style="font-size:10px;font-weight:400">/时</span></div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:5px">1.2km · 步行 16 分钟 · 余位 <b class="bad">3</b>/800 · 综合 <b>71</b> 分</div>
+        <div style="margin-top:7px;display:flex;gap:6px"><span class="tag r">高峰紧张</span></div>
+        <div style="display:flex;gap:9px;margin-top:11px">
+          <div style="flex:1;border:1px solid #cbd5e1;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#334155">导航前往</div>
+          <div style="flex:1.2;border:1px solid #2563eb;color:#2563eb;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">预约车位</div>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 4 ================= -->
+<figure>
+  <figcaption>4 · 车场详情 <em>pages/lot-detail</em></figcaption>
+  <div class="phone">
+    <div style="height:210px;position:relative;flex:none" class="map">
+      <div class="g"></div>
+      <div class="rd" style="left:-12%;top:52%;width:130%;height:11px;transform:rotate(-3deg)"></div>
+      <div class="rd" style="left:40%;top:-10%;width:10px;height:120%"></div>
+      <div class="pin on" style="left:34%;top:41%">万象城地下停车场</div>
+      <div class="sb" style="position:absolute;top:0;left:0;right:0;color:#0f172a"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="position:absolute;top:52px;left:16px;background:rgba(255,255,255,.94);border-radius:999px;padding:5px 13px;font-size:12.5px;font-weight:500">‹ 返回</div>
+    </div>
+
+    <div style="flex:1;overflow:hidden;padding:0 14px;background:#f8fafc">
+      <div class="card" style="margin-top:-18px;position:relative;z-index:4;padding:14px">
+        <div class="row">
+          <div style="font-size:17px;font-weight:700">万象城地下停车场</div>
+          <div style="font-size:12.5px;color:#f59e0b;font-weight:700">★ 4.8</div>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-top:6px">历下区经十路 1234 号 · 步行 320m</div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <div class="stat"><div class="k">实时余位</div><div class="v ok">46<span style="font-size:12px;color:#94a3b8;font-weight:400">/500</span></div></div>
+          <div class="stat"><div class="k">标准收费</div><div class="v pri">¥6<span style="font-size:12px;color:#94a3b8;font-weight:400">/时</span></div></div>
+          <div class="stat"><div class="k">营业时间</div><div class="v" style="font-size:15px;padding-top:4px">24 小时</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">未来 2 小时空闲预测 <span class="tag n" style="margin-left:5px">15 分钟粒度</span></div>
+        <div class="bars">
+          <i style="height:78%"></i><i style="height:62%"></i><i class="on" style="height:44%"></i>
+          <i class="bad" style="height:22%"></i><i style="height:50%"></i><i style="height:70%"></i>
+        </div>
+        <div style="display:flex;gap:6px;font-size:9.5px;color:#a1a1aa;margin-top:7px;text-align:center">
+          <span style="flex:1">14:00</span><span style="flex:1">14:30</span><span style="flex:1">15:00</span>
+          <span style="flex:1">15:30</span><span style="flex:1">16:00</span><span style="flex:1">16:30</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">收费规则</div>
+        <div class="row" style="font-size:12px;padding:3px 0"><span class="muted">首小时</span><span>¥6.00</span></div>
+        <div class="row" style="font-size:12px;padding:3px 0"><span class="muted">后续每小时（阶梯）</span><span>¥5.00</span></div>
+        <div class="row" style="font-size:12px;padding:3px 0"><span class="muted">计费步长</span><span>15 分钟</span></div>
+        <div class="row" style="font-size:12px;padding:3px 0"><span class="muted">单日封顶</span><span>¥40.00</span></div>
+        <div class="row" style="font-size:12px;padding:3px 0"><span class="muted">夜间（22:00–08:00）</span><span>¥3.00/时</span></div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:8px">可预约额度</div>
+        <div style="font-size:12px" class="muted">本车场已开放 <b class="pri">120</b> 个预约车位，当前时段剩余 <b class="ok">82</b></div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;line-height:1.7">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</div>
+      </div>
+      <div style="height:14px"></div>
+    </div>
+
+    <div class="bar" style="gap:10px">
+      <div style="flex:1;border:1px solid #cbd5e1;border-radius:999px;height:46px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:600;color:#334155">导航前往</div>
+      <div class="btn" style="flex:1.5;height:46px;font-size:14.5px">预约车位</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 5 ================= -->
+<figure>
+  <figcaption>5 · 预约确认 <em>pages/booking-confirm</em></figcaption>
+  <div class="phone">
+    <div class="hdr">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="font-size:13px;opacity:.9">‹ 返回 &nbsp;&nbsp; 确认预约</div>
+    </div>
+
+    <div class="body" style="padding-top:12px">
+      <div style="font-size:15px;font-weight:700">万象城地下停车场</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">历下区经十路 1234 号</div>
+
+      <div style="font-size:12.5px;font-weight:700;margin:20px 0 10px">到达时间 <span class="weak" style="font-weight:400">· 最早现在，最迟 2 小时内</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="chip on">13:40<span style="opacity:.75;font-size:10px"> 现在</span></span>
+        <span class="chip">14:10<span style="opacity:.6;font-size:10px"> · 30 分</span></span>
+        <span class="chip">14:40<span style="opacity:.6;font-size:10px"> · 1 时</span></span>
+        <span class="chip">15:10<span style="opacity:.6;font-size:10px"> · 1.5 时</span></span>
+        <span class="chip">15:40<span style="opacity:.6;font-size:10px"> · 2 时</span></span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:9px">预支停车费按预留时长计算，不足 1 小时按 1 小时</div>
+
+      <div class="card" style="margin-top:18px">
+        <div class="row" style="font-size:13px"><span class="muted">预约车牌</span><span style="font-weight:600">京A·8F2K9 ›</span></div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">费用明细</div>
+        <div class="row" style="font-size:12.5px;padding:4px 0"><span class="muted">预支停车费 · 按 1 小时计 × ¥6</span><span>¥6.00</span></div>
+        <div class="row" style="font-size:12.5px;padding:4px 0"><span class="muted">平台服务费</span><span>¥2.00</span></div>
+        <div class="row" style="font-size:12.5px;padding:8px 0 0;border-top:1px solid #f1f5f9;margin-top:7px">
+          <span class="muted">若选 15:40 到达（预留 2 小时）</span><span class="pri" style="font-weight:600">¥14.00</span>
+        </div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:7px;line-height:1.7">预支停车费由平台代收后转付车场，出场时闸机按实际停放时长计费并抵扣</div>
+      </div>
+
+      <div class="card" style="background:#f8fafc">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:8px">预约规则</div>
+        <div style="font-size:11.5px;line-height:2" class="muted">
+          · 入场截止 <b style="color:#0f172a">13:55</b>（到达时间 + 15 分钟），超时车位自动释放并记违约 1 次<br>
+          · 支付后 10 分钟内可免费改签；之后改签退预支停车费，服务费不退<br>
+          · 出场时由车场闸机按实际时长计费，预支停车费直接抵扣
+        </div>
+      </div>
+    </div>
+
+    <div class="bar">
+      <div>
+        <div style="font-size:10.5px" class="weak">合计</div>
+        <div style="font-size:21px;font-weight:700;color:#2563eb;letter-spacing:-.6px">¥8.00</div>
+      </div>
+      <div class="btn" style="padding:14px 40px;font-size:15px">提交预约</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 6 ================= -->
+<figure>
+  <figcaption>6 · 预约凭证 <em>pages/reservation-ticket</em></figcaption>
+  <div class="phone">
+    <div class="hdr" style="padding-top:0">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="text-align:center;padding:6px 0 4px">
+        <div style="font-size:36px;line-height:1">✓</div>
+        <div style="font-size:19px;font-weight:700;margin-top:8px">预约成功</div>
+        <div style="font-size:12px;opacity:.85;margin-top:6px">车位已为你锁定，车牌将自动识别放行</div>
+      </div>
+    </div>
+
+    <div class="body" style="padding-top:14px">
+      <div class="card" style="margin-top:-30px;position:relative;z-index:4;padding:18px;text-align:center">
+        <svg viewBox="-1 -1 27 27" width="150" height="150" style="display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:10px;padding:7px;box-sizing:content-box;background:#fff"><g fill="#0f172a"><rect x="0" y="0" width="1" height="1"/><rect x="1" y="0" width="1" height="1"/><rect x="2" y="0" width="1" height="1"/><rect x="3" y="0" width="1" height="1"/><rect x="4" y="0" width="1" height="1"/><rect x="5" y="0" width="1" height="1"/><rect x="6" y="0" width="1" height="1"/><rect x="9" y="0" width="1" height="1"/><rect x="11" y="0" width="1" height="1"/><rect x="16" y="0" width="1" height="1"/><rect x="18" y="0" width="1" height="1"/><rect x="19" y="0" width="1" height="1"/><rect x="20" y="0" width="1" height="1"/><rect x="21" y="0" width="1" height="1"/><rect x="22" y="0" width="1" height="1"/><rect x="23" y="0" width="1" height="1"/><rect x="24" y="0" width="1" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="6" y="1" width="1" height="1"/><rect x="13" y="1" width="1" height="1"/><rect x="16" y="1" width="1" height="1"/><rect x="18" y="1" width="1" height="1"/><rect x="24" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="2" y="2" width="1" height="1"/><rect x="3" y="2" width="1" height="1"/><rect x="4" y="2" width="1" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="8" y="2" width="1" height="1"/><rect x="10" y="2" width="1" height="1"/><rect x="11" y="2" width="1" height="1"/><rect x="12" y="2" width="1" height="1"/><rect x="18" y="2" width="1" height="1"/><rect x="20" y="2" width="1" height="1"/><rect x="21" y="2" width="1" height="1"/><rect x="22" y="2" width="1" height="1"/><rect x="24" y="2" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="2" y="3" width="1" height="1"/><rect x="3" y="3" width="1" height="1"/><rect x="4" y="3" width="1" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="10" y="3" width="1" height="1"/><rect x="11" y="3" width="1" height="1"/><rect x="12" y="3" width="1" height="1"/><rect x="13" y="3" width="1" height="1"/><rect x="15" y="3" width="1" height="1"/><rect x="18" y="3" width="1" height="1"/><rect x="20" y="3" width="1" height="1"/><rect x="21" y="3" width="1" height="1"/><rect x="22" y="3" width="1" height="1"/><rect x="24" y="3" width="1" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="2" y="4" width="1" height="1"/><rect x="3" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="10" y="4" width="1" height="1"/><rect x="13" y="4" width="1" height="1"/><rect x="18" y="4" width="1" height="1"/><rect x="20" y="4" width="1" height="1"/><rect x="21" y="4" width="1" height="1"/><rect x="22" y="4" width="1" height="1"/><rect x="24" y="4" width="1" height="1"/><rect x="0" y="5" width="1" height="1"/><rect x="6" y="5" width="1" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="10" y="5" width="1" height="1"/><rect x="12" y="5" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="16" y="5" width="1" height="1"/><rect x="18" y="5" width="1" height="1"/><rect x="24" y="5" width="1" height="1"/><rect x="0" y="6" width="1" height="1"/><rect x="1" y="6" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="3" y="6" width="1" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="5" y="6" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="11" y="6" width="1" height="1"/><rect x="15" y="6" width="1" height="1"/><rect x="16" y="6" width="1" height="1"/><rect x="18" y="6" width="1" height="1"/><rect x="19" y="6" width="1" height="1"/><rect x="20" y="6" width="1" height="1"/><rect x="21" y="6" width="1" height="1"/><rect x="22" y="6" width="1" height="1"/><rect x="23" y="6" width="1" height="1"/><rect x="24" y="6" width="1" height="1"/><rect x="9" y="7" width="1" height="1"/><rect x="10" y="7" width="1" height="1"/><rect x="11" y="7" width="1" height="1"/><rect x="12" y="7" width="1" height="1"/><rect x="13" y="7" width="1" height="1"/><rect x="14" y="7" width="1" height="1"/><rect x="15" y="7" width="1" height="1"/><rect x="16" y="7" width="1" height="1"/><rect x="0" y="8" width="1" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="3" y="8" width="1" height="1"/><rect x="5" y="8" width="1" height="1"/><rect x="7" y="8" width="1" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="14" y="8" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="19" y="8" width="1" height="1"/><rect x="20" y="8" width="1" height="1"/><rect x="21" y="8" width="1" height="1"/><rect x="22" y="8" width="1" height="1"/><rect x="23" y="8" width="1" height="1"/><rect x="24" y="8" width="1" height="1"/><rect x="0" y="9" width="1" height="1"/><rect x="3" y="9" width="1" height="1"/><rect x="8" y="9" width="1" height="1"/><rect x="10" y="9" width="1" height="1"/><rect x="12" y="9" width="1" height="1"/><rect x="17" y="9" width="1" height="1"/><rect x="19" y="9" width="1" height="1"/><rect x="21" y="9" width="1" height="1"/><rect x="22" y="9" width="1" height="1"/><rect x="24" y="9" width="1" height="1"/><rect x="1" y="10" width="1" height="1"/><rect x="4" y="10" width="1" height="1"/><rect x="5" y="10" width="1" height="1"/><rect x="6" y="10" width="1" height="1"/><rect x="9" y="10" width="1" height="1"/><rect x="11" y="10" width="1" height="1"/><rect x="15" y="10" width="1" height="1"/><rect x="17" y="10" width="1" height="1"/><rect x="18" y="10" width="1" height="1"/><rect x="19" y="10" width="1" height="1"/><rect x="20" y="10" width="1" height="1"/><rect x="21" y="10" width="1" height="1"/><rect x="2" y="11" width="1" height="1"/><rect x="3" y="11" width="1" height="1"/><rect x="9" y="11" width="1" height="1"/><rect x="11" y="11" width="1" height="1"/><rect x="16" y="11" width="1" height="1"/><rect x="17" y="11" width="1" height="1"/><rect x="18" y="11" width="1" height="1"/><rect x="20" y="11" width="1" height="1"/><rect x="21" y="11" width="1" height="1"/><rect x="23" y="11" width="1" height="1"/><rect x="24" y="11" width="1" height="1"/><rect x="0" y="12" width="1" height="1"/><rect x="3" y="12" width="1" height="1"/><rect x="7" y="12" width="1" height="1"/><rect x="8" y="12" width="1" height="1"/><rect x="10" y="12" width="1" height="1"/><rect x="12" y="12" width="1" height="1"/><rect x="13" y="12" width="1" height="1"/><rect x="14" y="12" width="1" height="1"/><rect x="15" y="12" width="1" height="1"/><rect x="18" y="12" width="1" height="1"/><rect x="19" y="12" width="1" height="1"/><rect x="20" y="12" width="1" height="1"/><rect x="21" y="12" width="1" height="1"/><rect x="22" y="12" width="1" height="1"/><rect x="23" y="12" width="1" height="1"/><rect x="0" y="13" width="1" height="1"/><rect x="1" y="13" width="1" height="1"/><rect x="2" y="13" width="1" height="1"/><rect x="3" y="13" width="1" height="1"/><rect x="5" y="13" width="1" height="1"/><rect x="6" y="13" width="1" height="1"/><rect x="7" y="13" width="1" height="1"/><rect x="9" y="13" width="1" height="1"/><rect x="11" y="13" width="1" height="1"/><rect x="12" y="13" width="1" height="1"/><rect x="15" y="13" width="1" height="1"/><rect x="17" y="13" width="1" height="1"/><rect x="18" y="13" width="1" height="1"/><rect x="19" y="13" width="1" height="1"/><rect x="20" y="13" width="1" height="1"/><rect x="22" y="13" width="1" height="1"/><rect x="1" y="14" width="1" height="1"/><rect x="2" y="14" width="1" height="1"/><rect x="4" y="14" width="1" height="1"/><rect x="7" y="14" width="1" height="1"/><rect x="8" y="14" width="1" height="1"/><rect x="11" y="14" width="1" height="1"/><rect x="13" y="14" width="1" height="1"/><rect x="17" y="14" width="1" height="1"/><rect x="21" y="14" width="1" height="1"/><rect x="22" y="14" width="1" height="1"/><rect x="1" y="15" width="1" height="1"/><rect x="2" y="15" width="1" height="1"/><rect x="4" y="15" width="1" height="1"/><rect x="7" y="15" width="1" height="1"/><rect x="8" y="15" width="1" height="1"/><rect x="10" y="15" width="1" height="1"/><rect x="13" y="15" width="1" height="1"/><rect x="14" y="15" width="1" height="1"/><rect x="15" y="15" width="1" height="1"/><rect x="17" y="15" width="1" height="1"/><rect x="22" y="15" width="1" height="1"/><rect x="23" y="15" width="1" height="1"/><rect x="4" y="16" width="1" height="1"/><rect x="6" y="16" width="1" height="1"/><rect x="10" y="16" width="1" height="1"/><rect x="13" y="16" width="1" height="1"/><rect x="18" y="16" width="1" height="1"/><rect x="21" y="16" width="1" height="1"/><rect x="24" y="16" width="1" height="1"/><rect x="8" y="17" width="1" height="1"/><rect x="11" y="17" width="1" height="1"/><rect x="13" y="17" width="1" height="1"/><rect x="15" y="17" width="1" height="1"/><rect x="16" y="17" width="1" height="1"/><rect x="19" y="17" width="1" height="1"/><rect x="21" y="17" width="1" height="1"/><rect x="24" y="17" width="1" height="1"/><rect x="0" y="18" width="1" height="1"/><rect x="1" y="18" width="1" height="1"/><rect x="2" y="18" width="1" height="1"/><rect x="3" y="18" width="1" height="1"/><rect x="4" y="18" width="1" height="1"/><rect x="5" y="18" width="1" height="1"/><rect x="6" y="18" width="1" height="1"/><rect x="8" y="18" width="1" height="1"/><rect x="10" y="18" width="1" height="1"/><rect x="11" y="18" width="1" height="1"/><rect x="12" y="18" width="1" height="1"/><rect x="16" y="18" width="1" height="1"/><rect x="17" y="18" width="1" height="1"/><rect x="19" y="18" width="1" height="1"/><rect x="20" y="18" width="1" height="1"/><rect x="24" y="18" width="1" height="1"/><rect x="0" y="19" width="1" height="1"/><rect x="6" y="19" width="1" height="1"/><rect x="8" y="19" width="1" height="1"/><rect x="11" y="19" width="1" height="1"/><rect x="12" y="19" width="1" height="1"/><rect x="14" y="19" width="1" height="1"/><rect x="18" y="19" width="1" height="1"/><rect x="23" y="19" width="1" height="1"/><rect x="0" y="20" width="1" height="1"/><rect x="2" y="20" width="1" height="1"/><rect x="3" y="20" width="1" height="1"/><rect x="4" y="20" width="1" height="1"/><rect x="6" y="20" width="1" height="1"/><rect x="8" y="20" width="1" height="1"/><rect x="9" y="20" width="1" height="1"/><rect x="14" y="20" width="1" height="1"/><rect x="16" y="20" width="1" height="1"/><rect x="20" y="20" width="1" height="1"/><rect x="21" y="20" width="1" height="1"/><rect x="22" y="20" width="1" height="1"/><rect x="24" y="20" width="1" height="1"/><rect x="0" y="21" width="1" height="1"/><rect x="2" y="21" width="1" height="1"/><rect x="3" y="21" width="1" height="1"/><rect x="4" y="21" width="1" height="1"/><rect x="6" y="21" width="1" height="1"/><rect x="8" y="21" width="1" height="1"/><rect x="9" y="21" width="1" height="1"/><rect x="10" y="21" width="1" height="1"/><rect x="11" y="21" width="1" height="1"/><rect x="13" y="21" width="1" height="1"/><rect x="16" y="21" width="1" height="1"/><rect x="18" y="21" width="1" height="1"/><rect x="19" y="21" width="1" height="1"/><rect x="21" y="21" width="1" height="1"/><rect x="23" y="21" width="1" height="1"/><rect x="24" y="21" width="1" height="1"/><rect x="0" y="22" width="1" height="1"/><rect x="2" y="22" width="1" height="1"/><rect x="3" y="22" width="1" height="1"/><rect x="4" y="22" width="1" height="1"/><rect x="6" y="22" width="1" height="1"/><rect x="8" y="22" width="1" height="1"/><rect x="9" y="22" width="1" height="1"/><rect x="13" y="22" width="1" height="1"/><rect x="14" y="22" width="1" height="1"/><rect x="19" y="22" width="1" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="23" y="22" width="1" height="1"/><rect x="24" y="22" width="1" height="1"/><rect x="0" y="23" width="1" height="1"/><rect x="6" y="23" width="1" height="1"/><rect x="12" y="23" width="1" height="1"/><rect x="15" y="23" width="1" height="1"/><rect x="16" y="23" width="1" height="1"/><rect x="18" y="23" width="1" height="1"/><rect x="19" y="23" width="1" height="1"/><rect x="21" y="23" width="1" height="1"/><rect x="0" y="24" width="1" height="1"/><rect x="1" y="24" width="1" height="1"/><rect x="2" y="24" width="1" height="1"/><rect x="3" y="24" width="1" height="1"/><rect x="4" y="24" width="1" height="1"/><rect x="5" y="24" width="1" height="1"/><rect x="6" y="24" width="1" height="1"/><rect x="8" y="24" width="1" height="1"/><rect x="10" y="24" width="1" height="1"/><rect x="12" y="24" width="1" height="1"/><rect x="14" y="24" width="1" height="1"/><rect x="18" y="24" width="1" height="1"/><rect x="20" y="24" width="1" height="1"/><rect x="21" y="24" width="1" height="1"/><rect x="23" y="24" width="1" height="1"/><rect x="24" y="24" width="1" height="1"/></g></svg>
+        <div style="font-size:15px;font-weight:700;margin-top:14px;letter-spacing:1px">京A·8F2K9</div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:5px">PR20260911004821</div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="font-size:13px;padding:4px 0"><span class="muted">车场</span><span style="font-weight:600">万象城地下停车场</span></div>
+        <div class="row" style="font-size:13px;padding:4px 0"><span class="muted">到达时间</span><span style="font-weight:600">今天 13:40</span></div>
+        <div class="row" style="font-size:13px;padding:4px 0"><span class="muted">入场截止</span><span style="font-weight:700" class="warn">13:55 · 剩 14 分钟</span></div>
+        <div class="row" style="font-size:13px;padding:4px 0"><span class="muted">已支付</span><span style="font-weight:600">¥8.00</span></div>
+      </div>
+
+      <div class="card" style="background:#fffbeb;border-color:#fde68a">
+        <div style="font-size:11.5px;line-height:1.85;color:#92400e">
+          <b>入场方式</b>：车辆驶近道闸时摄像头自动识别车牌，匹配有效预约后开闸，无需扫码。<br>
+          若道闸未自动开闸，请在车场端出示本页凭证人工核销。
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">费用去向</div>
+        <div class="row" style="font-size:12.5px;padding:3px 0"><span class="muted">预支停车费 · 预留 1 小时 → 车场</span><span>¥6.00</span></div>
+        <div class="row" style="font-size:12.5px;padding:3px 0"><span class="muted">平台服务费</span><span>¥2.00</span></div>
+        <div style="font-size:10.5px;color:#94a3b8;margin-top:8px;line-height:1.7">
+          预支停车费由平台代收后转付车场，出场时按实际时长计费并抵扣；平台服务费为平台收入。
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="font-size:12.5px;padding:3px 0"><span class="muted">车场地址</span><span>历下区经十路 1234 号</span></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <div style="flex:1;border:1px solid #e2e8f0;background:#fff;border-radius:999px;height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:#334155">改签</div>
+        <div style="flex:1;border:1px solid #e2e8f0;background:#fff;border-radius:999px;height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:#334155">取消预约</div>
+        <div style="flex:1.3" class="btn"><span style="font-size:13.5px">导航前往</span></div>
+      </div>
+    </div>
+    <div style="height:24px;flex:none"></div>
+  </div>
+</figure>
+
+<!-- ================= 7 ================= -->
+<figure>
+  <figcaption>7 · 订单中心 <em>pages/orders</em></figcaption>
+  <div class="phone">
+    <div class="hdr" style="padding-bottom:0">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="font-size:17px;font-weight:700;padding:4px 0 14px">订单</div>
+      <div style="display:flex;gap:22px;font-size:13.5px;padding-bottom:11px">
+        <span style="font-weight:700;border-bottom:2.5px solid #fff;padding-bottom:7px">待入场 <span style="opacity:.75">1</span></span>
+        <span style="opacity:.7">进行中</span><span style="opacity:.7">已完成</span><span style="opacity:.7">违约</span>
+      </div>
+    </div>
+
+    <div class="body" style="padding-top:14px;background:#f8fafc">
+      <div class="card" style="border-color:#2563eb;box-shadow:0 2px 9px rgba(37,99,235,.14)">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">万象城地下停车场</div>
+          <div class="tag">待入场</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:7px">京A·8F2K9 · 到达 今天 13:40</div>
+        <div style="font-size:11.5px;margin-top:4px" class="warn">入场截止 13:55 · 剩 14 分钟</div>
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <div style="flex:1;border:1px solid #e2e8f0;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#334155">取消</div>
+          <div style="flex:1.4;background:#2563eb;color:#fff;border-radius:999px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">查看凭证</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">银座商城 P2 停车场</div>
+          <div class="tag g">进行中</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:7px">鲁B·3T7M1 · 入场 今天 10:12</div>
+        <div class="row" style="margin-top:7px">
+          <span style="font-size:11.5px" class="weak">已停放 3 小时 28 分</span>
+          <span style="font-size:14px;font-weight:700" class="pri">¥18.00</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">恒隆广场停车场</div>
+          <div class="tag n">已完成</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:7px">京A·8F2K9 · 9月9日 14:20 – 16:05</div>
+        <div class="row" style="margin-top:7px">
+          <span style="font-size:11.5px" class="weak">实付</span>
+          <span style="font-size:14px;font-weight:700">¥14.00</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700">市第一人民医院停车场</div>
+          <div class="tag r">已违约</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:7px">9月6日 · 超时未入场，车位自动释放</div>
+        <div style="font-size:11.5px;margin-top:4px" class="bad">信用分 −10 · 累计违约 1/3</div>
+      </div>
+      <div style="height:14px"></div>
+    </div>
+
+    <div class="tabbar">
+      <div><i>◉</i>首页</div><div class="on"><i>▤</i>订单</div><div><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 8 ================= -->
+<figure>
+  <figcaption>8 · 我的（车主端） <em>pages/profile</em></figcaption>
+  <div class="phone">
+    <div class="hdr" style="padding-bottom:22px">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="display:flex;align-items:center;gap:13px;padding-top:6px">
+        <div style="width:52px;height:52px;border-radius:26px;background:rgba(255,255,255,.24);flex:none"></div>
+        <div>
+          <div style="font-size:16.5px;font-weight:700">138****6621</div>
+          <div style="font-size:11.5px;opacity:.85;margin-top:4px">信用分 <b>100</b> · 违约 0 次 · 已绑定 1 辆车</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="body" style="padding-top:0">
+      <div class="card" style="margin-top:-14px;position:relative;z-index:4;border:1.5px dashed #2563eb;background:#eff6ff">
+        <div class="row">
+          <div>
+            <div style="font-size:13.5px;font-weight:700;color:#1d4ed8">当前身份：车主</div>
+            <div style="font-size:11.5px;color:#475569;margin-top:4px">切换到车场方管理端</div>
+          </div>
+          <div style="font-size:12.5px;color:#2563eb;font-weight:700">切换 ›</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;padding:0">
+        <div class="row" style="padding:14px;border-bottom:1px solid #f1f5f9;font-size:13.5px"><span>我的车辆</span><span class="weak">京A·8F2K9 ›</span></div>
+        <div class="row" style="padding:14px;border-bottom:1px solid #f1f5f9;font-size:13.5px"><span>预约记录</span><span class="weak">›</span></div>
+        <div class="row" style="padding:14px;border-bottom:1px solid #f1f5f9;font-size:13.5px"><span>信用与违约</span><span class="weak">100 分 ›</span></div>
+        <div class="row" style="padding:14px;font-size:13.5px"><span>发票管理</span><span class="weak">›</span></div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="row" style="padding:14px;border-bottom:1px solid #f1f5f9;font-size:13.5px"><span>消息通知</span><span class="weak">已开启 ›</span></div>
+        <div class="row" style="padding:14px;font-size:13.5px"><span>隐私与授权</span><span class="weak">›</span></div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div><i>◉</i>首页</div><div><i>▤</i>订单</div><div class="on"><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 9 ================= -->
+<figure>
+  <figcaption>9 · 车场端看板 <em>pages/owner/dashboard</em></figcaption>
+  <div class="phone">
+    <div class="hdr" style="padding-bottom:18px">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="font-size:16.5px;font-weight:700;padding-top:4px">万象城地下停车场</div>
+      <div style="font-size:11.5px;opacity:.85;margin-top:5px">9 月 11 日 周五 · 营业中</div>
+    </div>
+
+    <div class="body" style="padding-top:12px">
+      <div style="display:flex;gap:9px;margin-top:-30px">
+        <div class="stat" style="position:relative;z-index:4"><div class="k">今日预约</div><div class="v">38</div></div>
+        <div class="stat" style="position:relative;z-index:4;border-color:#bbf7d0"><div class="k">履约率</div><div class="v ok">94<span style="font-size:12px">%</span></div></div>
+        <div class="stat" style="position:relative;z-index:4;border-color:#bfdbfe"><div class="k">今日收入</div><div class="v pri">2840</div></div>
+      </div>
+
+      <div class="card" style="margin-top:9px">
+        <div class="row" style="margin-bottom:9px">
+          <span style="font-size:12.5px;font-weight:700">可预约额度</span>
+          <span style="font-size:12px;color:#2563eb;font-weight:600">调整 ›</span>
+        </div>
+        <div style="font-size:12px" class="muted">总车位 <b style="color:#0f172a">500</b> · 可预约 <b class="pri">120</b> · 已锁定 <b style="color:#d97706">38</b> · 剩余 <b class="ok">82</b></div>
+        <div style="height:8px;background:#e2e8f0;border-radius:4px;margin-top:9px;overflow:hidden;display:flex">
+          <div style="width:20%;background:#2563eb"></div>
+          <div style="width:8%;background:#fbbf24"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">未来 2 小时空闲预测</div>
+        <div class="bars">
+          <i style="height:74%"></i><i style="height:58%"></i><i class="on" style="height:40%"></i>
+          <i style="height:26%"></i><i style="height:50%"></i><i style="height:68%"></i>
+        </div>
+      </div>
+
+      <div class="card" style="background:#eff6ff;border-color:#bfdbfe">
+        <div class="row">
+          <div>
+            <div style="font-size:11.5px;color:#1d4ed8">平台代收 · 待结算</div>
+            <div style="font-size:19px;font-weight:700;color:#1d4ed8;letter-spacing:-.5px;margin-top:3px">¥1,284.00</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10.5px" class="weak">本月累计</div>
+            <div style="font-size:13px;font-weight:700;margin-top:3px">¥12,460</div>
+          </div>
+        </div>
+        <div style="font-size:10.5px;color:#64748b;margin-top:8px">预支停车费由平台代收，T+1 结算；平台服务费 ¥2/单 为平台收入</div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-bottom:8px"><span style="font-size:12.5px;font-weight:700">待核销</span><span style="font-size:12px;color:#2563eb;font-weight:600">全部 ›</span></div>
+        <div class="row" style="font-size:12.5px;padding:7px 0;border-top:1px solid #f1f5f9">
+          <span>京A·8F2K9 <span class="weak">13:40 到达</span></span><span class="ok" style="font-weight:600">已到场</span>
+        </div>
+        <div class="row" style="font-size:12.5px;padding:7px 0;border-top:1px solid #f1f5f9">
+          <span>鲁B·3T7M1 <span class="weak">14:10 到达</span></span><span class="warn" style="font-weight:600">途中</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="on"><i>◉</i>看板</div><div><i>▤</i>预约</div><div><i>▦</i>车场</div><div><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 10 ================= -->
+<figure>
+  <figcaption>10 · 车场端预约管理 <em>pages/owner/reservations</em></figcaption>
+  <div class="phone">
+    <div class="hdr" style="padding-bottom:0">
+      <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+      <div style="font-size:17px;font-weight:700;padding:4px 0 14px">预约管理</div>
+      <div style="display:flex;gap:20px;font-size:13px;padding-bottom:11px">
+        <span style="font-weight:700;border-bottom:2.5px solid #fff;padding-bottom:7px">全部 38</span>
+        <span style="opacity:.7">待入场 6</span><span style="opacity:.7">已入场 29</span><span style="opacity:.7">违约 3</span>
+      </div>
+    </div>
+
+    <div class="body" style="padding-top:14px">
+      <div class="card" style="border-color:#2563eb">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700;letter-spacing:.5px">京A·8F2K9</div>
+          <div class="tag g">已到场</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:6px">到达 13:40 · 入场截止 13:55 · 已付预支 ¥8.00</div>
+        <div style="display:flex;gap:10px;margin-top:11px">
+          <div style="flex:1;border:1px solid #e2e8f0;border-radius:999px;height:34px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#334155">详情</div>
+          <div style="flex:1.5;background:#16a34a;color:#fff;border-radius:999px;height:34px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">人工核销开闸</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700;letter-spacing:.5px">鲁B·3T7M1</div>
+          <div class="tag">待入场</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:6px">到达 14:10 · 入场截止 14:25 · 已付预支 ¥8.00</div>
+        <div style="display:flex;gap:10px;margin-top:11px">
+          <div style="flex:1;border:1px solid #e2e8f0;border-radius:999px;height:34px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#334155">详情</div>
+          <div style="flex:1.5;border:1px solid #e2e8f0;border-radius:999px;height:34px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#94a3b8">未到场</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700;letter-spacing:.5px">鲁A·5K2X8</div>
+          <div class="tag g">已入场</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:6px">入场 12:05 · 已停放 1 小时 35 分 · 闸机计费中</div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-size:14.5px;font-weight:700;letter-spacing:.5px">鲁C·9M4T2</div>
+          <div class="tag r">已违约</div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin-top:6px">到达 11:30 · 超时未入场，车位已自动释放</div>
+        <div style="font-size:11.5px;margin-top:5px" class="bad">服务费 ¥2.00 不退 · 预支停车费已原路退回</div>
+      </div>
+      <div style="height:14px"></div>
+    </div>
+
+    <div class="tabbar">
+      <div><i>◉</i>看板</div><div class="on"><i>▤</i>预约</div><div><i>▦</i>车场</div><div><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 11 ================= -->
+<figure>
+  <figcaption>11 · 车场端「车场」配置中心 <em>pages/owner/lot</em></figcaption>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+    <div class="body" style="padding-top:6px">
+      <div style="font-size:17px;font-weight:700;padding:6px 0 14px">车场</div>
+
+      <div class="card" style="padding:0">
+        <div style="padding:14px;border-bottom:1px solid #f1f5f9">
+          <div class="row"><span style="font-size:13.5px;font-weight:600">车场信息</span><span class="weak" style="font-size:12px">›</span></div>
+          <div style="font-size:11.5px;color:#94a3b8;margin-top:6px">万象城地下停车场 · 历下区经十路 1234 号</div>
+        </div>
+        <div style="padding:14px;border-bottom:1px solid #f1f5f9">
+          <div class="row"><span style="font-size:13.5px;font-weight:600">营业时间与图片</span><span class="weak" style="font-size:12px">24 小时 ›</span></div>
+        </div>
+        <div class="row" style="padding:14px;font-size:13.5px">
+          <span style="font-weight:600">车位额度</span><span class="weak" style="font-size:12px">可预约 120 / 500 ›</span>
+        </div>
+      </div>
+
+      <div style="font-size:11.5px;color:#94a3b8;margin:20px 0 9px 2px">即将开放</div>
+
+      <div class="card" style="padding:0;background:#fafafa">
+        <div class="row" style="padding:14px;border-bottom:1px solid #f1f5f9">
+          <span style="font-size:13.5px;font-weight:600;color:#94a3b8">收费配置</span>
+          <span class="tag n">搁置</span>
+        </div>
+        <div class="row" style="padding:14px">
+          <span style="font-size:13.5px;font-weight:600;color:#94a3b8">对账结算</span>
+          <span class="tag n">搁置</span>
+        </div>
+      </div>
+
+      <div class="card" style="background:#f8fafc">
+        <div style="font-size:11.5px;line-height:1.85" class="muted">
+          收费配置与对账结算将在二期开放。当前预支停车费按车场标准首小时价自动生成，账单由平台代收后 T+1 结算，无需人工配置。
+        </div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div><i>◉</i>看板</div><div><i>▤</i>预约</div><div class="on"><i>▦</i>车场</div><div><i>◍</i>我的</div>
+    </div>
+  </div>
+</figure>
+
+<!-- ================= 12 ================= -->
+<figure>
+  <figcaption>12 · 车位额度调整 <em>pages/owner/quota</em></figcaption>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+    <div class="nav"><span class="back">‹ 返回</span><div class="t">车位额度</div></div>
+
+    <div class="body" style="padding-top:8px">
+      <div class="card" style="text-align:center;padding:26px">
+        <div style="font-size:11.5px" class="weak">开放预约车位数</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:26px;margin-top:12px">
+          <div style="width:46px;height:46px;border-radius:23px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:24px;color:#64748b">−</div>
+          <div style="font-size:44px;font-weight:700;letter-spacing:-1.5px;color:#2563eb;font-feature-settings:'tnum'">120</div>
+          <div style="width:46px;height:46px;border-radius:23px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:24px;color:#2563eb">+</div>
+        </div>
+        <div style="font-size:11.5px;color:#94a3b8;margin-top:12px">总车位 500 · 上限 400</div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="font-size:13px;padding:5px 0"><span class="muted">已锁定（未来 2 小时）</span><span style="font-weight:600">38</span></div>
+        <div class="row" style="font-size:13px;padding:5px 0"><span class="muted">当前可放出</span><span style="font-weight:600" class="ok">82</span></div>
+        <div class="row" style="font-size:13px;padding:5px 0"><span class="muted">今日履约率</span><span style="font-weight:600">94%</span></div>
+      </div>
+
+      <div class="card" style="background:#fffbeb;border-color:#fde68a">
+        <div style="font-size:11.5px;line-height:1.85;color:#92400e">
+          额度按 <b>未来 2 小时生效</b>。调整后已锁定的预约不受影响，超出新额度的部分需等已有预约释放后才能放出。
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:12.5px;font-weight:700;margin-bottom:9px">预估影响</div>
+        <div style="font-size:11.5px;line-height:1.9" class="muted">
+          按当前履约率 94% 与均价 ¥6/时估算：<br>
+          额度 120 → 每提高 10 个，日均可多承接约 <b style="color:#0f172a">7 单</b>，日均增收约 <b class="pri">¥84</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="bar"><div style="flex:1" class="btn"><span style="font-size:15px">保存并生效</span></div></div>
+  </div>
+</figure>
+
+</div>
+
+<p class="note">— 共 12 屏 · 车主端 8 屏 / 车场端 4 屏 —</p>
+
+<script>
+/* 单屏导出模式：screens.html#only-3 只渲染第 3 屏，供 Chrome headless 逐屏截图 */
+(function () {
+  var m = /^#only-(\d+)$/.exec(location.hash);
+  if (!m) return;
+  var idx = parseInt(m[1], 10);
+  var figs = document.querySelectorAll('.grid figure');
+  if (!figs[idx - 1]) return;
+  document.querySelector('h1').style.display = 'none';
+  document.querySelector('.lead').style.display = 'none';
+  document.querySelector('.note').style.display = 'none';
+  for (var i = 0; i < figs.length; i++) {
+    if (i !== idx - 1) figs[i].style.display = 'none';
+  }
+  document.querySelector('.grid').style.gridTemplateColumns = '375px';
+  document.querySelector('.grid').style.marginTop = '0';
+  document.body.style.padding = '0';
+  document.body.style.background = '#ffffff';
+})();
+</script>
+
+</body>
+</html>
