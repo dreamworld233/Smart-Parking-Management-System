@@ -1,0 +1,33 @@
+.tabbar {
+  display: flex;
+  height: 100rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-surface);
+  border-top: 2rpx solid var(--color-border);
+}
+
+.tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  font-size: 21rpx;
+  color: var(--color-text-weak);
+}
+
+.tabbar__item--on {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.tabbar__icon {
+  font-size: 36rpx;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.tabbar__item--on .tabbar__icon {
+  opacity: 1;
+}
