@@ -20,9 +20,23 @@
    - 若有「授权 IP」/「签名校验」选项，**留空 / 关闭**。小程序发起的请求出口 IP 不固定，绑 IP 会导致调用失败
 4. 如果需要绑定小程序：在 Key 配置里填写**微信小程序 AppID** `wx657c73ccec33ea8d`。AppID 在微信小程序后台 → **设置** → **帐号信息** 里能看到。
 5. 保存，复制生成的 Key。
-6. 把 Key 填进 `miniprogram/config.ts` 的 `QQMAP_KEY`。
+6. 把 Key 填进 **`miniprogram/config.local.ts`**（⚠️ **不是** `config.ts`）：
 
-> Key 是一串形如 `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX` 的字符。**不要提交到公开仓库**——本项目是私有仓库所以直接写进 `config.ts` 可以接受，但如果之后要开源，需要改成从环境/配置中心注入。
+   ```bash
+   cp miniprogram/config.local.example.ts miniprogram/config.local.ts
+   ```
+
+   然后编辑 `miniprogram/config.local.ts`：
+
+   ```ts
+   export const QQMAP_KEY = 'TKSBZ-你的新Key'
+   ```
+
+> ⚠️ **本仓库是公开的**（`dreamworld233/Smart-Parking-Management-System`）。
+> Key 一旦提交，爬虫几分钟内就能扫到；配额被刷爆后，线上地图会直接调不通。
+> **永远不要把 Key 写进 `config.ts` 或任何被 git 跟踪的文件。**
+
+`config.local.ts` 已在 `.gitignore` 中。`config.ts` 会自动读取它；文件不存在时回退到占位符 `REPLACE_WITH_YOUR_KEY`，所以新克隆的项目**仍然能编译通过**（只是地图接口会报 `INVALID_KEY`，直到你填上自己的 Key）。
 
 **配额**：腾讯位置服务的 WebServiceAPI 个人开发者有每日免费额度（搜索、逆地址解析等各接口分别计数）。课程演示规模远够用，但压测或反复刷列表时留意别打爆。具体数值以控制台「配额」页为准，官方会调整。
 

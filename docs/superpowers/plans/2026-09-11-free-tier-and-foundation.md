@@ -1960,22 +1960,11 @@ git commit -m "feat: add role selection page"
 
 只声明实际用到的接口。`wx.openLocation`（导航前往）不需要声明。
 
-- [ ] **Step 1: 写配置**
+- [ ] **Step 1: 确认配置（已在 2026-09-11 提前落地）**
 
-Create `miniprogram/config.ts`：
+`miniprogram/config.ts` 与 `miniprogram/config.local.example.ts` 已存在并提交，无需重写。`config.ts` 从 `.gitignore` 保护的 `config.local.ts` 读取真实 Key，缺失时回退到占位符——本仓库是**公开**的，Key 不得提交。
 
-```ts
-/** 腾讯位置服务 Key。在小程序后台配置 request 合法域名 https://apis.map.qq.com */
-export const QQMAP_KEY = 'REPLACE_WITH_YOUR_KEY'
-
-/** 首页默认搜索半径（米） */
-export const DEFAULT_RADIUS_M = 3000
-
-/** 请求超时（毫秒）。失败重试 1 次 */
-export const REQUEST_TIMEOUT_MS = 3000
-```
-
-> ⚠️ `QQMAP_KEY` 必须替换为真实 Key 后再联调，否则 `qqmap` 全部调用返回 `INVALID_KEY`。
+联调前确认 `miniprogram/config.local.ts` 存在（`cp miniprogram/config.local.example.ts miniprogram/config.local.ts` 后填入 Key）。没有它的话 `qqmap` 全部调用返回 `INVALID_KEY`。
 
 - [ ] **Step 2: 写定位服务**
 
