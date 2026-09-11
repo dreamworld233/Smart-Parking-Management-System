@@ -1624,9 +1624,16 @@ export function setDefaultPlate(plate: string): void {
   wx.setStorageSync(PLATE_KEY, plate)
 }
 
+/**
+ * 三个字段全查。只验 token 的话，`{ token: 'x' }` 这种半残对象会被当成有效会话放行，
+ * 而拿它去请求会在更远的地方以更难查的方式失败 —— 缺字段一律按未登录处理
+ */
 export function getSession(): Session | null {
   const s = wx.getStorageSync(SESSION_KEY)
-  return s && typeof s.token === 'string' ? (s as Session) : null
+  if (!s || typeof s.token !== 'string' || typeof s.userId !== 'string' || typeof s.expireAt !== 'number') {
+    return null
+  }
+  return s as Session
 }
 
 export function setSession(session: Session): void {
