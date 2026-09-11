@@ -1215,7 +1215,7 @@ export function topRecommendations(lots: ParkingLot[], ctx: Omit<ScoreContext, '
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `npm test -- scoring`
-Expected: PASS，16 passed
+Expected: PASS（该文件的测试随后扩充到 29 条，见本节末尾的「实施后修正」）
 
 - [ ] **Step 5: 写失败的测试（排序）**
 
@@ -1318,6 +1318,19 @@ Expected: PASS，全部通过
 git add miniprogram/domain/scoring.ts miniprogram/domain/sort.ts miniprogram/domain/__tests__/scoring.test.ts miniprogram/domain/__tests__/sort.test.ts
 git commit -m "feat(domain): add five-factor scoring and sorting"
 ```
+
+> **实施后修正** —— 上面的代码块是初版规格。本任务落地后又经过两轮修复评审，`miniprogram/domain/scoring.ts` 与 `sort.ts` 的**当前内容**才是准。主要差异：
+>
+> - 新增 `FREE_FLOOR = 1 - SATURATION_THRESHOLD`。PM 的 0.85 是**占用率**上限，直接拿它比 `freeRate` 会把空位充足的车场判成饱和，还会让归一化落到负区间。
+> - 新增 `availabilityLevel(freeRate)` 与 `AVAILABILITY_WARN_RATIO`，把空位档位收进领域层 —— 页面原先自定 0.1 / 0.25 两个阈值，会和评分对同一车场给出相反结论。Task 15 已改为调用它。
+> - 五个因子一律经 `clamp01` 夹到 0–1，`lowerIsBetter` 对空集合返回 1。此前 `lot ∉ allLots` 时距离因子能算出 1.99，`freeSpots > totalSpots` 时综合分能到 127。
+> - 「是否饱和」只在 `scoreLot` 里判定一次，再传给 `toneFor` / `buildReasons`，取代原来三处各自重算。
+> - `COMMUTE_WEIGHTS` 抬 `fee` 的同时下调 `distance` 到 0.05，否则权重合计 1.1、满分变 110。
+> - `topRecommendations` 签名为 `Omit<ScoreContext, 'allLots' | 'hasCharging'>` —— 该参数恒被车场自身 tags 覆盖，原签名会让 Task 13/14 的调用编不过。
+> - 理由里的金额差额先四舍五入到分（`5.1 - 5` 渲染出来是 `¥0.09999999999999964`）；`单价最低` 只在候选间真有价差时才产出。
+> - `sortLots` 对未知 key 兜底为综合排序 —— `sort(undefined)` 不抛错，只会静默不排序，而 Task 7 会从存储里恢复排序状态。
+>
+> 收尾测试数：`scoring.test.ts` 29 条、`sort.test.ts` 6 条，全仓 66 条通过。
 
 ---
 
@@ -3485,7 +3498,7 @@ git commit -m "feat: implement search page with map and recommendations"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { formatAmount, formatDistance, formatSpots } from '../../domain/format'
-import { scoreLot } from '../../domain/scoring'
+import { availabilityLevel, scoreLot } from '../../domain/scoring'
 import type { ParkingLot } from '../../domain/types'
 import { fetchNearbyLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
@@ -3548,7 +3561,8 @@ Page({
         distanceText: formatDistance(lot.distanceM),
         walkText: `${lot.walkMinutes} 分钟`,
         spotsText: formatSpots(free, total),
-        freeClass: rate < 0.1 ? 'bad' : rate < 0.25 ? 'warn' : 'ok',
+        // 档位由领域层判定，页面不自定阈值：自定 0.1 / 0.25 会让色条与评分对同一车场给出相反结论
+        freeClass: availabilityLevel(rate),
         freeRatePercent: Math.round(rate * 100),
         priceText: formatAmount(lot.pricing.firstHour),
         nextHourText: formatAmount(lot.pricing.perHourAfter),
