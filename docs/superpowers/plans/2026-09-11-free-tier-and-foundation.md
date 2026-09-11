@@ -549,11 +549,18 @@ export interface ScoreFactors {
   reputation: number
 }
 
+/** 推荐理由的整体基调，由领域层判定，页面据此选标签配色 */
+export type ReasonTone = 'good' | 'bad' | 'plain'
+
 export interface Recommendation {
   lot: ParkingLot
+  /** 四舍五入后的 0–100 整数 */
   score: number
   factors: ScoreFactors
+  /** 可解释推荐理由的展示文案 */
   reasons: string[]
+  /** 理由基调。页面不得用 reasons 里的中文文案做字符串比较 */
+  tone: ReasonTone
 }
 
 export type SortKey = 'composite' | 'distance' | 'fee' | 'availability'
@@ -680,8 +687,9 @@ export const PLATFORM_SERVICE_FEE = 2
  */
 export function leadHours(now: Date, arrive: Date): number {
   const diffMs = arrive.getTime() - now.getTime()
-  if (diffMs <= 0) return 1
-  return Math.max(1, Math.ceil(diffMs / (60 * 60 * 1000)))
+  // 非有限值（含 Invalid Date 产生的 NaN）与已过期都按 1 小时兜底
+  if (!(diffMs > 0) || !Number.isFinite(diffMs)) return 1
+  return Math.ceil(diffMs / (60 * 60 * 1000))
 }
 
 /**
@@ -700,10 +708,10 @@ export interface Quote {
 }
 
 export function quoteTotal(now: Date, arrive: Date, firstHourRate: number): Quote {
-  const hours = leadHours(now, arrive)
-  const prepaid = hours * firstHourRate
+  // 复用 prepaidParkingFee，避免计费公式在两处各写一遍后悄悄分叉
+  const prepaid = prepaidParkingFee(now, arrive, firstHourRate)
   return {
-    leadHours: hours,
+    leadHours: leadHours(now, arrive),
     prepaidParkingFee: prepaid,
     serviceFee: PLATFORM_SERVICE_FEE,
     totalAmount: prepaid + PLATFORM_SERVICE_FEE,
@@ -998,6 +1006,18 @@ describe('scoreLot', () => {
     expect(r.reasons.length).toBeLessThanOrEqual(3)
   })
 
+  it('基调：空位充足为 good', () => {
+    const r = scoreLot(lot(), { allLots: [lot()], hasCharging: false, userNeedsCharging: false })
+    expect(r.tone).toBe('good')
+  })
+
+  it('基调：高饱和为 bad', () => {
+    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'estimated' } }), {
+      allLots: [lot()], hasCharging: false, userNeedsCharging: false,
+    })
+    expect(r.tone).toBe('bad')
+  })
+
   it('饱和警戒线为 0.85', () => {
     expect(SATURATION_THRESHOLD).toBe(0.85)
   })
@@ -1014,7 +1034,7 @@ Expected: FAIL，`Cannot find module '../scoring'`
 Create `miniprogram/domain/scoring.ts`：
 
 ```ts
-import type { ParkingLot, Recommendation, ScoreFactors } from './types'
+import type { ParkingLot, ReasonTone, Recommendation, ScoreFactors } from './types'
 
 /** 占用率超过该值即为饱和，推荐时降权或剔除（PM 2.2） */
 export const SATURATION_THRESHOLD = 0.85
@@ -1103,7 +1123,17 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
     score: Math.round(raw * 100),
     factors,
     reasons: buildReasons(lot, ctx, factors, freeRate),
+    tone: toneFor(freeRate, factors),
   }
+}
+
+/**
+ * 推荐理由的整体基调，由领域层判定，页面只管渲染。
+ * 页面不得用 reasons 里的中文文案做字符串比较来选颜色。
+ */
+function toneFor(freeRate: number, factors: ScoreFactors): ReasonTone {
+  if (freeRate < SATURATION_THRESHOLD) return 'bad'
+  return factors.availability >= 0.6 || factors.fee >= 0.8 || factors.distance >= 0.8 ? 'good' : 'plain'
 }
 
 function buildReasons(
@@ -1146,7 +1176,7 @@ export function topRecommendations(lots: ParkingLot[], ctx: Omit<ScoreContext, '
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `npm test -- scoring`
-Expected: PASS，13 passed
+Expected: PASS，15 passed
 
 - [ ] **Step 5: 写失败的测试（排序）**
 
@@ -3140,7 +3170,7 @@ Page({
       lot: rec.lot,
       score: rec.score,
       reasons: rec.reasons,
-      tone: rec.reasons[0] === '高峰紧张' ? 'bad' : 'good',
+      tone: rec.tone,
       distanceText: formatDistance(rec.lot.distanceM),
       walkText: `${rec.lot.walkMinutes} 分钟`,
       spotsText: formatSpots(free, total),
