@@ -354,6 +354,10 @@ type Reservation = {
 |---|---|---|
 | **Skyline + `map` 原生组件** | ~~`map` 是原生组件，浮层压其上历来有层级问题~~ **已实测排除** | ✅ **2026-09-11 验证通过**，见下方「验证结论」，首页按原案实现 |
 | **车流预测服务** | 真实预测模型不在本阶段范围，详情页的预测柱是由实时空闲率推导的占位曲线（`lot-detail.ts` 的 `buildForecast`） | 接入真实预测服务后替换；在此之前界面不得把它说成真实预测 |
+| **`custom-tab-bar`** | 角色切换需按角色重建 tabBar，Skyline 下行为需实测 | 验证页：两套 tabBar 切换 |
+| **腾讯地图 Key** | 需在小程序后台配 `getLocation` 权限描述 + 位置服务 Key + 域名白名单 `https://apis.map.qq.com` | 用户申请（appid `wx657c73ccec33ea8d`） |
+| **`font-feature-settings: "tnum"`** | Skyline 支持情况未知 | 实测；不生效退化 |
+| **估算数据的可信度** | 车位数为估算，答辩可能被质疑 | 界面标注数据来源；PM 风险表中「预测精度」已有应对（双模型 + 置信度展示） |
 
 ### 验证结论：Skyline 下地图浮层（2026-09-11）
 
@@ -369,10 +373,6 @@ type Reservation = {
 **结论**：D7 的「地图铺满 + 底部可上拖面板」可原样实现，无需退回「固定上下分栏」，也无需把首页单独切回 WebView 渲染。
 
 验证中修掉的一个坑：面板收起态最初写成 `min-height: 60vh` + 硬编码 `translateY(420px)`，在 iPhone 8（667px 高）上面板顶部算出来是 687px，**整块跑到屏幕外，拖拽把手摸不到**——而这种现象与「手势被地图吃掉」无法区分，会导致错误的架构降级。改为按 `wx.getWindowInfo().windowHeight` 算出面板高度、收起时恒定露出 96px 把手后解决。
-| **`custom-tab-bar`** | 角色切换需按角色重建 tabBar，Skyline 下行为需实测 | 验证页：两套 tabBar 切换 |
-| **腾讯地图 Key** | 需在小程序后台配 `getLocation` 权限描述 + 位置服务 Key + 域名白名单 `https://apis.map.qq.com` | 用户申请（appid `wx657c73ccec33ea8d`） |
-| **`font-feature-settings: "tnum"`** | Skyline 支持情况未知 | 实测；不生效退化 |
-| **估算数据的可信度** | 车位数为估算，答辩可能被质疑 | 界面标注数据来源；PM 风险表中「预测精度」已有应对（双模型 + 置信度展示） |
 
 ---
 
