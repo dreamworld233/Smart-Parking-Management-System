@@ -2633,7 +2633,7 @@ function toVM(rec: Recommendation): CardVM {
     lot: rec.lot,
     score: rec.score,
     reasons: rec.reasons,
-    tone: rec.reasons[0] === '高峰紧张' ? 'bad' : 'good',
+    tone: rec.tone,
     distanceText: formatDistance(rec.lot.distanceM),
     walkText: `${rec.lot.walkMinutes} 分钟`,
     spotsText: formatSpots(free, total),
