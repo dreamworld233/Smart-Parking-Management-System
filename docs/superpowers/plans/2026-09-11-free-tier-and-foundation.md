@@ -714,7 +714,7 @@ export function quoteTotal(now: Date, arrive: Date, firstHourRate: number): Quot
 - [ ] **Step 5: 运行测试确认通过**
 
 Run: `npm test -- pricing`
-Expected: PASS，11 passed
+Expected: PASS，10 passed
 
 - [ ] **Step 6: 提交**
 
