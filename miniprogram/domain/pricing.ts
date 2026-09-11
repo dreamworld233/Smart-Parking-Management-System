@@ -7,8 +7,10 @@ export const PLATFORM_SERVICE_FEE = 2
  */
 export function leadHours(now: Date, arrive: Date): number {
   const diffMs = arrive.getTime() - now.getTime()
-  // 非有限值（含 Invalid Date 产生的 NaN）与已过期都按 1 小时兜底
-  if (!(diffMs > 0) || !Number.isFinite(diffMs)) return 1
+  // 故意写成 !(diffMs > 0) 而不是 diffMs <= 0：
+  // 后者对 NaN 求值为 false，会让 Invalid Date 一路算成 NaN 费用。
+  // 取反这一层是承重的，别"简化"掉。
+  if (!(diffMs > 0)) return 1
   return Math.ceil(diffMs / (60 * 60 * 1000))
 }
 

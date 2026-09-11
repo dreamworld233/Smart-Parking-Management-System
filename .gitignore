@@ -5,6 +5,9 @@ node_modules/
 miniprogram_npm/
 project.private.config.json
 
+# 本地私密配置：腾讯位置服务 Key（本仓库公开，Key 不得提交）
+miniprogram/config.local.ts
+
 # 编译产物
 dist/
 build/
