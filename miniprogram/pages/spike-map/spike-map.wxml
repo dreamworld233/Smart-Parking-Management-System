@@ -1,0 +1,39 @@
+<view class="wrap">
+  <map
+    id="spikeMap"
+    class="map"
+    latitude="{{lat}}"
+    longitude="{{lng}}"
+    scale="15"
+    show-location
+    enable-3D="{{false}}"
+  />
+
+  <!-- 验证点 1：普通 view 能否压在 map 之上 -->
+  <view class="float-search">浮层能否压住地图？</view>
+
+  <!-- 验证点 2：chips 行 -->
+  <view class="float-chips">
+    <view class="chip chip--on">综合</view>
+    <view class="chip">距离</view>
+    <view class="chip">价格</view>
+  </view>
+
+  <!-- 验证点 3：底部面板 + 拖拽手势 -->
+  <view
+    class="sheet"
+    style="transform: translateY({{sheetY}}px);"
+    bindtouchstart="onSheetTouchStart"
+    bindtouchmove="onSheetTouchMove"
+    bindtouchend="onSheetTouchEnd"
+  >
+    <view class="sheet__handle" />
+    <view class="sheet__title">面板可拖拽 · 当前 {{sheetY}}px</view>
+    <view class="sheet__card">万象城地下停车场 ¥6/时</view>
+    <view class="sheet__card">银座商城 P2 停车场 ¥5/时</view>
+    <view class="sheet__card">市第一人民医院停车场 ¥4/时</view>
+  </view>
+
+  <!-- 验证点 4：cover-view 对照组 -->
+  <cover-view class="cover-probe">cover-view 对照</cover-view>
+</view>

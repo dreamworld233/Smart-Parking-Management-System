@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/spike-map/spike-map",
     "pages/index/index",
     "pages/logs/logs"
   ],
