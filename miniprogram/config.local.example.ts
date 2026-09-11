@@ -5,5 +5,6 @@
 //
 //   cp miniprogram/config.local.example.ts miniprogram/config.local.ts
 //
+// ⚠️ 不要直接把 Key 写在本文件里。本文件是被 git 跟踪的模板，写在这里等于公开。
 // 申请步骤见 docs/setup/tencent-map-setup.md
 export const QQMAP_KEY = '在这里填你的腾讯位置服务 Key'
