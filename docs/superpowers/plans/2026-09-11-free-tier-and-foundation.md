@@ -2691,9 +2691,10 @@ git commit -m "feat(components): add lot card and sort chips"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { sortLots } from '../../domain/sort'
-import { topRecommendations } from '../../domain/scoring'
+import { availabilityLevel, topRecommendations } from '../../domain/scoring'
+import type { AvailabilityLevel } from '../../domain/scoring'
 import { formatDistance, formatSpots } from '../../domain/format'
-import type { ParkingLot, Recommendation, SortKey } from '../../domain/types'
+import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
 import { fetchNearbyLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
 
@@ -2731,11 +2732,12 @@ interface CardVM {
   lot: ParkingLot
   score: number
   reasons: string[]
-  tone: string
+  tone: ReasonTone
   distanceText: string
   walkText: string
   spotsText: string
-  freeClass: string
+  // 用领域类型而非 string：下次有人想在这里再写死一个阈值时，是类型错误而不是静默分叉
+  freeClass: AvailabilityLevel
 }
 
 function toVM(rec: Recommendation): CardVM {
@@ -2750,7 +2752,7 @@ function toVM(rec: Recommendation): CardVM {
     distanceText: formatDistance(rec.lot.distanceM),
     walkText: `${rec.lot.walkMinutes} 分钟`,
     spotsText: formatSpots(free, total),
-    freeClass: rate < 0.1 ? 'bad' : rate < 0.25 ? 'warn' : 'ok',
+    freeClass: availabilityLevel(rate),
   }
 }
 
@@ -3180,7 +3182,7 @@ git commit -m "feat: implement home page with map, recommendations and sorting"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { formatDistance, formatSpots } from '../../domain/format'
-import { topRecommendations } from '../../domain/scoring'
+import { availabilityLevel, topRecommendations } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
 import type { Recommendation, SortKey } from '../../domain/types'
 import { fetchNearbyLots } from '../../services/lot'
@@ -3287,7 +3289,7 @@ Page({
       distanceText: formatDistance(rec.lot.distanceM),
       walkText: `${rec.lot.walkMinutes} 分钟`,
       spotsText: formatSpots(free, total),
-      freeClass: rate < 0.1 ? 'bad' : rate < 0.25 ? 'warn' : 'ok',
+      freeClass: availabilityLevel(rate),
     }
   },
 
