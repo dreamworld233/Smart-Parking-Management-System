@@ -2691,7 +2691,7 @@ git commit -m "feat(components): add lot card and sort chips"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { sortLots } from '../../domain/sort'
-import { availabilityLevel, topRecommendations } from '../../domain/scoring'
+import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { formatDistance, formatSpots } from '../../domain/format'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
@@ -2743,7 +2743,8 @@ interface CardVM {
 function toVM(rec: Recommendation): CardVM {
   const free = rec.lot.availability.freeSpots
   const total = rec.lot.availability.totalSpots
-  const rate = total === 0 ? 0 : free / total
+  // 空闲率的派生（除零、NaN 兜底）只在领域层一处，页面不再自己算
+  const rate = freeRate(rec.lot.availability)
   return {
     lot: rec.lot,
     score: rec.score,
@@ -3182,7 +3183,7 @@ git commit -m "feat: implement home page with map, recommendations and sorting"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { formatDistance, formatSpots } from '../../domain/format'
-import { availabilityLevel, topRecommendations } from '../../domain/scoring'
+import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
 import type { Recommendation, SortKey } from '../../domain/types'
 import { fetchNearbyLots } from '../../services/lot'
@@ -3280,7 +3281,7 @@ Page({
   toVM(rec: Recommendation) {
     const free = rec.lot.availability.freeSpots
     const total = rec.lot.availability.totalSpots
-    const rate = total === 0 ? 0 : free / total
+    const rate = freeRate(rec.lot.availability)
     return {
       lot: rec.lot,
       score: rec.score,
@@ -3566,7 +3567,7 @@ git commit -m "feat: implement search page with map and recommendations"
 ```ts
 import { DEFAULT_RADIUS_M } from '../../config'
 import { formatAmount, formatDistance, formatSpots } from '../../domain/format'
-import { availabilityLevel, scoreLot } from '../../domain/scoring'
+import { availabilityLevel, freeRate, scoreLot } from '../../domain/scoring'
 import type { ParkingLot } from '../../domain/types'
 import { fetchNearbyLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
@@ -3617,7 +3618,7 @@ Page({
       const rec = scoreLot(lot, { allLots: lots, hasCharging: lot.tags.includes('充电桩'), userNeedsCharging: false })
       const free = lot.availability.freeSpots
       const total = lot.availability.totalSpots
-      const rate = total === 0 ? 0 : free / total
+      const rate = freeRate(lot.availability)
 
       this.setData({
         state: 'ready',
