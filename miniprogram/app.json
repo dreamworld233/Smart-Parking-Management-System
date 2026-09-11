@@ -1,12 +1,11 @@
 {
   "pages": [
-    "pages/spike-map/spike-map",
-    "pages/index/index",
-    "pages/logs/logs"
+    "pages/spike-map/spike-map"
   ],
   "window": {
     "navigationBarTextStyle": "black",
-    "navigationStyle": "custom"
+    "navigationStyle": "custom",
+    "backgroundColor": "#f8fafc"
   },
   "style": "v2",
   "renderer": "skyline",

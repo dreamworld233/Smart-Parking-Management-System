@@ -3,13 +3,17 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "author": "",
   "license": "",
-  "dependencies": {
-  },
   "devDependencies": {
-    "miniprogram-api-typings": "^2.8.3-1"
+    "@types/jest": "^30.0.0",
+    "jest": "^30.5.1",
+    "miniprogram-api-typings": "^5.2.3",
+    "ts-jest": "^29.4.12",
+    "typescript": "^6.0.3"
   }
 }
