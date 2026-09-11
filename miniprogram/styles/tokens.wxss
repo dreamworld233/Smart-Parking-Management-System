@@ -1,0 +1,46 @@
+page {
+  /* 主色 */
+  --color-primary: #2563eb;
+  --color-primary-deep: #1e3a8a;
+  --color-primary-soft: #eff6ff;
+
+  /* 语义 */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* 文字 */
+  --color-text: #0f172a;
+  --color-text-sub: #64748b;
+  --color-text-weak: #94a3b8;
+
+  /* 面 */
+  --color-border: #e2e8f0;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+
+  /* 字阶 */
+  --font-amount: 44rpx;
+  --font-title: 36rpx;
+  --font-card-title: 28rpx;
+  --font-body: 26rpx;
+  --font-sub: 24rpx;
+  --font-tag: 22rpx;
+  --font-micro: 20rpx;
+
+  /* 间距 */
+  --space-1: 8rpx;
+  --space-2: 16rpx;
+  --space-3: 24rpx;
+  --space-4: 32rpx;
+  --space-6: 48rpx;
+
+  /* 圆角 */
+  --radius-card: 16rpx;
+  --radius-pill: 999rpx;
+  --radius-sheet: 28rpx;
+
+  /* 阴影 */
+  --shadow-card: 0 2rpx 8rpx rgba(15, 23, 42, 0.06);
+  --shadow-float: 0 8rpx 32rpx rgba(15, 23, 42, 0.16);
+}
