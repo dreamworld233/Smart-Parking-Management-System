@@ -7,6 +7,11 @@
     "navigationStyle": "custom",
     "backgroundColor": "#f8fafc"
   },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于查询并推荐您当前位置周边的停车场"
+    }
+  },
   "style": "v2",
   "renderer": "skyline",
   "rendererOptions": {
