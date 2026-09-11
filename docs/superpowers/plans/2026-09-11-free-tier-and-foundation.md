@@ -291,9 +291,12 @@ git commit -m "chore: add Skyline map overlay spike page and record findings"
 
 ```bash
 npm i -D jest ts-jest @types/jest typescript
+npm i -D miniprogram-api-typings@latest
 ```
 
-Expected: `package.json` 的 `devDependencies` 出现 `jest`、`ts-jest`、`@types/jest`。
+Expected: `package.json` 的 `devDependencies` 出现 `jest`、`ts-jest`、`@types/jest`，`miniprogram-api-typings` 升到 3.x。
+
+> **为什么必须升 typings**：仓库原有的 `miniprogram-api-typings@2.8.3-1` 是 2021 年份的声明集，缺少基础库 2.20.1 之后新增的接口。Task 0 的验证页用了 `wx.getWindowInfo`，在旧 typings 下报 `TS2551: Property 'getWindowInfo' does not exist on type 'Wx'`。运行时没问题（`app.json` 的 `sdkVersionBegin` 是 3.0.0），但类型检查必须干净，否则后续每个 Task 都会淹没在这个假报错里。
 
 - [ ] **Step 2: 写测试配置**
 

@@ -15,7 +15,6 @@ Page({
     cardTaps: 0,
   },
 
-  sheetHeightPx: 0,
   dragStartY: 0,
   dragStartSheetY: 0,
 
@@ -23,7 +22,6 @@ Page({
     const windowHeight = wx.getWindowInfo().windowHeight
     const sheetHeight = Math.round(windowHeight * SHEET_HEIGHT_RATIO)
     const collapsedY = Math.max(0, sheetHeight - HANDLE_PEEK)
-    this.sheetHeightPx = sheetHeight
     // 启动即为收起态，但把手露出 HANDLE_PEEK 高度
     this.setData({ sheetHeight, collapsedY, sheetY: collapsedY })
   },
