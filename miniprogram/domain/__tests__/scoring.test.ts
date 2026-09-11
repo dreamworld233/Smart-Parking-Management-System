@@ -4,6 +4,7 @@ import {
   MEDICAL_WEIGHTS,
   SATURATION_THRESHOLD,
   scoreLot,
+  topRecommendations,
 } from '../scoring'
 import type { ParkingLot } from '../types'
 
@@ -50,7 +51,9 @@ describe('DEFAULT_WEIGHTS', () => {
 })
 
 describe('scoreLot', () => {
-  it('候选只有一个车场时距离与费用因子都取 1', () => {
+  // 单候选时集合内无从比较（min === max），两个因子都走「不惩罚」的兜底分支。
+  // 这条只钉兜底值，不代表费用/距离的排序方向 —— 方向分别由下面两条测试覆盖
+  it('候选只有一个车场时无从比较，距离与费用因子都取 1', () => {
     const r = scoreLot(lot({ distanceM: 0 }), {
       allLots: [lot({ distanceM: 0 })],
       hasCharging: false,
@@ -74,6 +77,17 @@ describe('scoreLot', () => {
       userNeedsCharging: false,
     })
     expect(near.factors.distance).toBeGreaterThan(far.factors.distance)
+  })
+
+  it('费用越低费用因子越高，最低价取 1、最高价取 0', () => {
+    const cheap = lot({ id: 'cheap', pricing: { ...lot().pricing, firstHour: 4 } })
+    const pricey = lot({ id: 'pricey', pricing: { ...lot().pricing, firstHour: 10 } })
+    const allLots = [cheap, pricey]
+    const ctx = { allLots, hasCharging: false, userNeedsCharging: false }
+
+    expect(scoreLot(cheap, ctx).factors.fee).toBe(1)
+    expect(scoreLot(pricey, ctx).factors.fee).toBe(0)
+    expect(scoreLot(cheap, ctx).factors.fee).toBeGreaterThan(scoreLot(pricey, ctx).factors.fee)
   })
 
   it('得分取整且在 0–100 之间', () => {
@@ -142,5 +156,32 @@ describe('scoreLot', () => {
 
   it('饱和警戒线为 0.85', () => {
     expect(SATURATION_THRESHOLD).toBe(0.85)
+  })
+})
+
+describe('topRecommendations', () => {
+  it('按评分降序返回，且不超过 n 条', () => {
+    const lots = [
+      lot({ id: 'a' }),
+      lot({ id: 'b', distanceM: 2000 }),
+      lot({ id: 'c', distanceM: 50 }),
+      lot({ id: 'd', distanceM: 900 }),
+    ]
+    const top = topRecommendations(lots, { hasCharging: false, userNeedsCharging: false }, 2)
+
+    expect(top.length).toBe(2)
+    expect(top[0].score).toBeGreaterThanOrEqual(top[1].score)
+  })
+
+  it('充电桩按各车场自身标签判定，不受 ctx.hasCharging 影响', () => {
+    // ctx.hasCharging 故意传 true：若实现直接沿用调用方的值，两个车场都会拿到 infra 1，
+    // 这条断言就会挂 —— 这正是要钉住「按车场自身 tags 覆盖」的行为
+    const withPile = lot({ id: 'pile', tags: ['充电桩'] })
+    const withoutPile = lot({ id: 'nopile' })
+    const top = topRecommendations([withPile, withoutPile], { hasCharging: true, userNeedsCharging: true }, 2)
+
+    expect(top[0].lot.id).toBe('pile')
+    expect(top[0].factors.infra).toBe(1)
+    expect(top[1].factors.infra).toBe(0)
   })
 })
