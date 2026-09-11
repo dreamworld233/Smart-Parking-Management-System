@@ -1,3 +1,6 @@
+> ⚠️ **本文档已作废（2026-09-11）。** 计划目标是「到达即停」，与需求基线（2026-09-10 定稿）的「未来时段预约锁位」冲突；其中「Mock 数据先驱动开发」也与课程要求「真题真做，不允许随意模拟数据」冲突。
+> 生效文档：`docs/superpowers/specs/2026-09-11-smart-parking-miniprogram-ui-design.md`。新的实现计划将基于该文档重写。
+
 # 微信小程序智能停车（MVP 到达即停）实现计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
