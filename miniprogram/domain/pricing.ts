@@ -7,8 +7,9 @@ export const PLATFORM_SERVICE_FEE = 2
  */
 export function leadHours(now: Date, arrive: Date): number {
   const diffMs = arrive.getTime() - now.getTime()
-  if (diffMs <= 0) return 1
-  return Math.max(1, Math.ceil(diffMs / (60 * 60 * 1000)))
+  // 非有限值（含 Invalid Date 产生的 NaN）与已过期都按 1 小时兜底
+  if (!(diffMs > 0) || !Number.isFinite(diffMs)) return 1
+  return Math.ceil(diffMs / (60 * 60 * 1000))
 }
 
 /**
@@ -27,10 +28,9 @@ export interface Quote {
 }
 
 export function quoteTotal(now: Date, arrive: Date, firstHourRate: number): Quote {
-  const hours = leadHours(now, arrive)
-  const prepaid = hours * firstHourRate
+  const prepaid = prepaidParkingFee(now, arrive, firstHourRate)
   return {
-    leadHours: hours,
+    leadHours: leadHours(now, arrive),
     prepaidParkingFee: prepaid,
     serviceFee: PLATFORM_SERVICE_FEE,
     totalAmount: prepaid + PLATFORM_SERVICE_FEE,
