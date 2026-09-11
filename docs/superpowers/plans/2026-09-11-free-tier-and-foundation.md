@@ -1911,8 +1911,24 @@ git commit -m "feat: add role selection page"
 - Create: `miniprogram/services/location.ts`
 - Create: `miniprogram/services/qqmap.ts`
 - Create: `miniprogram/config.ts`
+- Modify: `miniprogram/app.json`
 
-**前置**：需要腾讯位置服务的 Key，且在小程序后台把 `https://apis.map.qq.com` 加进 request 合法域名。Key 未就绪时本任务的服务会返回明确错误，不影响后续任务的编写与提交。
+**前置**：需要腾讯位置服务的 Key，且在小程序后台把 `https://apis.map.qq.com` 加进 request 合法域名。Key 未就绪时本任务的服务会返回明确错误，不影响后续任务的编写与提交。完整的申请步骤见 `docs/setup/tencent-map-setup.md`。
+
+- [ ] **Step 0: 声明地理位置接口**
+
+`wx.getLocation` 除了后台开通，还必须在 `app.json` 显式声明，否则接口直接 fail、提审也会被拦。在 `miniprogram/app.json` 顶层加两个键：
+
+```json
+"requiredPrivateInfos": ["getLocation"],
+"permission": {
+  "scope.userLocation": {
+    "desc": "用于查询并推荐您当前位置周边的停车场"
+  }
+}
+```
+
+只声明实际用到的接口。`wx.openLocation`（导航前往）不需要声明。
 
 - [ ] **Step 1: 写配置**
 
