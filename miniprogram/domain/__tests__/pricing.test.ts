@@ -30,6 +30,11 @@ describe('leadHours', () => {
     const arrive = new Date('2026-09-11T09:30:00')
     expect(leadHours(now, arrive)).toBe(1)
   })
+
+  it('Invalid Date 产生的 NaN 按 1 小时兜底', () => {
+    const bad = new Date('garbage')
+    expect(leadHours(bad, bad)).toBe(1)
+  })
 })
 
 describe('prepaidParkingFee', () => {
