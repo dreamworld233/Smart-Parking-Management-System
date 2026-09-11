@@ -11,6 +11,25 @@ export const SATURATION_THRESHOLD = 0.85
  */
 export const FREE_FLOOR = 1 - SATURATION_THRESHOLD
 
+/** 空闲率不到饱和线这么多倍时算「接近饱和」。仅用于展示档位，不参与评分 */
+export const AVAILABILITY_WARN_RATIO = 2
+
+export type AvailabilityLevel = 'ok' | 'warn' | 'bad'
+
+/**
+ * 空位展示档位（详情页色条、列表标签用）。
+ *
+ * 阈值全部由 FREE_FLOOR 派生，页面不得自定 0.1 / 0.25 这类数字：
+ * 两套阈值会让色条和评分对同一个车场给出相反结论。
+ * 非有限值按 bad 兜底 —— 数据缺失时宁可显示紧张，也不要显示成「空位充足」。
+ */
+export function availabilityLevel(freeRate: number): AvailabilityLevel {
+  if (!Number.isFinite(freeRate)) return 'bad'
+  if (freeRate <= FREE_FLOOR) return 'bad'
+  if (freeRate <= FREE_FLOOR * AVAILABILITY_WARN_RATIO) return 'warn'
+  return 'ok'
+}
+
 export interface ScoreWeights {
   fee: number
   distance: number

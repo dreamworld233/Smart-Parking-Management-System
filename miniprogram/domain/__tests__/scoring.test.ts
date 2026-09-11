@@ -1,8 +1,11 @@
 import {
+  AVAILABILITY_WARN_RATIO,
   COMMUTE_WEIGHTS,
   DEFAULT_WEIGHTS,
+  FREE_FLOOR,
   MEDICAL_WEIGHTS,
   SATURATION_THRESHOLD,
+  availabilityLevel,
   scoreLot,
   topRecommendations,
 } from '../scoring'
@@ -47,6 +50,46 @@ describe('DEFAULT_WEIGHTS', () => {
       const sum = w.fee + w.distance + w.availability + w.infra + w.reputation
       expect(sum).toBeCloseTo(1, 10)
     }
+  })
+})
+
+describe('availabilityLevel', () => {
+  it('饱和线上及以下为 bad', () => {
+    expect(availabilityLevel(0)).toBe('bad')
+    expect(availabilityLevel(FREE_FLOOR)).toBe('bad')
+  })
+
+  it('刚过饱和线、未到警戒倍数为 warn', () => {
+    expect(availabilityLevel(FREE_FLOOR + 0.001)).toBe('warn')
+    expect(availabilityLevel(FREE_FLOOR * AVAILABILITY_WARN_RATIO)).toBe('warn')
+  })
+
+  it('明显宽裕为 ok', () => {
+    expect(availabilityLevel(FREE_FLOOR * AVAILABILITY_WARN_RATIO + 0.001)).toBe('ok')
+    expect(availabilityLevel(1)).toBe('ok')
+  })
+
+  it('非有限值按 bad 兜底', () => {
+    expect(availabilityLevel(NaN)).toBe('bad')
+  })
+
+  it('档位边界与评分基调的饱和线是同一条', () => {
+    // 页面不得自定 0.1 / 0.25 这类阈值 —— 那会让色条和评分对同一个车场给出相反结论。
+    // 这条把两者的边界钉在一起：空闲率恰好落在饱和线上时，档位与 tone 必须同时是 bad
+    const total = 1000
+    const atLine = lot({
+      id: 'at',
+      availability: { freeSpots: FREE_FLOOR * total, totalSpots: total, source: 'estimated' },
+    })
+    const aboveLine = lot({
+      id: 'above',
+      availability: { freeSpots: FREE_FLOOR * total + 1, totalSpots: total, source: 'estimated' },
+    })
+    const ctx = { allLots: [atLine, aboveLine], hasCharging: false, userNeedsCharging: false }
+
+    expect(availabilityLevel(FREE_FLOOR)).toBe('bad')
+    expect(scoreLot(atLine, ctx).tone).toBe('bad')
+    expect(scoreLot(aboveLine, ctx).tone).not.toBe('bad')
   })
 })
 
