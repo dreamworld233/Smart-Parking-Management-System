@@ -6,11 +6,16 @@ export const ENTRY_GRACE_MINUTES = 15
 
 const MINUTE_MS = 60 * 1000
 
+/** 预约窗口长度（毫秒） */
+const WINDOW_MS = MAX_LEAD_HOURS * 60 * MINUTE_MS
+
 export interface ArrivalOption {
   offsetMinutes: number
   time: Date
   /** 展示标签：「现在」/「30 分」/「1 时」/「1.5 时」/「2 时」 */
   label: string
+  /** 生成该选项时的基准时刻。校验窗口只能用它，不得重新读时钟 */
+  builtAt: Date
 }
 
 const OFFSETS = [0, 30, 60, 90, 120]
@@ -24,17 +29,20 @@ function labelFor(offsetMinutes: number): string {
 
 /** 生成预约确认页的到达时间选项 */
 export function buildArrivalOptions(now: Date): ArrivalOption[] {
+  // Invalid Date（getTime 为 NaN）时不提供任何选项，与 pricing 的兜底策略一致
+  if (!Number.isFinite(now.getTime())) return []
   return OFFSETS.map(offsetMinutes => ({
     offsetMinutes,
     time: new Date(now.getTime() + offsetMinutes * MINUTE_MS),
     label: labelFor(offsetMinutes),
+    builtAt: now,
   }))
 }
 
 /** 到达时间是否落在 [now, now + MAX_LEAD_HOURS] 窗口内 */
 export function isWithinWindow(now: Date, arrive: Date): boolean {
   const diff = arrive.getTime() - now.getTime()
-  return diff >= 0 && diff <= MAX_LEAD_HOURS * 60 * MINUTE_MS
+  return diff >= 0 && diff <= WINDOW_MS
 }
 
 /** 入场截止时刻 = 到达时间 + 入场宽限期 */
