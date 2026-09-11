@@ -22,16 +22,17 @@
   <!-- 验证点 3：底部面板 + 拖拽手势 -->
   <view
     class="sheet"
-    style="transform: translateY({{sheetY}}px);"
+    style="height: {{sheetHeight}}px; transform: translateY({{sheetY}}px);"
     bindtouchstart="onSheetTouchStart"
     bindtouchmove="onSheetTouchMove"
     bindtouchend="onSheetTouchEnd"
+    bindtouchcancel="onSheetTouchCancel"
   >
     <view class="sheet__handle" />
-    <view class="sheet__title">面板可拖拽 · 当前 {{sheetY}}px</view>
-    <view class="sheet__card">万象城地下停车场 ¥6/时</view>
-    <view class="sheet__card">银座商城 P2 停车场 ¥5/时</view>
-    <view class="sheet__card">市第一人民医院停车场 ¥4/时</view>
+    <view class="sheet__title">面板可拖拽 · sheetY {{sheetY}} / 收起 {{collapsedY}} · 卡片点击 {{cardTaps}} 次</view>
+    <view class="sheet__card" bindtap="onCardTap">万象城地下停车场 ¥6/时</view>
+    <view class="sheet__card" bindtap="onCardTap">银座商城 P2 停车场 ¥5/时</view>
+    <view class="sheet__card" bindtap="onCardTap">市第一人民医院停车场 ¥4/时</view>
   </view>
 
   <!-- 验证点 4：cover-view 对照组 -->
