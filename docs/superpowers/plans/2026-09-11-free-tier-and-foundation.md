@@ -899,7 +899,13 @@ git commit -m "feat(domain): add arrival window and entry deadline"
 Create `miniprogram/domain/__tests__/scoring.test.ts`：
 
 ```ts
-import { DEFAULT_WEIGHTS, SATURATION_THRESHOLD, scoreLot } from '../scoring'
+import {
+  COMMUTE_WEIGHTS,
+  DEFAULT_WEIGHTS,
+  MEDICAL_WEIGHTS,
+  SATURATION_THRESHOLD,
+  scoreLot,
+} from '../scoring'
 import type { ParkingLot } from '../types'
 
 function lot(over: Partial<ParkingLot> = {}): ParkingLot {
@@ -911,7 +917,9 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     distanceM: 320,
     walkMinutes: 4,
     pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
-    availability: { freeSpots: 46, totalSpots: 500, source: 'estimated' },
+    // 空闲率 0.4，明显高于饱和下限 0.15 —— 默认 fixture 必须是「不紧张」的，
+    // 否则「空位充足为 good」与「高饱和为 bad」两条测试会落在同一区间里打架
+    availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
     reservableQuota: 120,
     rating: 4.8,
     tags: [],
@@ -932,6 +940,13 @@ describe('DEFAULT_WEIGHTS', () => {
 
   it('费用权重最高', () => {
     expect(DEFAULT_WEIGHTS.fee).toBe(0.3)
+  })
+
+  it('三个场景预设的权重都合计为 1', () => {
+    for (const w of [DEFAULT_WEIGHTS, MEDICAL_WEIGHTS, COMMUTE_WEIGHTS]) {
+      const sum = w.fee + w.distance + w.availability + w.infra + w.reputation
+      expect(sum).toBeCloseTo(1, 10)
+    }
   })
 })
 
@@ -1044,8 +1059,16 @@ Create `miniprogram/domain/scoring.ts`：
 ```ts
 import type { ParkingLot, ReasonTone, Recommendation, ScoreFactors } from './types'
 
-/** 占用率超过该值即为饱和，推荐时降权或剔除（PM 2.2） */
+/** 占用率警戒线：占用率超过该值即为饱和，推荐时降权或剔除（PM 2.2） */
 export const SATURATION_THRESHOLD = 0.85
+
+/**
+ * 饱和对应的「空闲率」下限 = 1 - 占用率警戒线。
+ * 方向很容易搞反：PM 的 0.85 约束的是**占用率**上限，不是空闲率下限。
+ * 直接拿 0.85 去和 freeRate 比，会把空位充足的车场也判成饱和，
+ * 而且会让归一化落到负区间（空闲率 0.8 时算出 -0.33）。
+ */
+export const FREE_FLOOR = 1 - SATURATION_THRESHOLD
 
 export interface ScoreWeights {
   fee: number
@@ -1067,8 +1090,12 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
 /** 就医场景：可用性权重上调、费用下调（PM 2.2） */
 export const MEDICAL_WEIGHTS: ScoreWeights = { ...DEFAULT_WEIGHTS, availability: 0.35, fee: 0.2 }
 
-/** 通勤场景：费用权重上调（PM 2.2） */
-export const COMMUTE_WEIGHTS: ScoreWeights = { ...DEFAULT_WEIGHTS, fee: 0.4 }
+/**
+ * 通勤场景：费用权重上调（PM 2.2）。
+ * 抬 fee 的同时必须砍 distance —— 权重合计恒为 1 是评分落在 0–100 的前提，
+ * 只加不减会让满分变成 110。
+ */
+export const COMMUTE_WEIGHTS: ScoreWeights = { ...DEFAULT_WEIGHTS, fee: 0.4, distance: 0.05 }
 
 export interface ScoreContext {
   /** 同一批候选车场，用于归一化 */
@@ -1080,30 +1107,28 @@ export interface ScoreContext {
   weights?: ScoreWeights
 }
 
-function normalize(value: number, min: number, max: number): number {
+/**
+ * 在候选集合内把「越小越优」的指标（费用、距离）归一化到 0–1：
+ * 最小的得 1，最大的得 0。集合内所有值相同时一律得 1（无从比较，不给惩罚）。
+ */
+function lowerIsBetter(value: number, all: number[]): number {
+  const min = Math.min(...all)
+  const max = Math.max(...all)
   if (max === min) return 1
-  return (value - min) / (max - min)
+  return 1 - (value - min) / (max - min)
 }
 
 export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
   const weights = ctx.weights ?? DEFAULT_WEIGHTS
 
-  const fees = ctx.allLots.map(l => l.pricing.firstHour)
-  const dists = ctx.allLots.map(l => l.distanceM)
+  const feeFactor = lowerIsBetter(lot.pricing.firstHour, ctx.allLots.map(l => l.pricing.firstHour))
+  const distanceFactor = lowerIsBetter(lot.distanceM, ctx.allLots.map(l => l.distanceM))
 
-  // 费用：归一化倒数，越便宜越高
-  const feeSpan = Math.max(...fees) - Math.min(...fees)
-  const feeFactor = feeSpan === 0 ? 1 : 1 - normalize(lot.pricing.firstHour, Math.min(...fees), Math.max(...fees))
-
-  // 距离：越近越高
-  const distSpan = Math.max(...dists) - Math.min(...dists)
-  const distanceFactor = distSpan === 0 ? 1 : 1 - normalize(lot.distanceM, Math.min(...dists), Math.max(...dists))
-
-  // 可用性：预测空闲率，低于警戒线归零
+  // 可用性：空闲率低于饱和下限直接归零；高于下限则从下限到满位线性映射到 0–1
   const freeRate = lot.availability.totalSpots === 0
     ? 0
     : lot.availability.freeSpots / lot.availability.totalSpots
-  const availabilityFactor = freeRate < SATURATION_THRESHOLD ? 0 : normalize(freeRate, SATURATION_THRESHOLD, 1)
+  const availabilityFactor = freeRate <= FREE_FLOOR ? 0 : (freeRate - FREE_FLOOR) / (1 - FREE_FLOOR)
 
   // 基础设施：仅纯电/插混车受充电桩影响
   const infraFactor = ctx.userNeedsCharging ? (ctx.hasCharging ? 1 : 0) : 1
@@ -1140,7 +1165,7 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
  * 页面不得用 reasons 里的中文文案做字符串比较来选颜色。
  */
 function toneFor(freeRate: number, factors: ScoreFactors): ReasonTone {
-  if (freeRate < SATURATION_THRESHOLD) return 'bad'
+  if (freeRate <= FREE_FLOOR) return 'bad'
   return factors.availability >= 0.6 || factors.fee >= 0.8 || factors.distance >= 0.8 ? 'good' : 'plain'
 }
 
@@ -1152,7 +1177,7 @@ function buildReasons(
 ): string[] {
   const reasons: string[] = []
 
-  if (freeRate < SATURATION_THRESHOLD) {
+  if (freeRate <= FREE_FLOOR) {
     reasons.push('高峰紧张')
   } else if (factors.availability >= 0.6) {
     reasons.push('空位充足')
@@ -1172,7 +1197,13 @@ function buildReasons(
   return reasons.slice(0, 3)
 }
 
-/** 按评分降序取 Top N（PM FR-U06 要求 Top3） */
+/**
+ * 按评分降序取 Top N（PM FR-U06 要求 Top3）。
+ *
+ * 注意 hasCharging 是按**每个车场自己的** tags 推出来的，会覆盖 ctx 里传进来的同名值 ——
+ * 「车场有没有充电桩」本来就是车场自身的属性，不应由调用方统一指定。
+ * ctx.hasCharging 只在直接调用 scoreLot 时才需要调用方自己填对。
+ */
 export function topRecommendations(lots: ParkingLot[], ctx: Omit<ScoreContext, 'allLots'>, n = 3): Recommendation[] {
   const scored = lots.map(l =>
     scoreLot(l, { ...ctx, allLots: lots, hasCharging: l.tags.includes('充电桩') }),
@@ -1184,7 +1215,7 @@ export function topRecommendations(lots: ParkingLot[], ctx: Omit<ScoreContext, '
 - [ ] **Step 4: 运行测试确认通过**
 
 Run: `npm test -- scoring`
-Expected: PASS，15 passed
+Expected: PASS，16 passed
 
 - [ ] **Step 5: 写失败的测试（排序）**
 
@@ -1203,12 +1234,18 @@ function rec(id: string, score: number, distanceM: number, firstHour: number, fr
     distanceM,
     walkMinutes: 1,
     pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
-    availability: { freeSpots, totalSpots: 100, source: 'estimated' },
+    availability: { freeSpots, totalSpots: 500, source: 'estimated' },
     reservableQuota: 10,
     rating: 4.5,
     tags: [],
   }
-  return { lot, score, factors: { fee: 0, distance: 0, availability: 0, infra: 0, reputation: 0 }, reasons: [] }
+  return {
+    lot,
+    score,
+    factors: { fee: 0, distance: 0, availability: 0, infra: 0, reputation: 0 },
+    reasons: [],
+    tone: 'plain',
+  }
 }
 
 const input = [
