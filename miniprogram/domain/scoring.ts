@@ -1,4 +1,4 @@
-import type { ParkingLot, ReasonTone, Recommendation, ScoreFactors } from './types'
+import type { LotAvailability, ParkingLot, ReasonTone, Recommendation, ScoreFactors } from './types'
 
 /** 占用率警戒线：占用率超过该值即为饱和，推荐时降权或剔除（PM 2.2） */
 export const SATURATION_THRESHOLD = 0.85
@@ -11,7 +11,22 @@ export const SATURATION_THRESHOLD = 0.85
  */
 export const FREE_FLOOR = 1 - SATURATION_THRESHOLD
 
-/** 空闲率不到饱和线这么多倍时算「接近饱和」。仅用于展示档位，不参与评分 */
+/** 是否达到饱和：空闲率不高于饱和下限。评分与展示档位共用这一条判定 */
+export function isSaturated(freeRate: number): boolean {
+  return freeRate <= FREE_FLOOR
+}
+
+/**
+ * 「接近饱和」的警戒倍数：空闲率不到饱和线的这么多倍时判 warn。
+ *
+ * 留这段余量而不直接拿饱和线当上界，是因为车场需要一点缓冲：贴着线判 warn
+ * 的话，一次普通的高峰就会把它顶进红色档，档位会在临界点附近反复横跳。
+ * 仅用于展示档位，不参与评分。
+ *
+ * 取值必须落在 (1, 1/FREE_FLOOR)：等于 1 时 warn 档整个不可达（bad 与 ok 直接相邻），
+ * 大于等于 1/FREE_FLOOR 时 ok 档不可达（空闲率拉满到 1 也还是 warn）。
+ * 这两个边界是用户可见的：调大倍数就是加宽琥珀色带。
+ */
 export const AVAILABILITY_WARN_RATIO = 2
 
 export type AvailabilityLevel = 'ok' | 'warn' | 'bad'
@@ -25,9 +40,20 @@ export type AvailabilityLevel = 'ok' | 'warn' | 'bad'
  */
 export function availabilityLevel(freeRate: number): AvailabilityLevel {
   if (!Number.isFinite(freeRate)) return 'bad'
-  if (freeRate <= FREE_FLOOR) return 'bad'
+  if (isSaturated(freeRate)) return 'bad'
   if (freeRate <= FREE_FLOOR * AVAILABILITY_WARN_RATIO) return 'warn'
   return 'ok'
+}
+
+/**
+ * 空闲率。totalSpots 为 0（除零）或数值缺失（算出 NaN）时一律按 0 处理 ——
+ * 这个失败方向是安全的：0 落在饱和区间内，宁可判紧张也不要把缺数据说成空位充足。
+ */
+export function freeRate(availability: LotAvailability): number {
+  const raw = availability.totalSpots === 0
+    ? 0
+    : availability.freeSpots / availability.totalSpots
+  return Number.isFinite(raw) ? raw : 0
 }
 
 export interface ScoreWeights {
@@ -100,16 +126,14 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
   const distanceFactor = lowerIsBetter(lot.distanceM, ctx.allLots.map(l => l.distanceM))
 
   // 可用性：空闲率低于饱和下限直接归零；高于下限则从下限到满位线性映射到 0–1。
-  // totalSpots 为 0 时按空闲率 0 处理以免除零；非有限值（数据缺失算成 NaN）同样按 0
-  const rawFreeRate = lot.availability.totalSpots === 0
-    ? 0
-    : lot.availability.freeSpots / lot.availability.totalSpots
-  const freeRate = Number.isFinite(rawFreeRate) ? rawFreeRate : 0
-  // 饱和只在这里判一次，再传给 toneFor / buildReasons。
-  // 三处各写一遍 freeRate <= FREE_FLOOR，改一处漏两处就会出现
+  // 除零与缺失值口径收敛在 freeRate()，页面要展示同一个数字也调它，
+  // 免得各写一份 totalSpots === 0 的判断，改一处漏一处就对不上了
+  const rate = freeRate(lot.availability)
+  // 饱和判定只有 isSaturated 一处定义；这里求一次再传给 toneFor / buildReasons。
+  // 三处各写一遍比较式，改一处漏两处就会出现
   // 「可用性因子 > 0 却标红写「高峰紧张」」的自相矛盾产物
-  const saturated = freeRate <= FREE_FLOOR
-  const availabilityFactor = saturated ? 0 : clamp01((freeRate - FREE_FLOOR) / (1 - FREE_FLOOR))
+  const saturated = isSaturated(rate)
+  const availabilityFactor = saturated ? 0 : clamp01((rate - FREE_FLOOR) / (1 - FREE_FLOOR))
 
   // 基础设施：仅纯电/插混车受充电桩影响
   const infraFactor = ctx.userNeedsCharging ? (ctx.hasCharging ? 1 : 0) : 1

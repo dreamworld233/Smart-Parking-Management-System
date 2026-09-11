@@ -79,10 +79,17 @@ describe('availabilityLevel', () => {
     const total = 1000
     const atLine = lot({
       id: 'at',
+      distanceM: 100,
+      pricing: { ...lot().pricing, firstHour: 6 },
       availability: { freeSpots: FREE_FLOOR * total, totalSpots: total, source: 'estimated' },
     })
+    // aboveLine 刻意又远又贵：默认 fixture 两辆车场同价同距离，费用与距离因子都会取 1，
+    // 于是「不是 bad」会经费用/距离的 good 捷径通过 —— 断言看着绿，实际与可用性无关。
+    // 把这两项压到 0 之后，tone 才只可能由 availability 决定，挂掉时也才会指向可用性
     const aboveLine = lot({
       id: 'above',
+      distanceM: 2000,
+      pricing: { ...lot().pricing, firstHour: 10 },
       availability: { freeSpots: FREE_FLOOR * total + 1, totalSpots: total, source: 'estimated' },
     })
     const ctx = { allLots: [atLine, aboveLine], hasCharging: false, userNeedsCharging: false }
@@ -90,6 +97,19 @@ describe('availabilityLevel', () => {
     expect(availabilityLevel(FREE_FLOOR)).toBe('bad')
     expect(scoreLot(atLine, ctx).tone).toBe('bad')
     expect(scoreLot(aboveLine, ctx).tone).not.toBe('bad')
+  })
+
+  it('档位与基调在整条数轴上一致，不依赖两边都引用同一个常量', () => {
+    // 上面那条两侧都走 FREE_FLOOR 符号，因此只钉得住「两边同源」，钉不住「两边同值」：
+    // 某一侧被写死成 0.15 而 SATURATION_THRESHOLD 后来改动时它照样绿。
+    // 这里改用字面量取样，把档位与基调的关系直接钉在数轴上。
+    // 注意 tone 只可能经 saturated 变 bad（toneFor 其余分支给的是 good/plain），
+    // 所以这条等价式判的就是饱和线本身
+    for (const rate of [0, 0.12, FREE_FLOOR, 0.16, 0.31, 1]) {
+      const l = lot({ id: `r${rate}`, availability: { freeSpots: rate * 1000, totalSpots: 1000, source: 'estimated' } })
+      const ctx = { allLots: [l], hasCharging: false, userNeedsCharging: false }
+      expect(availabilityLevel(rate) === 'bad').toBe(scoreLot(l, ctx).tone === 'bad')
+    }
   })
 })
 
