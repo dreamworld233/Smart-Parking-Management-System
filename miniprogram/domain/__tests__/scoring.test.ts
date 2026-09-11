@@ -136,14 +136,39 @@ describe('scoreLot', () => {
     expect(r.reasons).toContain('高峰紧张')
   })
 
-  it('产出可解释理由，最多 3 条', () => {
-    const r = scoreLot(lot(), { allLots: [lot()], hasCharging: false, userNeedsCharging: false })
-    expect(r.reasons.length).toBeGreaterThan(0)
-    expect(r.reasons.length).toBeLessThanOrEqual(3)
+  it('理由多于 3 条时按优先级截断', () => {
+    // 最便宜 + 最近 + 空位充足 + 有充电桩 = 4 条理由，截断后「有充电桩」应被挤掉
+    const best = lot({
+      id: 'best',
+      distanceM: 50,
+      tags: ['充电桩'],
+      availability: { freeSpots: 450, totalSpots: 500, source: 'estimated' },
+    })
+    const other = lot({ id: 'other', distanceM: 900, pricing: { ...lot().pricing, firstHour: 9 } })
+    const r = scoreLot(best, { allLots: [best, other], hasCharging: true, userNeedsCharging: true })
+
+    expect(r.reasons).toEqual(['空位充足', '单价最低', '距目的地最近'])
   })
 
   it('基调：空位充足为 good', () => {
-    const r = scoreLot(lot(), { allLots: [lot()], hasCharging: false, userNeedsCharging: false })
+    // 目标车场是这批里最远也最贵的，费用与距离因子都贴近 0，
+    // 'good' 只可能来自 availability —— 否则这条断言跟可用性无关
+    const roomy = lot({
+      id: 'roomy',
+      distanceM: 2000,
+      pricing: { ...lot().pricing, firstHour: 10 },
+      availability: { freeSpots: 480, totalSpots: 500, source: 'estimated' },
+    })
+    const tight = lot({
+      id: 'tight',
+      distanceM: 100,
+      pricing: { ...lot().pricing, firstHour: 4 },
+      availability: { freeSpots: 400, totalSpots: 500, source: 'estimated' },
+    })
+    const r = scoreLot(roomy, { allLots: [roomy, tight], hasCharging: false, userNeedsCharging: false })
+
+    expect(r.factors.availability).toBeGreaterThanOrEqual(0.6)
+    expect(r.factors.fee).toBe(0)
     expect(r.tone).toBe('good')
   })
 
@@ -152,6 +177,60 @@ describe('scoreLot', () => {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.tone).toBe('bad')
+  })
+
+  it('总车位为 0 时按空闲率 0 处理，可用性因子归零且基调为 bad', () => {
+    const r = scoreLot(lot({ availability: { freeSpots: 0, totalSpots: 0, source: 'estimated' } }), {
+      allLots: [lot()], hasCharging: false, userNeedsCharging: false,
+    })
+    expect(r.factors.availability).toBe(0)
+    expect(r.tone).toBe('bad')
+  })
+
+  it('空闲数超过总车位时因子被夹到 1，综合分不越界', () => {
+    const r = scoreLot(lot({ availability: { freeSpots: 1000, totalSpots: 500, source: 'estimated' } }), {
+      allLots: [lot()], hasCharging: false, userNeedsCharging: false,
+    })
+    expect(r.factors.availability).toBe(1)
+    expect(r.score).toBeLessThanOrEqual(100)
+  })
+
+  it('目标车场不在候选集合内时因子仍夹在 0–1，综合分不越界', () => {
+    // 单独高亮某条推荐就会这么调：目标车场的费用与距离都优于整个候选集合，
+    // 不夹紧时费用、距离、可用性三个因子都会超过 1，综合分算出 174
+    const orphan = lot({
+      id: 'orphan',
+      distanceM: 0,
+      pricing: { ...lot().pricing, firstHour: 0 },
+      availability: { freeSpots: 1000, totalSpots: 500, source: 'estimated' },
+      rating: 5,
+    })
+    const r = scoreLot(orphan, {
+      allLots: [
+        lot({ id: 'x', distanceM: 1000, pricing: { ...lot().pricing, firstHour: 10 } }),
+        lot({ id: 'y', distanceM: 2000, pricing: { ...lot().pricing, firstHour: 20 } }),
+      ],
+      hasCharging: false,
+      userNeedsCharging: false,
+    })
+
+    expect(r.factors.fee).toBe(1)
+    expect(r.factors.distance).toBe(1)
+    expect(r.score).toBeGreaterThanOrEqual(0)
+    expect(r.score).toBeLessThanOrEqual(100)
+  })
+
+  it('评分缺失（NaN）时口碑因子按 0 计，综合分仍是有限数', () => {
+    const r = scoreLot(lot({ rating: NaN }), {
+      allLots: [lot()], hasCharging: false, userNeedsCharging: false,
+    })
+    expect(r.factors.reputation).toBe(0)
+    expect(Number.isFinite(r.score)).toBe(true)
+  })
+
+  it('候选集合为空时综合分仍是有限数', () => {
+    const r = scoreLot(lot(), { allLots: [], hasCharging: false, userNeedsCharging: false })
+    expect(Number.isFinite(r.score)).toBe(true)
   })
 
   it('饱和警戒线为 0.85', () => {
@@ -167,18 +246,22 @@ describe('topRecommendations', () => {
       lot({ id: 'c', distanceM: 50 }),
       lot({ id: 'd', distanceM: 900 }),
     ]
-    const top = topRecommendations(lots, { hasCharging: false, userNeedsCharging: false }, 2)
+    const top = topRecommendations(lots, { userNeedsCharging: false }, 2)
 
     expect(top.length).toBe(2)
     expect(top[0].score).toBeGreaterThanOrEqual(top[1].score)
   })
 
-  it('充电桩按各车场自身标签判定，不受 ctx.hasCharging 影响', () => {
-    // ctx.hasCharging 故意传 true：若实现直接沿用调用方的值，两个车场都会拿到 infra 1，
-    // 这条断言就会挂 —— 这正是要钉住「按车场自身 tags 覆盖」的行为
+  it('充电桩按各车场自身标签判定，调用方传什么都不影响', () => {
+    // 签名已用类型禁掉 hasCharging，这里刻意绕过类型钉住运行时行为：
+    // 万一有人从 JS 或旧签名调进来，调用方的值也不能盖过车场自身的 tags
     const withPile = lot({ id: 'pile', tags: ['充电桩'] })
     const withoutPile = lot({ id: 'nopile' })
-    const top = topRecommendations([withPile, withoutPile], { hasCharging: true, userNeedsCharging: true }, 2)
+    const forged = {
+      hasCharging: true,
+      userNeedsCharging: true,
+    } as unknown as Parameters<typeof topRecommendations>[1]
+    const top = topRecommendations([withPile, withoutPile], forged, 2)
 
     expect(top[0].lot.id).toBe('pile')
     expect(top[0].factors.infra).toBe(1)

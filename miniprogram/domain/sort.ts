@@ -12,5 +12,9 @@ const COMPARATORS: Record<SortKey, (a: Recommendation, b: Recommendation) => num
 }
 
 export function sortLots(recs: Recommendation[], key: SortKey): Recommendation[] {
-  return recs.slice().sort(COMPARATORS[key])
+  // 未知 key（例如从本地缓存读回的旧排序状态）回落到综合排序。
+  // 必须显式兜底：sort(undefined) 不抛错，而是把元素转成字符串比较后原样返回，
+  // 于是「排序坏了」看起来跟「排序生效但恰好没变」一模一样
+  const compare = COMPARATORS[key] ?? COMPARATORS.composite
+  return recs.slice().sort(compare)
 }
