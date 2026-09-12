@@ -4034,3 +4034,10 @@ git commit -m "feat: implement lot detail page"
 - 真实车流预测服务：当前 `buildForecast` 是由实时空闲率推导的占位曲线，接入后替换
 - 登录与会话：`app.ts` 本阶段不做 `wx.login`，`services/api.ts` 在计划 2 需要后端时再引入
 - 详情页（Task 15）的估算字段标注：卡片已在 Task 12 补了 `estimateText` 标签，详情页的三统计块与收费规则卡尚未逐处标注
+
+**首页遗留问题（2026-09-12 发现，Task 13 的人工校验尚未做）：**
+
+- **地图没能正常显示**：根因未定位。候选方向：Skyline 下 `map` 原生组件的渲染、`https://apis.map.qq.com` 是否已配为 request 合法域名、`.wrap` 的 `100vh` 在真机上的实际高度。校验时**模拟器与真机各看一次**再下结论
+- **定位失败 / 被拒时的兜底位置未定**：`home.ts` 的 `data.lat/lng` 目前是硬编码的济南坐标（36.6512 / 117.1201），`no-location` 态下地图仍停在那个点，视觉上像「已经定位到济南」。需要与产品确认：兜底到固定城市中心并明说，还是这种态下干脆弱化地图
+- 首页其余待人工校验项：面板拖拽与吸附、chips 切换排序、图钉 ↔ 卡片选中联动、定位失败两种文案（被拒 vs 定位服务失败）、骨架屏与错误态
+- `/pages/search/search`（Task 14）、`/pages/lot-detail/lot-detail`（Task 15）尚未注册，首页的搜索入口与卡片点击在它们落地前会 `navigateTo` 失败 —— 预期中间态
