@@ -30,6 +30,7 @@
     "navigationStyle": "custom",
     "backgroundColor": "#f8fafc"
   },
+  "requiredPrivateInfos": ["getLocation"],
   "permission": {
     "scope.userLocation": {
       "desc": "用于查询并推荐您当前位置周边的停车场"

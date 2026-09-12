@@ -148,6 +148,8 @@
 |---|---|
 | `INVALID_KEY` / `status: 111` | Key 没勾 WebServiceAPI，或 Key 填错 |
 | `status: 110` | 请求来源未被授权——检查是否误设了「授权 IP」 |
+| `status: 311` | Key 格式错误（复制时被截断/混入空格） |
+| `status: 121` `此key每日调用量已达到上限` | **当天不可恢复**，该接口的免费额度已用光，只能等次日或去控制台提升配额。2026-09-12 实测踩到过一次——开发期反复刷列表页就能打爆 |
 | `request:fail url not in domain list` | request 合法域名没配；开发期可勾「不校验合法域名」绕过 |
 | `getLocation:fail api scope is not declared in the privacy agreement` | `app.json` 没声明 `requiredPrivateInfos`，或隐私保护指引没配 |
 | `getLocation:fail auth deny` | 用户主动拒绝了定位授权——本项目会走「未获取到定位授权」空态，属正常降级 |
