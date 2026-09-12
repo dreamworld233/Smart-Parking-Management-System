@@ -1,4 +1,4 @@
-import { QQMapError, searchByKeyword, searchNearby, walkingDistance } from '../../miniprogram/services/qqmap'
+import { QQMapError, searchByKeyword, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
 import { QQMAP_KEY } from '../../miniprogram/config'
 
 interface ReqOption {
@@ -188,6 +188,114 @@ describe('walkingDistance', () => {
     stubRequest(opt => opt.fail({ errMsg: 'request:fail timeout' }))
 
     await expect(walkingDistance({ lat: 0, lng: 0 }, { lat: 1, lng: 1 })).resolves.toBeNull()
+  })
+})
+
+describe('walkingDistances（批量）', () => {
+  /** 按 to 里的坐标个数造一个矩阵信封 */
+  function matrixFor(url: string): unknown {
+    const to = decodeURIComponent(url).match(/to=([^&]*)/)?.[1] ?? ''
+    const n = to.split(';').filter(Boolean).length
+    return { status: 0, message: 'query ok', result: { rows: [{ elements: Array.from({ length: n }, (_, i) => ({ distance: 100 * (i + 1), duration: 60 * (i + 1) })) }] } }
+  }
+
+  it('一次请求装下多个目的地，返回与入参同序', async () => {
+    stubRequest(opt => opt.success({ data: matrixFor(opt.url) }))
+
+    const r = await walkingDistances({ lat: 0, lng: 0 }, [
+      { lat: 1, lng: 1 },
+      { lat: 2, lng: 2 },
+      { lat: 3, lng: 3 },
+    ])
+
+    expect(sent.length).toBe(1)
+    expect(r).toEqual([
+      { distanceM: 100, durationMin: 1 },
+      { distanceM: 200, durationMin: 2 },
+      { distanceM: 300, durationMin: 3 },
+    ])
+  })
+
+  it('超过 5 个目的地时拆批，批次之间有间隔', async () => {
+    // 实测每秒约 5 点：一批 6 个会直接吃 120。拆批 + 间隔是能不能用的前提，
+    // 不是优化项
+    stubRequest(opt => opt.success({ data: matrixFor(opt.url) }))
+
+    const r = await walkingDistances(
+      { lat: 0, lng: 0 },
+      Array.from({ length: 6 }, (_, i) => ({ lat: i, lng: i })),
+      0,
+    )
+
+    expect(sent.length).toBe(2)
+    const pointsPerCall = sent.map(opt => (decodeURIComponent(opt.url).match(/to=([^&]*)/)?.[1] ?? '').split(';').length)
+    expect(pointsPerCall).toEqual([5, 1])
+    expect(r).toHaveLength(6)
+    expect(r.every(x => x !== null)).toBe(true)
+  })
+
+  it('某一批失败只影响该批，返回 null 而不是错位', async () => {
+    // 前两发是第一批的「首次 + 重试」，都失败才算这一批没救；
+    // 第三发是第二批，正常返回
+    stubRequest((opt, callIndex) => {
+      if (callIndex <= 2) opt.fail({ errMsg: 'request:fail timeout' })
+      else opt.success({ data: matrixFor(opt.url) })
+    })
+
+    const r = await walkingDistances(
+      { lat: 0, lng: 0 },
+      Array.from({ length: 6 }, (_, i) => ({ lat: i, lng: i })),
+      0,
+    )
+
+    // 前 5 个是失败的那批，第 6 个属于后一批
+    expect(r.slice(0, 5)).toEqual([null, null, null, null, null])
+    expect(r[5]).not.toBeNull()
+  })
+
+  it('某一批被限流（HTTP 200 但 status 120）时同样只影响该批', async () => {
+    // 实测限流返回的是 200 + status 120，不是网络错误 ——
+    // 而 status 非 0 属于业务错误，不重试，所以这一批直接判失败
+    stubRequest((opt, callIndex) => {
+      if (callIndex === 1) opt.success({ data: { status: 120, message: '此key每秒请求量已达到上限' } })
+      else opt.success({ data: matrixFor(opt.url) })
+    })
+
+    const r = await walkingDistances(
+      { lat: 0, lng: 0 },
+      Array.from({ length: 6 }, (_, i) => ({ lat: i, lng: i })),
+      0,
+    )
+
+    expect(r.slice(0, 5)).toEqual([null, null, null, null, null])
+    expect(r[5]).not.toBeNull()
+    // 限流不重试：重试只会把配额烧得更狠
+    expect(sent.length).toBe(2)
+  })
+
+  it('elements 数量不足时补 null，不错位挪用别人的距离', async () => {
+    // 只有 2 个元素却问了 3 个坐标：第 3 个必须为 null。
+    // 若用「取不到就复用上一个」这类兜底，会把 A 车场的距离安到 B 头上
+    stubRequest(opt =>
+      opt.success({
+        data: { status: 0, message: 'query ok', result: { rows: [{ elements: [{ distance: 111, duration: 60 }, { distance: 222, duration: 120 }] }] } },
+      }),
+    )
+
+    const r = await walkingDistances({ lat: 0, lng: 0 }, [
+      { lat: 1, lng: 1 },
+      { lat: 2, lng: 2 },
+      { lat: 3, lng: 3 },
+    ])
+
+    expect(r.map(x => x?.distanceM ?? null)).toEqual([111, 222, null])
+  })
+
+  it('空入参不发请求', async () => {
+    stubRequest(opt => opt.success({ data: matrixFor(opt.url) }))
+
+    await expect(walkingDistances({ lat: 0, lng: 0 }, [])).resolves.toEqual([])
+    expect(sent.length).toBe(0)
   })
 })
 

@@ -1,6 +1,6 @@
 import { QQMAP_KEY } from '../../miniprogram/config'
-import { QQMapError, searchByKeyword, searchNearby, walkingDistance } from '../../miniprogram/services/qqmap'
-import { installWxRequestShim } from './wx-node-shim'
+import { QQMapError, searchByKeyword, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
+import { installWxRequestShim, throttleMatrix } from './wx-node-shim'
 
 // 假 Key 时整组跳过并说明原因：公开仓库新克隆的机器上跑 test:live 不该给个
 // 看不懂的失败，但也不能静默当成通过
@@ -57,12 +57,35 @@ maybeDescribe('qqmap 真接口', () => {
       const pois = await searchNearby('停车场', CENTER, RADIUS_M)
       const target = pois[0]
 
+      await throttleMatrix()
       const walk = await walkingDistance(CENTER, target.location)
 
       expect(walk).not.toBeNull()
       // 路线距离不会短于直线距离，但会按绕行放大 —— 用它替掉直线距离才有意义
       expect(walk!.distanceM).toBeGreaterThanOrEqual(Math.floor(target.distanceM))
       expect(walk!.durationMin).toBeGreaterThanOrEqual(1)
+    },
+    20000,
+  )
+
+  it(
+    '批量矩阵一次问 3 个目的地，结果与入参同序',
+    async () => {
+      const pois = await searchNearby('停车场', CENTER, RADIUS_M)
+
+      const targets = pois.slice(0, 3).map(p => p.location)
+
+      await throttleMatrix()
+      const results = await walkingDistances(CENTER, targets)
+
+      expect(results).toHaveLength(3)
+      expect(results.every(r => r !== null)).toBe(true)
+      // 顺序错位会让某个车场拿到别人的距离 —— 路线距离不可能短于自己的直线距离，
+      // 逐项比对就能抓到错位（拿远处的路线配近处的直线时会立刻矛盾）
+      results.forEach((r, i) => {
+        expect(r!.distanceM).toBeGreaterThanOrEqual(Math.floor(pois[i].distanceM))
+        expect(r!.durationMin).toBeGreaterThanOrEqual(1)
+      })
     },
     20000,
   )

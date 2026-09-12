@@ -1,12 +1,9 @@
-import { QQMAP_KEY, REQUEST_TIMEOUT_MS } from '../config'
+import { QQMAP_KEY, REQUEST_TIMEOUT_MS, WALK_METERS_PER_MINUTE } from '../config'
 import type { GeoPoint } from '../domain/types'
 
 const BASE = 'https://apis.map.qq.com'
 const SEARCH_PATH = '/ws/place/v1/search'
 const MATRIX_PATH = '/ws/distance/v1/matrix'
-
-/** 步行速度约 80 米/分钟（约 4.8 km/h），与 lot.ts 的降级估算同口径 */
-const WALK_METERS_PER_MINUTE = 80
 
 /**
  * 腾讯各接口的信封**不一致**：地点搜索把结果放在顶层 `data`，路径矩阵放在顶层 `result`。
@@ -139,30 +136,81 @@ interface MatrixRaw {
   rows?: Array<{ elements?: Array<{ distance: number; duration: number }> }>
 }
 
-/** 步行距离与时长。失败返回 null，调用方降级为直线距离 */
-export async function walkingDistance(
-  from: GeoPoint,
-  to: GeoPoint,
-): Promise<{ distanceM: number; durationMin: number } | null> {
+export interface WalkResult {
+  distanceM: number
+  durationMin: number
+}
+
+/**
+ * 单次矩阵请求的目的地上限。
+ *
+ * 实测（2026-09-12）**每个目的地计 1 点，每秒约 5 点**：
+ * 单发 5 点成功、6 点立刻返回 status 120（每秒请求量已达到上限）；
+ * 同一秒内「3 点 + 3 点」也会让第二发失败，而「2 点 + 2 点」两发都过。
+ * 所以一批最多 5 个，且批次之间必须留间隔 ——
+ * 20 个车场并发查询（每个一次请求）会有大半被限流，静默退回估算值
+ */
+const MATRIX_MAX_POINTS_PER_CALL = 5
+/** 批次间隔要盖过「每秒」这个窗口，取 1.1 秒 */
+const MATRIX_CHUNK_GAP_MS = 1100
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function toWalkResult(el: { distance: number; duration: number }): WalkResult {
+  return {
+    distanceM: el.distance,
+    // 优先用接口耗时：它是**路线**距离对应的步行时间，比拿直线距离硬除要准得多
+    //（实测 1747 米直线约 1.1 公里，路线 1747 米 / 1588 秒）。
+    // 文档说步行方式不计算耗时，实测该接口给了真实值 —— 万一某个配额档位或
+    // 版本真的返回 0，再按步行速度从距离兜底，不能让用户看到「步行 0 分钟」
+    durationMin: el.duration > 0
+      ? Math.max(1, Math.round(el.duration / 60))
+      : Math.max(1, Math.round(el.distance / WALK_METERS_PER_MINUTE)),
+  }
+}
+
+async function matrixChunk(from: GeoPoint, tos: GeoPoint[]): Promise<Array<WalkResult | null>> {
+  const empty = tos.map(() => null)
+  if (tos.length === 0) return empty
   try {
     const raw = await get<MatrixRaw>(MATRIX_PATH, {
       mode: 'walking',
       from: `${from.lat},${from.lng}`,
-      to: `${to.lat},${to.lng}`,
+      to: tos.map(t => `${t.lat},${t.lng}`).join(';'),
     })
-    const el = raw?.rows?.[0]?.elements?.[0]
-    if (!el) return null
-    return {
-      distanceM: el.distance,
-      // 优先用接口耗时：它是**路线**距离对应的步行时间，比拿直线距离硬除要准得多
-      //（实测 1747 米直线约 1.1 公里，路线 1747 米 / 1588 秒）。
-      // 文档说步行方式不计算耗时，实测该接口给了真实值 —— 万一某个配额档位或
-      // 版本真的返回 0，再按步行速度从距离兜底，不能让用户看到「步行 0 分钟」
-      durationMin: el.duration > 0
-        ? Math.max(1, Math.round(el.duration / 60))
-        : Math.max(1, Math.round(el.distance / WALK_METERS_PER_MINUTE)),
-    }
+    const elements = raw?.rows?.[0]?.elements ?? []
+    // elements 与入参坐标同序（实测 1×3 的顺序与传入一致）。
+    // 数量不足时按缺失补 null 而不是错位补齐：错位会把 A 车场的距离安到 B 头上
+    return tos.map((_, i) => {
+      const el = elements[i]
+      return el ? toWalkResult(el) : null
+    })
   } catch {
-    return null
+    return empty
   }
+}
+
+/**
+ * 批量步行距离与时长，返回数组与 `tos` **同序**；某一项查不到为 null，
+ * 调用方据此降级为直线距离估算。失败不抛异常。
+ */
+export async function walkingDistances(
+  from: GeoPoint,
+  tos: GeoPoint[],
+  chunkGapMs: number = MATRIX_CHUNK_GAP_MS,
+): Promise<Array<WalkResult | null>> {
+  const out: Array<WalkResult | null> = []
+  for (let i = 0; i < tos.length; i += MATRIX_MAX_POINTS_PER_CALL) {
+    if (i > 0 && chunkGapMs > 0) await delay(chunkGapMs)
+    out.push(...(await matrixChunk(from, tos.slice(i, i + MATRIX_MAX_POINTS_PER_CALL))))
+  }
+  return out
+}
+
+/** 单个目的地的步行距离与时长。失败返回 null，调用方降级为直线距离 */
+export async function walkingDistance(from: GeoPoint, to: GeoPoint): Promise<WalkResult | null> {
+  const [only] = await walkingDistances(from, [to], 0)
+  return only ?? null
 }
