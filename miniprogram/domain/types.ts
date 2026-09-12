@@ -25,6 +25,16 @@ export interface LotAvailability {
   source: DataSource
 }
 
+/**
+ * 距离与步行时长的来源。
+ * - `route`：路径矩阵查到的真实步行路线
+ * - `estimated`：直线距离 × 绕行系数估算
+ *
+ * 必须逐条标注而不是整批一个标记：矩阵接口按「目的地」计费（实测约 5 点/秒），
+ * 首页只查得起少数几个车场，同一次列表里两种数据是混着的
+ */
+export type DistanceSource = 'route' | 'estimated'
+
 export interface ParkingLot {
   id: string
   name: string
@@ -32,6 +42,8 @@ export interface ParkingLot {
   location: GeoPoint
   distanceM: number
   walkMinutes: number
+  /** 上面两个数的来源，页面据此决定是否标「估算」 */
+  distanceSource: DistanceSource
   pricing: LotPricing
   availability: LotAvailability
   /** 车场开放的可预约车位数 */

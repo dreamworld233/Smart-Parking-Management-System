@@ -19,6 +19,8 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     location: { lat: 36.65, lng: 117.12 },
     distanceM: 320,
     walkMinutes: 4,
+    // fixture 是人造的，距离谈不上「实测路线」，标 estimated 更诚实
+    distanceSource: 'estimated',
     pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
     // 空闲率 0.4，明显高于饱和下限 0.15 —— 默认 fixture 必须是「不紧张」的，
     // 否则「空位充足为 good」与「高饱和为 bad」两条测试会落在同一区间里打架

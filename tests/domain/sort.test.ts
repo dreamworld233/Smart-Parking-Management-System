@@ -9,6 +9,7 @@ function rec(id: string, score: number, distanceM: number, firstHour: number, fr
     location: { lat: 0, lng: 0 },
     distanceM,
     walkMinutes: 1,
+    distanceSource: 'estimated',
     pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
     availability: { freeSpots, totalSpots: 500, source: 'estimated' },
     reservableQuota: 10,
