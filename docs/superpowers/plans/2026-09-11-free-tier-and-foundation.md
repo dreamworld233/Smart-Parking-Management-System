@@ -2681,7 +2681,17 @@ git commit -m "feat(components): add lot card and sort chips"
 
 ## Task 13: 首页
 
-`item` 的展示字段（`distanceText` / `walkText` / `spotsText` / `freeClass` / `score` / `reasons` / `tone`）在页面层用 Task 6 的格式化函数预先算好，组件只负责渲染。
+> **已实现（2026-09-12），实现与下面的代码块有 6 处偏差 —— 以代码为准：**
+> 1. **`fetchNearbyLots` 没有 `walkDistanceResolved` 字段**，真名是 `hasEstimatedDistance`，且语义相反。更关键的是它**按设计几乎恒为 true**（只给推荐 Top3 查真实路线，20 个车场里其余全是估算），绑到橙色横幅上会变成**常驻横幅**。改为**不做这个横幅**：逐条来源标注已经在卡片上（`estimateText`）；UI 稿 §6 的 BR-05「预测服务降级」横幅要等计划 2 有真实预测服务时再挂条件
+> 2. **面板几何 px 化 + 补上拖拽**：计划里 `.sheet` 用 `max-height: 58vh` 且 `sheet__handle` 只是个装饰（没有任何手势处理），与 UI 稿 D7/§5.1 的「底部可上拖面板」和 Task 0 的验证结论都对不上 —— Task 0 明确记了「按 `windowHeight` 算高度，vh + 硬编码偏移在 iPhone 8 上会把面板整块顶出屏外」。改为 Task 0 验证过的方案：px 高度 + `translateY` 吸附 + `touchcancel` 兜底；**手势只绑在抓手区**，避免和列表滚动抢
+> 3. **搜索框 top 不能写死 104rpx**：会钻进右上角胶囊下面，真机上整条点不动。改为 `getMenuButtonBoundingClientRect().bottom + 8`，取不到时退回 100px；chips 行同理跟着算
+> 4. **`.sheet` 不能用 `bottom: 0`**：tabBar 是 absolute 覆盖层，会盖掉面板底部一条（含最后一张卡片）。改为 `bottom = --tabbar-h 换算成 px + 安全区`
+> 5. **定位失败要分两种文案**：`services/location.ts` 的 `reason` 特意区分 `denied` / `failed`，计划只写了一套「未获取到定位授权」，定位服务本身失败时那句话是错的
+> 6. `SORT_LABELS` 提到 `domain/format.ts`：排序 chips 与首页「已按 X 排序」提示共用一份文案，首页用 `short`
+>
+> **本任务完成时的已知断点：** `/pages/search/search`（Task 14）与 `/pages/lot-detail/lot-detail`（Task 15）尚未注册，首页的搜索入口与卡片点击在这两个任务落地前会 `navigateTo` 失败。
+
+`item` 的展示字段（`distanceText` / `walkText` / `spotsText` / `freeClass` / `score` / `reasons` / `tone` / `estimateText`）在页面层用 Task 6 的格式化函数预先算好，组件只负责渲染。
 
 **Files:**
 - Modify: `miniprogram/pages/home/*`

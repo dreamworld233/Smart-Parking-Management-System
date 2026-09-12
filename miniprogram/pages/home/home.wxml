@@ -1,1 +1,77 @@
-<view class="page">首页（待实现）</view>
+<view class="wrap">
+  <map
+    class="wrap__map"
+    latitude="{{lat}}"
+    longitude="{{lng}}"
+    scale="15"
+    show-location
+    markers="{{markers}}"
+    bindmarkertap="onPinTap"
+  />
+
+  <view class="search" style="top: {{searchTop}}px" bindtap="onSearchTap">
+    <text class="search__icon">🔍</text>
+    <text class="search__ph">搜目的地 / 车场</text>
+    <text class="search__map">地图</text>
+  </view>
+
+  <view class="chips-row" style="top: {{chipsTop}}px">
+    <sort-chips value="{{sortKey}}" bind:change="onSortChange" />
+  </view>
+
+  <view class="sheet" style="height: {{sheetHeight}}px; bottom: {{sheetBottom}}px; transform: translateY({{sheetY}}px)">
+    <view
+      class="grip"
+      bindtouchstart="onGripTouchStart"
+      bindtouchmove="onGripTouchMove"
+      bindtouchend="onGripTouchEnd"
+      bindtouchcancel="onGripTouchCancel"
+      bindtap="onGripTap"
+    >
+      <view class="grip__handle" />
+      <view class="grip__hint" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
+    </view>
+
+    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在获取周边车场…" />
+
+    <state-view
+      wx:elif="{{state === 'no-location'}}"
+      kind="empty"
+      text="{{noLocText}}"
+      hint="{{noLocHint}}"
+      action-text="去搜索"
+      bind:action="onSearchTap"
+    />
+
+    <state-view
+      wx:elif="{{state === 'empty'}}"
+      kind="empty"
+      text="附近 3 公里内未找到停车场"
+      hint="试试搜索指定目的地"
+      action-text="去搜索"
+      bind:action="onSearchTap"
+    />
+
+    <state-view
+      wx:elif="{{state === 'error'}}"
+      kind="error"
+      text="车场数据加载失败"
+      hint="请检查网络后重试"
+      action-text="重试"
+      bind:action="onRetry"
+    />
+
+    <scroll-view wx:else class="sheet__list" scroll-y>
+      <lot-card
+        wx:for="{{cards}}"
+        wx:key="lot.id"
+        item="{{item}}"
+        selected="{{item.lot.id === selectedId}}"
+        bind:cardtap="onCardTap"
+        bind:navigate="onNavigate"
+        bind:reserve="onReserve"
+      />
+      <view class="sheet__tail" />
+    </scroll-view>
+  </view>
+</view>

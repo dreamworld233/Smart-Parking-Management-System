@@ -1,5 +1,34 @@
+import type { ParkingLot, SortKey } from './types'
+
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
+}
+
+/**
+ * 排序维度的文案。放在领域层而不是组件里：排序 chips 与首页的
+ * 「已按 X 排序」提示是同一份事实，各写一份必然有一处先漂移
+ */
+export const SORT_LABELS: Record<SortKey, { short: string; long: string }> = {
+  composite: { short: '综合', long: '综合推荐' },
+  distance: { short: '距离', long: '距离最近' },
+  fee: { short: '价格', long: '费用最低' },
+  availability: { short: '空位', long: '空位最多' },
+}
+
+/**
+ * 数据来源标注（UI 稿 §6「数据为估算值 → 卡片与详情页标注数据来源」）。
+ *
+ * 逐条判而不是「整批一个标记」：首页只给推荐 Top3 查得起真实步行路线，
+ * 同一次列表里 route 与 estimated 是混着的，整批标「估算」会把真实数据也说成估算。
+ * 没有估算项时返回空串，调用方据此不渲染标签 —— 不能返回「全部为真实数据」，
+ * 那会在数据源缺失（source 为 'poi'/'rule' 但与实际不符）时给出虚假保证
+ */
+export function sourceNote(lot: ParkingLot): string {
+  const parts: string[] = []
+  if (lot.distanceSource === 'estimated') parts.push('距离')
+  if (lot.pricing.source === 'estimated') parts.push('收费')
+  if (lot.availability.source === 'estimated') parts.push('余位')
+  return parts.length ? `${parts.join('、')}为估算` : ''
 }
 
 /** 数据缺失时的统一占位。0 与「未知」语义不同，不可混用 */

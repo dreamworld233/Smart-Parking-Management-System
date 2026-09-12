@@ -5,7 +5,9 @@ import {
   formatPlate,
   formatSpots,
   formatTimeRangeLabel,
+  sourceNote,
 } from '../../miniprogram/domain/format'
+import type { ParkingLot } from '../../miniprogram/domain/types'
 
 describe('formatDistance', () => {
   // 分界线画在**四舍五入之后**的米数上，不是入参上：
@@ -139,5 +141,49 @@ describe('formatPlate', () => {
     // 用户手输或上游存了「京·A8·K9」时，只删首个分隔符会重排成「京A·8·K9」——
     // 看着像车牌，其实是错的
     expect(formatPlate('京·A8·K9')).toBe('京A·8K9')
+  })
+})
+
+describe('sourceNote', () => {
+  function lot(over: Partial<ParkingLot> = {}): ParkingLot {
+    return {
+      id: 'L1',
+      name: '万象城地下停车场',
+      address: '历下区经十路 1234 号',
+      location: { lat: 36.65, lng: 117.12 },
+      distanceM: 320,
+      walkMinutes: 4,
+      distanceSource: 'estimated',
+      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
+      reservableQuota: 120,
+      rating: 4.8,
+      tags: [],
+      ...over,
+    }
+  }
+
+  it('全为估算时逐项列出', () => {
+    expect(sourceNote(lot())).toBe('距离、收费、余位为估算')
+  })
+
+  it('只有距离是估算时不牵连收费与余位', () => {
+    // 首页只给 Top3 查真实步行路线，所以这条是常态：
+    // 整批标「估算」会把真实的收费规则也一起说成估算
+    const mixed = lot({
+      distanceSource: 'estimated',
+      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'rule' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'poi' },
+    })
+    expect(sourceNote(mixed)).toBe('距离为估算')
+  })
+
+  it('全部来自真实来源时返回空串，调用方不渲染标签', () => {
+    const real = lot({
+      distanceSource: 'route',
+      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'rule' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'poi' },
+    })
+    expect(sourceNote(real)).toBe('')
   })
 })

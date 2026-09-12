@@ -1,1 +1,8 @@
-{ "navigationStyle": "custom", "usingComponents": {} }
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "lot-card": "/components/lot-card/lot-card",
+    "sort-chips": "/components/sort-chips/sort-chips",
+    "state-view": "/components/state-view/state-view"
+  }
+}

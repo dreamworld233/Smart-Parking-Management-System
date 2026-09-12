@@ -1,6 +1,92 @@
-.page {
-  padding: var(--space-4);
-  /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
-  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  /* 面板收起时靠 translateY 移出屏外，这里必须裁掉，否则会撑出页面滚动 */
+  overflow: hidden;
+  background: #eaefe9;
+}
+
+/* Skyline 不支持 position: fixed，地图与浮层只能用 absolute 铺在根节点上 */
+.wrap__map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.search {
+  position: absolute;
+  left: 28rpx;
+  right: 28rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 26rpx;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  font-size: var(--font-body);
   color: var(--color-text-weak);
 }
+
+.search__icon { margin-right: 12rpx; }
+.search__ph { flex: 1; }
+.search__map {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.chips-row {
+  position: absolute;
+  left: 28rpx;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.16);
+  padding: 18rpx 28rpx 0;
+  display: flex;
+  flex-direction: column;
+  /* 高度、bottom、translateY 由 home.ts 按窗口尺寸算出后内联传入 */
+}
+
+.grip {
+  flex: none;
+  padding-bottom: 20rpx;
+}
+
+.grip__handle {
+  width: 76rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: #cbd5e1;
+  margin: 0 auto 20rpx;
+}
+
+.grip__hint {
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
+
+.sheet__list {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不给 0 的话 scroll-view 会撑破面板 */
+  height: 0;
+}
+
+.sheet__list lot-card {
+  display: block;
+  margin-bottom: 18rpx;
+}
+
+/* 面板 bottom 已让开 tabBar，这里只留一点呼吸空间 */
+.sheet__tail { height: 24rpx; }
