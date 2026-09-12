@@ -8,16 +8,20 @@ import {
 } from '../../miniprogram/domain/format'
 
 describe('formatDistance', () => {
-  it('小于 1 公里用米', () => {
+  // 分界线画在**四舍五入之后**的米数上，不是入参上：
+  // 999.6 先变成 1000 再判档，于是显示 1.0km 而不是「1000m」
+  it('四舍五入后不足 1000 米用米', () => {
     expect(formatDistance(320)).toBe('320m')
+    expect(formatDistance(999.4)).toBe('999m')
   })
 
-  it('1 公里及以上用公里，保留 1 位小数', () => {
-    expect(formatDistance(1200)).toBe('1.2km')
-  })
-
-  it('刚好 1000 米为 1.0km', () => {
+  it('四舍五入后达到 1000 米按公里显示', () => {
+    expect(formatDistance(999.6)).toBe('1.0km')
     expect(formatDistance(1000)).toBe('1.0km')
+  })
+
+  it('1 公里以上用公里，保留 1 位小数', () => {
+    expect(formatDistance(1200)).toBe('1.2km')
   })
 
   it('负数按 0 处理', () => {
@@ -44,6 +48,13 @@ describe('formatSpots', () => {
 
   it('余位为 NaN 同样显示 --', () => {
     expect(formatSpots(NaN, 500)).toBe('--/500')
+  })
+
+  it('负数车位按 0 处理，不把脏数据当数字渲染', () => {
+    // 与 freeRate 的兜底同向：坏数据宁可说「没空位」，也不要说成「空位充足」。
+    // 注意这与「缺失显示 --」不冲突 —— 一个是数据脏，一个是数据没有
+    expect(formatSpots(-1, 500)).toBe('0/500')
+    expect(formatSpots(46, -500)).toBe('46/0')
   })
 })
 
@@ -89,23 +100,25 @@ describe('formatCountdown', () => {
 })
 
 describe('formatTimeRangeLabel', () => {
+  // 参数序与 formatCountdown / time.ts 的 isWithinWindow 对齐：now 在前。
+  // 两位都是 Date，写反了类型检查抓不到，只会静默把「现在」渲染成到达时间
   it('当天显示「今天 HH:mm」', () => {
     const now = new Date('2026-09-11T10:00:00')
-    expect(formatTimeRangeLabel(new Date('2026-09-11T13:40:00'), now)).toBe('今天 13:40')
+    expect(formatTimeRangeLabel(now, new Date('2026-09-11T13:40:00'))).toBe('今天 13:40')
   })
 
   it('次日显示「明天 HH:mm」', () => {
     const now = new Date('2026-09-11T23:00:00')
-    expect(formatTimeRangeLabel(new Date('2026-09-12T00:30:00'), now)).toBe('明天 00:30')
+    expect(formatTimeRangeLabel(now, new Date('2026-09-12T00:30:00'))).toBe('明天 00:30')
   })
 
   it('更远的日期显示「M月D日 HH:mm」', () => {
     const now = new Date('2026-09-11T10:00:00')
-    expect(formatTimeRangeLabel(new Date('2026-09-13T08:05:00'), now)).toBe('9月13日 08:05')
+    expect(formatTimeRangeLabel(now, new Date('2026-09-13T08:05:00'))).toBe('9月13日 08:05')
   })
 
   it('时间无效时返回空字符串', () => {
-    expect(formatTimeRangeLabel(new Date('无效'), new Date('2026-09-11T10:00:00'))).toBe('')
+    expect(formatTimeRangeLabel(new Date('2026-09-11T10:00:00'), new Date('无效'))).toBe('')
   })
 })
 
@@ -120,5 +133,11 @@ describe('formatPlate', () => {
 
   it('长度不足时原样返回', () => {
     expect(formatPlate('京A8')).toBe('京A8')
+  })
+
+  it('清掉全部已有分隔符，不只第一个', () => {
+    // 用户手输或上游存了「京·A8·K9」时，只删首个分隔符会重排成「京A·8·K9」——
+    // 看着像车牌，其实是错的
+    expect(formatPlate('京·A8·K9')).toBe('京A·8K9')
   })
 })

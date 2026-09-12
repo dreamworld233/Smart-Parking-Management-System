@@ -201,6 +201,22 @@ describe('scoreLot', () => {
     expect(r.reasons).toContain('高峰紧张')
   })
 
+  it('价差文案与 formatAmount 同口径，保留两位小数', () => {
+    // 5.1 - 5 在浮点下是 0.09999999999999964。理由文案自己拼金额会渲染成 ¥0.1，
+    // 同一笔钱在列表里却是 ¥0.10，两处对不上
+    const near = lot({ id: 'near', pricing: { ...lot().pricing, firstHour: 5.1 } })
+    const cheapest = lot({ id: 'cheap', pricing: { ...lot().pricing, firstHour: 5 } })
+    const far = lot({ id: 'far', pricing: { ...lot().pricing, firstHour: 20 } })
+    const r = scoreLot(near, {
+      allLots: [near, cheapest, far],
+      hasCharging: false,
+      userNeedsCharging: false,
+    })
+
+    expect(r.factors.fee).toBeGreaterThanOrEqual(0.8)
+    expect(r.reasons).toContain('比最低价贵 ¥0.10')
+  })
+
   it('理由多于 3 条时按优先级截断', () => {
     // 最便宜 + 最近 + 空位充足 + 有充电桩 = 4 条理由，截断后「有充电桩」应被挤掉
     const best = lot({

@@ -1,3 +1,4 @@
+import { formatAmount } from './format'
 import type { LotAvailability, ParkingLot, ReasonTone, Recommendation, ScoreFactors } from './types'
 
 /** 占用率警戒线：占用率超过该值即为饱和，推荐时降权或剔除（PM 2.2） */
@@ -25,6 +26,8 @@ export function isSaturated(freeRate: number): boolean {
  *
  * 取值必须落在 (1, 1/FREE_FLOOR)：等于 1 时 warn 档整个不可达（bad 与 ok 直接相邻），
  * 大于等于 1/FREE_FLOOR 时 ok 档不可达（空闲率拉满到 1 也还是 warn）。
+ * 上界这半句以「空闲率不超过 1」为前提 —— freeRate 对 freeSpots 大于 totalSpots
+ * 的脏数据并不封顶，那种输入下 ok 仍可能出现，饱和判定不受影响。
  * 这两个边界是用户可见的：调大倍数就是加宽琥珀色带。
  */
 export const AVAILABILITY_WARN_RATIO = 2
@@ -192,8 +195,9 @@ function buildReasons(
 
   if (factors.fee >= 0.8) {
     const diff = lot.pricing.firstHour - minFee
-    // 差额先四舍五入到分：5.1 - 5 在浮点下是 0.09999999999999964，直接渲染很难看
-    if (diff > 0) reasons.push(`比最低价贵 ¥${Math.round(diff * 100) / 100}`)
+    // 金额一律走 formatAmount：自己拼会把 5.1 - 5（浮点下 0.09999999999999964）
+    // 渲染成 ¥0.1，而同一笔钱在列表里是 ¥0.10
+    if (diff > 0) reasons.push(`比最低价贵 ¥${formatAmount(diff)}`)
     // 候选里根本没有价差时不说「最低」——否则一组同价车场会个个都标「单价最低」
     else if (maxFee > minFee) reasons.push('单价最低')
   }

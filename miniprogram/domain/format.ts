@@ -14,13 +14,18 @@ export function formatDistance(meters: number): string {
 }
 
 /**
- * 余位展示。缺失时显示 `--`，绝不显示 0（0 与未知语义不同）。
- * Number.isFinite 一次同时挡掉 null / undefined / NaN，不必逐个判空
+ * 单个车位数的展示。缺失时显示 `--`，绝不显示 0（0 与未知语义不同）；
+ * 负数按 0 处理 —— 那是脏数据，与 freeRate 的兜底同向：
+ * 宁可说「没空位」，也不要把坏数据说成「空位充足」。
+ * typeof + Number.isFinite 一起用：前者让 TS 收窄掉 null，后者挡 NaN
  */
+function formatSpotCount(v: number | null): string {
+  return typeof v === 'number' && Number.isFinite(v) ? String(Math.max(0, v)) : UNKNOWN
+}
+
+/** 余位展示，形如 `46/500` */
 export function formatSpots(free: number | null, total: number | null): string {
-  const f = Number.isFinite(free) ? String(free) : UNKNOWN
-  const t = Number.isFinite(total) ? String(total) : UNKNOWN
-  return `${f}/${t}`
+  return `${formatSpotCount(free)}/${formatSpotCount(total)}`
 }
 
 /**
@@ -54,7 +59,12 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
-export function formatTimeRangeLabel(time: Date, now: Date): string {
+/**
+ * 到达时刻文案。参数序 **now 在前**，与 formatCountdown、time.ts 的
+ * isWithinWindow 一致 —— 两个入参都是 Date，写反了类型检查抓不到，
+ * 只会静默把「现在」渲染成到达时间
+ */
+export function formatTimeRangeLabel(now: Date, time: Date): string {
   // 无效 Date 的 getHours() 是 NaN，不挡会渲染成「NaN月NaN日 NaN:NaN」
   if (!Number.isFinite(time.getTime()) || !Number.isFinite(now.getTime())) return ''
   const hhmm = `${pad2(time.getHours())}:${pad2(time.getMinutes())}`
@@ -67,10 +77,12 @@ export function formatTimeRangeLabel(time: Date, now: Date): string {
 /**
  * 车牌展示：省市简称 + 字母后插入分隔点。
  * 不足 4 位的不可能是车牌，原样返回 —— 门槛写成 3 会把「京A8」这种脏数据
- * 变成「京A·8」，看着像正常车牌，反而更难排查
+ * 变成「京A·8」，看着像正常车牌，反而更难排查。
+ * 分隔符要全局清：只替换首个的话，「京·A8·K9」会被重排成「京A·8·K9」，
+ * 一个看着对、实际错的车牌
  */
 export function formatPlate(plate: string): string {
-  const raw = plate.replace('·', '')
+  const raw = plate.replace(/·/g, '')
   if (raw.length < 4) return plate
   return `${raw.slice(0, 2)}·${raw.slice(2)}`
 }
