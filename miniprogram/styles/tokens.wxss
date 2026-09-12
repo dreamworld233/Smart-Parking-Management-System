@@ -28,6 +28,10 @@ page {
   --font-tag: 22rpx;
   --font-micro: 20rpx;
 
+  /* 布局 */
+  /* Skyline 不支持 fixed，tabBar 只能 absolute 贴页面根节点，页面需自己让出这个高度 */
+  --tabbar-h: 100rpx;
+
   /* 间距 */
   --space-1: 8rpx;
   --space-2: 16rpx;

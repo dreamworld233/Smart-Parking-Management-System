@@ -1,4 +1,6 @@
 .page {
   padding: var(--space-4);
+  /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   color: var(--color-text-weak);
 }
