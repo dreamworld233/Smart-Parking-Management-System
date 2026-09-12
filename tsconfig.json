@@ -3,7 +3,10 @@
     "strictNullChecks": true,
     "noImplicitAny": true,
     "module": "CommonJS",
-    "target": "ES2020",
+    // 不能是 ES2020：`??` 与 `?.` 属于 ES2020 语法，target 定在 ES2020 时
+    // TS 原样输出，而真机的 JS 引擎不认 —— 2026-09-12 真机调试报
+    // 「SyntaxError: Unexpected token ?」即此。ES2017 会让 TS 把它们降级
+    "target": "ES2017",
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -16,7 +19,9 @@
     "noUnusedParameters": true,
     "strict": true,
     "strictPropertyInitialization": true,
-    "lib": ["ES2020"],
+    // lib 跟着 target 一起压在 ES2017：这样写 `replaceAll` / `Object.fromEntries`
+    // 这类设备不支持的 API 会当场编译报错，而不是等到真机上才炸
+    "lib": ["ES2017"],
     "typeRoots": [
       "./typings"
     ]
