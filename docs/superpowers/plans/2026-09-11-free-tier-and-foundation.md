@@ -2409,9 +2409,11 @@ git commit -m "feat(services): aggregate POI into parking lots with estimated fi
 
 ## Task 12: 车场卡片与排序 chips 组件
 
-**Files:**
-- Create: `miniprogram/components/lot-card/*`
-- Create: `miniprogram/components/sort-chips/*`
+> **已实现（2026-09-12），实现与下面的代码块有 4 处偏差 —— 以代码为准：**
+> 1. **`sort-chips` 的 `variant` 原本声明了却没生效**（`OPTIONS` 只有一套短文案），而 UI 稿 §5.2 要求搜索页用「综合推荐 / 距离最近 / 费用最低 / 空位最多」。改为 `OPTIONS` 同时带 `short` / `long`，WXML 里按 `variant` 取，不做 observer 回写 `data`
+> 2. **`lot-card.wxml` 的推荐理由循环会自我遮蔽**：`wx:for="{{item.reasons}}"` 的默认循环变量就叫 `item`，把外层属性 `item` 盖掉，`class="tag {{item.tone}}"` 取到的是理由字符串，**class 静默变空、标签全掉色**（不报错）。改成 `wx:for-item="reason"`
+> 3. **卡片补了数据来源标注**：新增 `item.estimateText` 字段（空串不渲染），渲染成虚线框的 `tag source`。UI 稿 §6「数据为估算值 → 卡片与详情页标注数据来源」是硬要求，原规格漏了
+> 4. `lot-card.ts` 里 `item` 声明成 `Object` 会让 `data.item` 推成 `never`（`value: null` 推不出元素类型），统一走 `readItem()` 收窄；三个事件都从 `item` 取 id，不再用 `dataset` 传一遍
 
 - [ ] **Step 1: 写 sort-chips**
 
@@ -2751,6 +2753,22 @@ interface CardVM {
   spotsText: string
   // 用领域类型而非 string：下次有人想在这里再写死一个阈值时，是类型错误而不是静默分叉
   freeClass: AvailabilityLevel
+  // Task 12 新增：卡片的数据来源标注，来自 domain 的 sourceNote()
+  estimateText: string
+}
+
+/**
+ * 数据来源标注（UI 稿 §6「数据为估算值 → 卡片与详情页标注数据来源」）。
+ * **放在 `domain/format.ts` 并补 `tests/domain/format.test.ts`**，Task 14/15 复用同一份文案。
+ * 逐条判而不是「够不够精确一律标」：首页只给 Top3 查真实步行路线，
+ * 同一次列表里 route 与 estimated 是混着的，整批标一个反而误导
+ */
+export function sourceNote(lot: ParkingLot): string {
+  const parts: string[] = []
+  if (lot.distanceSource === 'estimated') parts.push('距离')
+  if (lot.pricing.source === 'estimated') parts.push('收费')
+  if (lot.availability.source === 'estimated') parts.push('余位')
+  return parts.length ? `${parts.join('、')}为估算` : ''
 }
 
 function toVM(rec: Recommendation): CardVM {
@@ -2767,6 +2785,7 @@ function toVM(rec: Recommendation): CardVM {
     walkText: `${rec.lot.walkMinutes} 分钟`,
     spotsText: formatSpots(free, total),
     freeClass: availabilityLevel(rate),
+    estimateText: sourceNote(rec.lot),
   }
 }
 
@@ -4004,4 +4023,4 @@ git commit -m "feat: implement lot detail page"
 - 车场端全部页面 → 计划 3
 - 真实车流预测服务：当前 `buildForecast` 是由实时空闲率推导的占位曲线，接入后替换
 - 登录与会话：`app.ts` 本阶段不做 `wx.login`，`services/api.ts` 在计划 2 需要后端时再引入
-- `miniprogram/services/lot.ts` 的估算字段（车位数、余位、收费）在界面上尚未逐处标注来源，计划 2 统一处理
+- 详情页（Task 15）的估算字段标注：卡片已在 Task 12 补了 `estimateText` 标签，详情页的三统计块与收费规则卡尚未逐处标注
