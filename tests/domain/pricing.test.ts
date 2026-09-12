@@ -1,4 +1,4 @@
-import { PLATFORM_SERVICE_FEE, leadHours, prepaidParkingFee, quoteTotal } from '../pricing'
+import { PLATFORM_SERVICE_FEE, leadHours, prepaidParkingFee, quoteTotal } from '../../miniprogram/domain/pricing'
 
 describe('leadHours', () => {
   it('不足 1 小时按 1 小时计', () => {

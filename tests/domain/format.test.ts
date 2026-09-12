@@ -5,7 +5,7 @@ import {
   formatPlate,
   formatSpots,
   formatTimeRangeLabel,
-} from '../format'
+} from '../../miniprogram/domain/format'
 
 describe('formatDistance', () => {
   it('小于 1 公里用米', () => {

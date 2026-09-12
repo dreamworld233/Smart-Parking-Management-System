@@ -8,8 +8,8 @@ import {
   availabilityLevel,
   scoreLot,
   topRecommendations,
-} from '../scoring'
-import type { ParkingLot } from '../types'
+} from '../../miniprogram/domain/scoring'
+import type { ParkingLot } from '../../miniprogram/domain/types'
 
 function lot(over: Partial<ParkingLot> = {}): ParkingLot {
   return {

@@ -1,4 +1,4 @@
-import { ENTRY_GRACE_MINUTES, MAX_LEAD_HOURS, buildArrivalOptions, enterDeadline, isWithinWindow } from '../time'
+import { ENTRY_GRACE_MINUTES, MAX_LEAD_HOURS, buildArrivalOptions, enterDeadline, isWithinWindow } from '../../miniprogram/domain/time'
 
 const NOW = new Date('2026-09-11T13:40:00')
 const MINUTE_MS = 60 * 1000

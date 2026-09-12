@@ -1,5 +1,5 @@
-import { sortLots } from '../sort'
-import type { ParkingLot, Recommendation, SortKey } from '../types'
+import { sortLots } from '../../miniprogram/domain/sort'
+import type { ParkingLot, Recommendation, SortKey } from '../../miniprogram/domain/types'
 
 function rec(id: string, score: number, distanceM: number, firstHour: number, freeSpots: number): Recommendation {
   const lot: ParkingLot = {
