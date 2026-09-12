@@ -4,13 +4,15 @@
   "description": "",
   "scripts": {
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:live": "jest --config jest.live.config.js"
   },
   "keywords": [],
   "author": "",
   "license": "",
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.2",
     "jest": "^30.5.1",
     "miniprogram-api-typings": "^5.2.3",
     "ts-jest": "^29.4.12",

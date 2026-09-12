@@ -83,6 +83,39 @@ describe('searchNearby', () => {
 
     await expect(searchNearby('停车场', { lat: 0, lng: 0 }, 100)).rejects.toBeInstanceOf(QQMapError)
   })
+
+  it('半径外 POI 由本地过滤掉', async () => {
+    // 实测接口的 nearby 半径不生效：r=300 与 r=3000 返回同一批（最远 685 米），
+    // 不自己过滤的话首页会把 3 公里外的车场也列出来
+    stubRequest(opt =>
+      opt.success({
+        data: searchBody([
+          { ...RAW_POI, id: 'in', _distance: 200 },
+          { ...RAW_POI, id: 'out', _distance: 900 },
+        ]),
+      }),
+    )
+
+    const pois = await searchNearby('停车场', { lat: 0, lng: 0 }, 500)
+
+    expect(pois.map(p => p.id)).toEqual(['in'])
+  })
+
+  it('不依赖服务端顺序，按距离升序返回', async () => {
+    stubRequest(opt =>
+      opt.success({
+        data: searchBody([
+          { ...RAW_POI, id: 'far', _distance: 480 },
+          { ...RAW_POI, id: 'near', _distance: 120 },
+          { ...RAW_POI, id: 'mid', _distance: 300 },
+        ]),
+      }),
+    )
+
+    const pois = await searchNearby('停车场', { lat: 0, lng: 0 }, 500)
+
+    expect(pois.map(p => p.id)).toEqual(['near', 'mid', 'far'])
+  })
 })
 
 describe('searchByKeyword', () => {
@@ -173,7 +206,8 @@ describe('失败处理', () => {
       else opt.success({ data: searchBody([RAW_POI]) })
     })
 
-    const pois = await searchNearby('停车场', { lat: 0, lng: 0 }, 100)
+    // 半径必须盖住 fixture 的 320 米，否则会被本地过滤掉，这条就测不到重试了
+    const pois = await searchNearby('停车场', { lat: 0, lng: 0 }, 1000)
 
     expect(pois).toHaveLength(1)
     expect(sent.length).toBe(2)

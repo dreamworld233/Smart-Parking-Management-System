@@ -4,6 +4,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "typeRoots": ["./node_modules/@types", "./typings"],
-    "types": ["jest"]
+    // node 只给测试用（live 套件把 wx.request 接到 Node 的 https 上）；
+    // 主 tsconfig 不引 node 类型，免得小程序代码里误用 Node API 也能过编译
+    "types": ["jest", "node"]
   }
 }

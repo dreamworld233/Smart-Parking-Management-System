@@ -101,17 +101,27 @@ function toPoi(item: RawPoi): PoiItem {
   }
 }
 
-/** 关键词周边检索。region 为城市名，小程序端可留空由坐标决定 */
+/**
+ * 关键词周边检索，返回半径内按距离升序的 POI。
+ *
+ * 半径是**本地过滤**的：实测接口的 `nearby(...,r)` 半径不生效 ——
+ * r 取 300 / 1000 / 3000 并配上 auto_extend=0/1，返回的都是同一批「最近 20 条」。
+ * 想靠接口自己限半径，首页会把 3 公里外的车场也列进来。排序同理：
+ * 按 `_distance` 排一次不贵，且不依赖服务端的排序口径
+ */
 export async function searchNearby(keyword: string, center: GeoPoint, radiusM: number): Promise<PoiItem[]> {
   const raw = await get<RawPoi[]>(SEARCH_PATH, {
     keyword,
     boundary: `nearby(${center.lat},${center.lng},${radiusM})`,
-    // 不按距离排序时接口不返回 _distance，车场距离会全变成 0
+    // 按距离排序请求，让接口把最近的排在前面（_distance 也随之下发）
     orderby: '_distance',
     page_size: 20,
     page_index: 1,
   })
-  return (raw ?? []).map(toPoi)
+  return (raw ?? [])
+    .map(toPoi)
+    .filter(poi => poi.distanceM <= radiusM)
+    .sort((a, b) => a.distanceM - b.distanceM)
 }
 
 /** 关键词城市级检索，用于搜索页输入目的地/车场名 */

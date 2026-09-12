@@ -150,6 +150,7 @@
 | `status: 110` | 请求来源未被授权——检查是否误设了「授权 IP」 |
 | `status: 311` | Key 格式错误（复制时被截断/混入空格） |
 | `status: 121` `此key每日调用量已达到上限` | 额度已满。**但别急着认定当天就废了**：2026-09-12 实测同一分钟内时通时不通，几分钟后自行恢复——先重试/稍后再试，持续 121 再去控制台「配额」页确认 |
+| 周边检索返回了半径外的地点 | **接口的 `nearby(lat,lng,r)` 半径不生效**（实测 r=300/1000/3000、auto_extend=0/1 都返回同一批「最近 20 条」）。半径必须本地过滤，见 `services/qqmap.ts` 的 `searchNearby` |
 | `request:fail url not in domain list` | request 合法域名没配；开发期可勾「不校验合法域名」绕过 |
 | `getLocation:fail api scope is not declared in the privacy agreement` | `app.json` 没声明 `requiredPrivateInfos`，或隐私保护指引没配 |
 | `getLocation:fail auth deny` | 用户主动拒绝了定位授权——本项目会走「未获取到定位授权」空态，属正常降级 |
