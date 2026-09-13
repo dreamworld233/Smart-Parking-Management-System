@@ -46,6 +46,18 @@ export function fallbackNotice(reason: 'denied' | 'failed', placeName: string): 
     : `定位失败，默认显示${placeName}周边`
 }
 
+/**
+ * **搜索页**的定位提示。与 `fallbackNotice` 分家而不是复用，因为两页里定位的
+ * 作用根本不同：首页没有定位就换一批数据（改成兜底点周边），搜索页显示的始终是
+ * **用户输入的目的地**周边的车场，定位只参与「同名地点谁排前面」这一个排序提示。
+ * 照抄首页那句「默认显示合肥大学周边」会与实际画面不符 —— 用户没搜合肥大学也照样看到它
+ */
+export function searchLocationNotice(reason: 'denied' | 'failed'): string {
+  return reason === 'denied'
+    ? '未开启定位，无法优先显示离您近的地点'
+    : '定位失败，无法优先显示离您近的地点'
+}
+
 /** 数据缺失时的统一占位。0 与「未知」语义不同，不可混用 */
 const UNKNOWN = '--'
 

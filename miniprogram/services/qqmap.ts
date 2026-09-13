@@ -84,7 +84,12 @@ interface RawPoi {
   title: string
   address: string
   location: { lat: number; lng: number }
-  /** 仅在 boundary 为 nearby 且按距离排序时返回 */
+  /**
+   * 与检索中心的直线距离。`nearby` 边界下即会下发，**与 orderby 无关**
+   * （2026-09-13 实测；早前「必须传 orderby=_distance」的说法不成立 ——
+   * 传它只是为了排序，别为了拿到这个字段给 `searchDestination` 加回去，
+   * 那会让相关度排序变成距离优先）
+   */
   _distance?: number
 }
 
@@ -110,7 +115,8 @@ export async function searchNearby(keyword: string, center: GeoPoint, radiusM: n
   const raw = await get<RawPoi[]>(SEARCH_PATH, {
     keyword,
     boundary: `nearby(${center.lat},${center.lng},${radiusM})`,
-    // 按距离排序请求，让接口把最近的排在前面（_distance 也随之下发）
+    // 按距离排序请求，让接口把最近的排在前面（这里只是为了顺序 ——
+    // _distance 在 nearby 边界下不传 orderby 也照样下发）
     orderby: '_distance',
     page_size: 20,
     page_index: 1,
@@ -121,11 +127,49 @@ export async function searchNearby(keyword: string, center: GeoPoint, radiusM: n
     .sort((a, b) => a.distanceM - b.distanceM)
 }
 
-/** 关键词城市级检索，用于搜索页输入目的地/车场名 */
+/**
+ * 关键词城市级检索。
+ *
+ * ⚠️ **页面不要用它**：它的 `region` 一旦与关键词的真实所在城市不符，接口会
+ * 跨城模糊兜底 —— 实测 `keyword=合肥大学&boundary=region(济南,0)` 返回的是
+ * **山东大学、济南大学**，页面会一本正经地列出一批错误的车场，且没有任何
+ * 迹象表明搜错了。目的地检索请用 `searchDestination`。留在这里是因为知道
+ * 城市、也接受同名地点混入时它仍有意义（live 测试拿它当接口探针）
+ */
 export async function searchByKeyword(keyword: string, region: string): Promise<PoiItem[]> {
   const raw = await get<RawPoi[]>(SEARCH_PATH, {
     keyword,
     boundary: `region(${region},0)`,
+    page_size: 20,
+    page_index: 1,
+  })
+  return (raw ?? []).map(toPoi)
+}
+
+/**
+ * 目的地检索：把关键词当**地点名**搜，返回按相关度排序的候选，供搜索页取首个
+ * 匹配当下车点。
+ *
+ * 三点与 `searchNearby` 不同，都是 2026-09-13 实测逼出来的：
+ * - **不传 `orderby`**：默认是相关度排序。传 `_distance` 会变成距离优先 ——
+ *   实测搜「万象城」的头条成了 4.6 公里外的「XX民宿(万象城店)」，真正要去的
+ *   合肥万象城反而排在第 3 位之后
+ * - **不按半径过滤**：接口的半径是摆设（实测 r=50000 照样返回 545 公里外的
+ *   结果），而这正是目的地检索想要的 —— 用户在外地也能搜到老家的目的地，
+ *   本地过滤等于把跨城检索全砍了
+ * - **`center` 只影响排序**，不构成范围限制：同样搜「万象城」，以合肥为心返回
+ *   合肥万象城、以济南为心返回济南万象城。所以不需要「当前城市」这种概念，
+ *   定位拿不到时传兜底点即可
+ */
+export async function searchDestination(
+  keyword: string,
+  center: GeoPoint,
+  biasRadiusM: number,
+): Promise<PoiItem[]> {
+  const raw = await get<RawPoi[]>(SEARCH_PATH, {
+    keyword,
+    // 半径只是语法上必填（`boundary` 不能省，少了直接 348），接口不按它筛
+    boundary: `nearby(${center.lat},${center.lng},${biasRadiusM})`,
     page_size: 20,
     page_index: 1,
   })

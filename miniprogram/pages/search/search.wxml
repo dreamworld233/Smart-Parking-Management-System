@@ -1,0 +1,84 @@
+<view class="wrap">
+  <view class="bar" style="top: {{searchTop}}px">
+    <view class="bar__back" bindtap="onBack">‹</view>
+    <input
+      class="bar__input"
+      value="{{keyword}}"
+      placeholder="搜目的地 / 车场名"
+      confirm-type="search"
+      bindinput="onInput"
+      bindconfirm="onSearch"
+    />
+    <view class="bar__cancel" bindtap="onBack">取消</view>
+  </view>
+
+  <!-- 还没搜过：只出历史，不出地图（少一次原生组件创建） -->
+  <view class="hist" wx:if="{{state === 'idle'}}" style="padding-top: {{mapTop}}px">
+    <view class="hist__title" wx:if="{{history.length}}">历史搜索</view>
+    <view class="hist__list" wx:if="{{history.length}}">
+      <view
+        wx:for="{{history}}"
+        wx:key="*this"
+        class="hist__item"
+        data-kw="{{item}}"
+        bindtap="onHistoryTap"
+      >{{item}}</view>
+    </view>
+    <view class="hist__empty" wx:else>输入目的地或车场名，找它周边的停车场</view>
+  </view>
+
+  <map
+    wx:if="{{state !== 'idle'}}"
+    class="wrap__map"
+    style="top: {{mapTop}}px; height: {{mapHeight}}px"
+    latitude="{{centerLat}}"
+    longitude="{{centerLng}}"
+    scale="15"
+    markers="{{markers}}"
+  />
+
+  <view class="chips-row" wx:if="{{state === 'ready'}}" style="top: {{chipsTop}}px">
+    <!-- 长标签：UI 稿 §5.2 是「综合推荐 / 距离最近 / 费用最低 / 空位最多」，首页才用短的那套 -->
+    <sort-chips variant="long" value="{{sortKey}}" bind:change="onSortChange" />
+  </view>
+
+  <view class="sheet" wx:if="{{state !== 'idle'}}" style="top: {{sheetTop}}px; padding-bottom: {{safeBottom}}px">
+    <view class="sheet__handle" />
+
+    <view class="notice" wx:if="{{fallbackText}}">
+      <text class="notice__text">{{fallbackText}}</text>
+    </view>
+
+    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在检索…" />
+
+    <state-view
+      wx:elif="{{state === 'empty'}}"
+      kind="empty"
+      text="没有找到相关车场"
+      hint="换个关键词，或直接输入目的地"
+    />
+
+    <state-view
+      wx:elif="{{state === 'error'}}"
+      kind="error"
+      text="检索失败"
+      hint="请检查网络后重试"
+      action-text="重试"
+      bind:action="onRetry"
+    />
+
+    <scroll-view wx:elif="{{state === 'ready'}}" class="sheet__list" scroll-y>
+      <view class="sheet__hint">{{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
+      <lot-card
+        wx:for="{{cards}}"
+        wx:key="lot.id"
+        item="{{item}}"
+        show-actions
+        bind:cardtap="onCardTap"
+        bind:navigate="onNavigate"
+        bind:reserve="onReserve"
+      />
+      <view class="sheet__tail" />
+    </scroll-view>
+  </view>
+</view>

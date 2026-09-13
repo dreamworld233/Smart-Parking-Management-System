@@ -1,5 +1,5 @@
 import { QQMAP_KEY } from '../../miniprogram/config'
-import { QQMapError, searchByKeyword, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
+import { QQMapError, searchByKeyword, searchDestination, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
 import { installWxRequestShim, throttleMatrix } from './wx-node-shim'
 
 // 假 Key 时整组跳过并说明原因：公开仓库新克隆的机器上跑 test:live 不该给个
@@ -29,8 +29,8 @@ maybeDescribe('qqmap 真接口', () => {
       for (const poi of pois) {
         expect(poi.id).not.toBe('')
         expect(poi.title).not.toBe('')
-        // 距离字段只有传了 orderby=_distance 才有值。这条挂了就说明排序参数丢了，
-        // 页面会把所有车场显示成 0 米
+        // 距离字段挂 0 说明接口没下发 _distance，页面会把车场全显示成 0 米。
+        // （不是 orderby 的问题：2026-09-13 实测 nearby 边界下不传 orderby 也有值）
         expect(poi.distanceM).toBeGreaterThan(0)
         expect(poi.distanceM).toBeLessThanOrEqual(RADIUS_M)
         expect(poi.location.lat).toBeCloseTo(CENTER.lat, 1)
@@ -47,6 +47,22 @@ maybeDescribe('qqmap 真接口', () => {
 
       expect(pois.length).toBeGreaterThan(0)
       expect(pois.some(p => p.title.indexOf('泉城广场') >= 0)).toBe(true)
+    },
+    20000,
+  )
+
+  it(
+    '目的地检索跨城也能命中正确的地点',
+    async () => {
+      // 以**济南**为心搜「合肥大学」，这是搜索页取首个匹配当下车点的那一步。
+      // 两个已排除的写法在这条上都会露馅：region(济南) 给的是山东大学/济南大学，
+      // orderby=_distance 给的是一堆「XX大学」小 POI。相关度排序必须把合肥大学排第一。
+      // 顺带固定住「半径是摆设」这个前提：545 公里外的结果照收
+      const pois = await searchDestination('合肥大学', CENTER, 50000)
+
+      expect(pois.length).toBeGreaterThan(0)
+      expect(pois[0].title).toContain('合肥大学')
+      expect(pois[0].distanceM).toBeGreaterThan(400000)
     },
     20000,
   )

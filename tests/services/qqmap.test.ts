@@ -1,4 +1,4 @@
-import { QQMapError, searchByKeyword, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
+import { QQMapError, searchByKeyword, searchDestination, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
 import { QQMAP_KEY } from '../../miniprogram/config'
 
 interface ReqOption {
@@ -60,7 +60,8 @@ describe('searchNearby', () => {
 
     await searchNearby('停车场', { lat: 36.65, lng: 117.12 }, 3000)
 
-    // 不传 orderby 时接口不返回 _distance，车场距离会全是 0
+    // 这里传 orderby 是为了**排序**（最近的排前面），不是为了让 _distance 出现：
+    // 2026-09-13 实测 nearby 边界下不传 orderby 也照样下发 _distance
     const url = decodeURIComponent(sent[0].url)
     expect(url).toContain('https://apis.map.qq.com/ws/place/v1/search?')
     expect(url).toContain('boundary=nearby(36.65,117.12,3000)')
@@ -127,6 +128,43 @@ describe('searchByKeyword', () => {
     const url = decodeURIComponent(sent[0].url)
     expect(url).toContain('boundary=region(济南,0)')
     expect(url).toContain('keyword=泉城广场')
+  })
+})
+
+describe('searchDestination', () => {
+  it('请求带 nearby 边界，但**不带** orderby', async () => {
+    stubRequest(opt => opt.success({ data: searchBody([]) }))
+
+    await searchDestination('万象城', { lat: 31.75, lng: 117.25 }, 50000)
+
+    // 传 orderby=_distance 会变成距离优先：实测搜「万象城」的头条变成 4.6 公里外的
+    // 「XX民宿(万象城店)」，真正要去的合肥万象城排到第 3 位之后。
+    // 默认的相关度排序才是目的地检索要的
+    const url = decodeURIComponent(sent[0].url)
+    expect(url).toContain('boundary=nearby(31.75,117.25,50000)')
+    expect(url).not.toContain('orderby')
+  })
+
+  it('保留远处的结果，不按半径过滤', async () => {
+    // 接口的半径是摆设：实测 r=50000 照样返回 545 公里外的同名地点，
+    // 而这正是跨城目的地检索想要的。加回本地过滤等于把跨城检索全砍掉
+    const far = { ...RAW_POI, id: 'far', title: '合肥大学(南艳湖校区)', _distance: 545434.78 }
+    stubRequest(opt => opt.success({ data: searchBody([far]) }))
+
+    const pois = await searchDestination('合肥大学', { lat: 36.65, lng: 117.12 }, 50000)
+
+    expect(pois).toHaveLength(1)
+    expect(pois[0].title).toBe('合肥大学(南艳湖校区)')
+    expect(pois[0].distanceM).toBe(545434.78)
+  })
+
+  it('缺失的 _distance 记 0，而不是 NaN', async () => {
+    const { _distance, ...noDistance } = RAW_POI
+    stubRequest(opt => opt.success({ data: searchBody([noDistance]) }))
+
+    const pois = await searchDestination('万象城', { lat: 31.75, lng: 117.25 }, 50000)
+
+    expect(pois[0].distanceM).toBe(0)
   })
 })
 

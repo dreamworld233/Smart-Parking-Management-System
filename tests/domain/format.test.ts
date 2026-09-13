@@ -1,5 +1,6 @@
 import {
   fallbackNotice,
+  searchLocationNotice,
   formatAmount,
   formatCountdown,
   formatDistance,
@@ -199,5 +200,19 @@ describe('fallbackNotice', () => {
     // 相同就意味着「去设置页授权」与「检查定位开关」被合并成同一句，
     // 用户照着做也无从下手 —— 这正是 services/location.ts 要分开 reason 的原因
     expect(fallbackNotice('denied', '合肥大学')).not.toBe(fallbackNotice('failed', '合肥大学'))
+  })
+})
+
+describe('searchLocationNotice', () => {
+  it('两种失败各说各的话', () => {
+    expect(searchLocationNotice('denied')).toBe('未开启定位，无法优先显示离您近的地点')
+    expect(searchLocationNotice('failed')).toBe('定位失败，无法优先显示离您近的地点')
+  })
+
+  it('不照抄首页那套「默认显示 X 周边」', () => {
+    // 搜索页显示的是**目的地**周边的车场，定位只参与「同名地点谁排前面」的排序提示，
+    // 说「默认显示合肥大学周边」与实际画面不符 —— 参数不同，两句话必须不同
+    expect(searchLocationNotice('denied')).not.toBe(fallbackNotice('denied', '合肥大学'))
+    expect(searchLocationNotice('denied')).not.toContain('合肥大学')
   })
 })

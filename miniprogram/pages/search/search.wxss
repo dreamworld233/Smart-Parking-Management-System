@@ -1,0 +1,141 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* 顶栏与地图、面板一样用 px 定位（top 由 search.ts 按胶囊下沿算好内联传入）：
+   写死 88rpx 的状态栏占位在带胶囊的真机上会让返回键钻进胶囊下面 */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.bar__input {
+  flex: 1;
+  height: 72rpx;
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0 24rpx;
+  font-size: 26rpx;
+}
+
+.bar__cancel {
+  font-size: 26rpx;
+  color: var(--color-text-weak);
+}
+
+/* 顶部留白由 search.ts 算成 px 内联传入（要刚好让开绝对定位的顶栏） */
+.hist {
+  padding: 0 28rpx;
+}
+
+.hist__title {
+  font-size: 23rpx;
+  color: var(--color-text-weak);
+  margin-bottom: 20rpx;
+}
+
+.hist__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.hist__item {
+  padding: 12rpx 28rpx;
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.hist__empty {
+  padding: 40rpx 0;
+  text-align: center;
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
+
+/* 高度与 top 由 search.ts 算成 px 内联传入 */
+.wrap__map {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.chips-row {
+  position: absolute;
+  left: 28rpx;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  padding: 18rpx 28rpx 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet__handle {
+  width: 76rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: #cbd5e1;
+  margin: 0 auto 20rpx;
+  flex: none;
+}
+
+/* 与首页 .notice 同一套样式：两页各存一份是有意的 —— 见计划 Task 14 偏差说明，
+   合并要等 Skyline 页面级 @import 验证过再说 */
+.notice {
+  flex: none;
+  padding: 14rpx var(--space-3);
+  margin-bottom: var(--space-2);
+  background: #fffbeb;
+  border: 2rpx solid #fde68a;
+  border-radius: var(--radius-card);
+}
+
+.notice__text {
+  font-size: var(--font-sub);
+  color: var(--color-warning);
+}
+
+.sheet__hint {
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+  margin-bottom: 16rpx;
+}
+
+.sheet__list {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不给 0 的话 scroll-view 会撑破面板 */
+  height: 0;
+}
+
+.sheet__list lot-card {
+  display: block;
+  margin-bottom: 18rpx;
+}
+
+.sheet__tail { height: 40rpx; }

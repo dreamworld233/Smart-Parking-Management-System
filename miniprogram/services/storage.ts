@@ -56,3 +56,34 @@ export function setSession(session: Session): void {
 export function clearSession(): void {
   wx.removeStorageSync(SESSION_KEY)
 }
+
+const SEARCH_HISTORY_KEY = 'qnt.searchHistory'
+
+/** 历史搜索最多留几条。再多也只是把面板撑长，用户不会翻 */
+const SEARCH_HISTORY_MAX = 8
+
+/**
+ * 历史搜索词。与另外三个 getter 同规格地校验形状：
+ * `|| []` 只挡假值，存储里是字符串或对象时照样放行，页面下一句
+ * `history.filter(...)` 就是 `is not a function` 当场抛，而且抛在 setData 之前，
+ * 整页白屏。非字符串项逐条剔掉而不是整批作废 —— 一条脏数据不该让历史全没了
+ */
+export function getSearchHistory(): string[] {
+  const v = wx.getStorageSync(SEARCH_HISTORY_KEY)
+  if (!Array.isArray(v)) return []
+  return v.filter((item): item is string => typeof item === 'string')
+}
+
+/**
+ * 记一条搜索词：置顶、去重、截到上限。返回写入后的列表供页面直接渲染。
+ *
+ * 以**存储**为基准读数，不接页面的 `data.history`：列表若有第二个写入口
+ * （比如首页的搜索入口），拿内存里的旧值当基准会把另一处的记录覆盖掉
+ */
+export function pushSearchHistory(keyword: string): string[] {
+  const next = [keyword]
+    .concat(getSearchHistory().filter(h => h !== keyword))
+    .slice(0, SEARCH_HISTORY_MAX)
+  wx.setStorageSync(SEARCH_HISTORY_KEY, next)
+  return next
+}

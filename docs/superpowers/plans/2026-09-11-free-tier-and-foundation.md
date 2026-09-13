@@ -3202,6 +3202,24 @@ git commit -m "feat: implement home page with map, recommendations and sorting"
 
 ## Task 14: 搜索页
 
+> **已实现（2026-09-13），实现与下面的代码块有 7 处偏差 —— 以代码为准：**
+> 1. **`REGION = '济南'` 会静默给错答案**（2026-09-13 真接口实测，最要紧的一条）：`boundary` 是**必填**参数（不传直接 `348 参数错误，以下参数不合法：boundary`），而 `keyword=合肥大学&boundary=region(济南,0)` 返回的是**山东大学、济南大学、山东商业职业技术大学** —— 腾讯按关键词模糊匹配、跨城兜底，页面会一本正经地列出「合肥大学周边」的济南车场，且没有任何迹象表明搜错了。**全国检索这条路也不通**：`region(全国,0)` 对「万象城」返回 `status 0 / count 0 / data []`，只给一个城市级的 `cluster` 聚合数组，拿不到坐标。
+>
+>    改为 `services/qqmap.ts` 新增的 **`searchDestination(keyword, center, biasRadiusM)`**：`boundary=nearby(...)`、**不传 `orderby`、不做半径过滤**，中心点只当排序提示。三条都是实测逼出来的：
+>    - **不传 `orderby`**：默认按**相关度**排。传 `_distance` 会变成距离优先，搜「万象城」的头条成了 4.6 公里外的「XX民宿(万象城店)」，真正要去的**合肥万象城反而排在第 3 位之后**
+>    - **不按半径过滤**：半径在接口侧是摆设（实测 r=50000 照样返回 545 公里外的结果），而这恰恰是目的地检索想要的 —— 用户在外地也能搜到老家的目的地，本地过滤等于把跨城检索全砍了
+>    - **中心点只影响排序**：同样搜「万象城」，以合肥为心返回合肥万象城、以济南为心返回济南万象城。所以城市名这个我们根本没处拿的概念，**整个删掉**，定位拿不到时以 `FALLBACK_PLACE` 为心即可（与首页兜底口径一致）
+>
+>    附带修正一条旧结论：`services/qqmap.ts` 里「不传 `orderby=_distance` 就不返回 `_distance`」这句**在 `nearby` 边界下不成立** —— 今天实测不传 `orderby` 时 `_distance` 照常下发（首页传 `orderby` 是为了排序，不是为了让 `_distance` 出现）
+> 2. **`toVM` 漏了 `estimateText`**：`LotCardItem` 要求该字段，卡片的来源标注完全靠它。照计划写，`sourceNote` 那一栏渲染成空，**课程红线「估算数据必须标注来源」当场破掉**（Task 12 特意加、Task 13 特意接的东西）。补 `estimateText: sourceNote(rec.lot)`，与首页一致
+> 3. **历史搜索没走 `services/storage.ts`**：计划在页面里裸调 `wx.getStorageSync` 并直接 `|| []`，与 `getRole` / `getSession` / `getDefaultPlate` 的「读存储必须校验形状」约定不符 —— `|| []` 只挡假值，存储里是对象或字符串时照样放行，`history.filter` 当场抛。改为新增 `getSearchHistory()` / `pushSearchHistory()`，含条数上限与字符串过滤
+> 4. **`.sb { height: 88rpx }` 又写死了状态栏高度**：与 Task 13 偏差第 3 条同一个坑（写死的高度在带胶囊的真机上会钻到胶囊下面）。改为 `getMenuButtonBoundingClientRect().bottom + 8`，px 化
+> 5. **地图与面板几何 rpx 硬编码**：`.wrap__map` 的 `top: 180rpx; height: 480rpx`、`.chips-row` 的 `top: 670rpx`、`.sheet` 的 `top: 740rpx` —— Task 0 与 Task 13 的结论都是「按 `windowHeight` 算成 px」。矮屏不会顶出屏外，但大屏上地图固定 480rpx 会留出一大块空白。按首页同一套算法 px 化
+> 6. **`★ 推荐` 绑在排序后的首项上**：`i === 0` 在按距离/费用/空位排序后指向的**不是**推荐车场，而 UI 稿 D8 说的是「推荐结果 pin 用主色高亮」，与当前排序无关。改为按综合得分最高者标记（`topRecommendations` 已按分数降序，取 `recommendations[0].lot.id`），换排序时标记不跟着跑
+> 7. `state` 用内联字面量联合类型，按首页提取成 `type ViewState`
+>
+> **规格里没问题、别乱改的两处**：`show-actions` 的写法是对的（组件 `properties` 声明 `showActions`，WXML 用连字符，框架负责映射 —— 仓库里 `state-view` 的 `actionText` / `action-text` 就是先例）；搜索页不是 tabBar 页，**不需要**让出 `--tabbar-h`。
+
 **Files:**
 - Create: `miniprogram/pages/search/*`
 - Modify: `miniprogram/app.json`

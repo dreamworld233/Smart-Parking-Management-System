@@ -3,6 +3,7 @@
     "pages/role-select/role-select",
     "pages/spike-map/spike-map",
     "pages/home/home",
+    "pages/search/search",
     "pages/orders/orders",
     "pages/profile/profile",
     "pages/owner/dashboard/dashboard",
