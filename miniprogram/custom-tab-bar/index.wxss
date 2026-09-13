@@ -9,10 +9,13 @@
   bottom: 0;
   pointer-events: auto;
   display: flex;
-  height: var(--tabbar-h);
+  /* 全部带兜底值：本组件由框架单独挂载，取不到 app.wxss 里定义在 `page` 上的变量时
+     var() 会让整条声明失效 —— 背景没了，底下的地图直接透上来（真机上看着像导航栏被地图盖住）。
+     兜底值要与 styles/tokens.wxss 保持一致 */
+  height: var(--tabbar-h, 100rpx);
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--color-surface);
-  border-top: 2rpx solid var(--color-border);
+  background: var(--color-surface, #ffffff);
+  border-top: 2rpx solid var(--color-border, #e2e8f0);
 }
 
 .tabbar__item {
@@ -23,11 +26,11 @@
   justify-content: center;
   gap: 6rpx;
   font-size: 21rpx;
-  color: var(--color-text-weak);
+  color: var(--color-text-weak, #94a3b8);
 }
 
 .tabbar__item--on {
-  color: var(--color-primary);
+  color: var(--color-primary, #2563eb);
   font-weight: 600;
 }
 

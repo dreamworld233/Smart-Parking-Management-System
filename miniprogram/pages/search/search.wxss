@@ -10,6 +10,11 @@
    写死 88rpx 的状态栏占位在带胶囊的真机上会让返回键钻进胶囊下面 */
 .bar {
   position: absolute;
+  /* z-index 必须写：Skyline 没有 Web 的层叠上下文，且所有节点默认 position: relative，
+     兄弟之间纯按 DOM 顺序绘制。下面的 .hist 排在顶栏之后，它的盒子从 y=0 起、铺满整宽
+     （padding-top 只推内容，不推盒子），会把整条顶栏盖住 —— 透明所以看得见、点不动。
+     Skyline 的 z-index 只对同级兄弟有效，顶栏与 .hist 正是同级 */
+  z-index: 1;
   left: 0;
   right: 0;
   display: flex;
@@ -72,11 +77,14 @@
   color: var(--color-text-weak);
 }
 
-/* 高度与 top 由 search.ts 算成 px 内联传入 */
+/* 高度与 top 由 search.ts 算成 px 内联传入。
+   width 必须显式写：map 是 Skyline 的原生 canvas 组件，只给 left/right 它不会把宽度撑开，
+   会按默认宽度从左边起画 —— 真机上表现为地图左移、右侧空一条（首页那份一直有 width，所以没事） */
 .wrap__map {
   position: absolute;
   left: 0;
   right: 0;
+  width: 100%;
 }
 
 .chips-row {
