@@ -2688,6 +2688,7 @@ git commit -m "feat(components): add lot card and sort chips"
 > 4. **`.sheet` 不能用 `bottom: 0`**：tabBar 是 absolute 覆盖层，会盖掉面板底部一条（含最后一张卡片）。改为 `bottom = --tabbar-h 换算成 px + 安全区`
 > 5. **定位失败要分两种文案**：`services/location.ts` 的 `reason` 特意区分 `denied` / `failed`，计划只写了一套「未获取到定位授权」，定位服务本身失败时那句话是错的
 > 6. `SORT_LABELS` 提到 `domain/format.ts`：排序 chips 与首页「已按 X 排序」提示共用一份文案，首页用 `short`
+> 7. **定位失败/被拒不再走空态，改用兜底点继续拉数据**（2026-09-13 用户拍板）：计划里的 `no-location` 态下地图仍停在 `data.lat/lng` 的硬编码坐标上，用户看着像「已定位到那里」。改为：定位拿不到就拿 `config.ts` 的 `FALLBACK_PLACE`（合肥大学南艳湖校区，坐标是真接口查的，见该常量注释）当定位点，照常调 `fetchNearbyLots`，面板顶部出一条可点重试的提示条，文案由 `domain/format.ts` 的 `fallbackNotice(reason, placeName)` 按 `denied` / `failed` 分开给。**`ViewState` 随之删掉 `'no-location'`**（该态已不可达），`noLocText` / `noLocHint` 换成单个 `fallbackText`（正常定位时为空串）
 >
 > **本任务完成时的已知断点：** `/pages/search/search`（Task 14）与 `/pages/lot-detail/lot-detail`（Task 15）尚未注册，首页的搜索入口与卡片点击在这两个任务落地前会 `navigateTo` 失败。
 
@@ -4037,7 +4038,7 @@ git commit -m "feat: implement lot detail page"
 
 **首页遗留问题（2026-09-12 发现，Task 13 的人工校验尚未做）：**
 
-- **地图没能正常显示**：根因未定位。候选方向：Skyline 下 `map` 原生组件的渲染、`https://apis.map.qq.com` 是否已配为 request 合法域名、`.wrap` 的 `100vh` 在真机上的实际高度。校验时**模拟器与真机各看一次**再下结论
-- **定位失败 / 被拒时的兜底位置未定**：`home.ts` 的 `data.lat/lng` 目前是硬编码的济南坐标（36.6512 / 117.1201），`no-location` 态下地图仍停在那个点，视觉上像「已经定位到济南」。需要与产品确认：兜底到固定城市中心并明说，还是这种态下干脆弱化地图
+- ~~**地图没能正常显示**~~ **已结案（2026-09-13）：是开发者工具的限制，不是代码问题。** 工具控制台原文：`[Component] <map>: 开发者工具暂未支持 Skyline 下的 canvas 组件调试，请先到真机上预览调试。` 真机上地图与卡片均正常。**教训**：这条在 Task 0 就有机会暴露——Task 0 的结论是按**真机**记的（spec D1「真机验证通过」），工具里的空白被当成了同一现象，于是在首页上又排查了一轮。以后 `map` / 其他 Skyline 原生组件的验收**默认只在真机做**，工具里的异常先看控制台有没有「开发者工具暂未支持…」这类原文
+- ~~**定位失败 / 被拒时的兜底位置未定**~~ **已于 2026-09-13 拍板并实现**：兜底点 = 合肥大学（南艳湖校区），且**兜底即当定位点继续拉周边车场**（不是只挪地图坐标），面板顶部出提示条 + 「重新定位」。见本文件 Task 13 顶部偏差第 7 条
 - 首页其余待人工校验项：面板拖拽与吸附、chips 切换排序、图钉 ↔ 卡片选中联动、定位失败两种文案（被拒 vs 定位服务失败）、骨架屏与错误态
 - `/pages/search/search`（Task 14）、`/pages/lot-detail/lot-detail`（Task 15）尚未注册，首页的搜索入口与卡片点击在它们落地前会 `navigateTo` 失败 —— 预期中间态

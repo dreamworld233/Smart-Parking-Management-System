@@ -1,4 +1,5 @@
 import {
+  fallbackNotice,
   formatAmount,
   formatCountdown,
   formatDistance,
@@ -185,5 +186,18 @@ describe('sourceNote', () => {
       availability: { freeSpots: 200, totalSpots: 500, source: 'poi' },
     })
     expect(sourceNote(real)).toBe('')
+  })
+})
+
+describe('fallbackNotice', () => {
+  it('被拒与定位失败各说各的话', () => {
+    expect(fallbackNotice('denied', '合肥大学')).toBe('未开启定位，默认显示合肥大学周边')
+    expect(fallbackNotice('failed', '合肥大学')).toBe('定位失败，默认显示合肥大学周边')
+  })
+
+  it('两种失败的文案不能相同', () => {
+    // 相同就意味着「去设置页授权」与「检查定位开关」被合并成同一句，
+    // 用户照着做也无从下手 —— 这正是 services/location.ts 要分开 reason 的原因
+    expect(fallbackNotice('denied', '合肥大学')).not.toBe(fallbackNotice('failed', '合肥大学'))
   })
 })

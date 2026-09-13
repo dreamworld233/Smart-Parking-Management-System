@@ -32,16 +32,12 @@
       <view class="grip__hint" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
     </view>
 
-    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在获取周边车场…" />
+    <view wx:if="{{fallbackText}}" class="notice" bindtap="onRetry">
+      <text class="notice__text">{{fallbackText}}</text>
+      <text class="notice__retry">重新定位</text>
+    </view>
 
-    <state-view
-      wx:elif="{{state === 'no-location'}}"
-      kind="empty"
-      text="{{noLocText}}"
-      hint="{{noLocHint}}"
-      action-text="去搜索"
-      bind:action="onSearchTap"
-    />
+    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在获取周边车场…" />
 
     <state-view
       wx:elif="{{state === 'empty'}}"

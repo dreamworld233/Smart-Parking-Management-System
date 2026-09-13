@@ -20,6 +20,23 @@ export const QQMAP_KEY = localKey || 'REPLACE_WITH_YOUR_KEY'
 /** 首页默认搜索半径（米） */
 export const DEFAULT_RADIUS_M = 3000
 
+/**
+ * 定位失败 / 被拒时的兜底中心：合肥大学（南艳湖校区）。
+ *
+ * 坐标不是估的，是 2026-09-13 用本项目 Key 打
+ * `/ws/place/v1/search?keyword=合肥大学&boundary=region(合肥,0)` 返回的
+ * 首条「教育学校:大学」POI（31.752727 / 117.254098，地址：蜀山区锦绣大道 99 号）。
+ * 课程红线不许模拟数据，所以这里必须留来源；换城市时照同样的路子重新查一次。
+ *
+ * 用法：首页定位失败时**直接拿它当定位点继续拉周边车场**，并在面板上明说是兜底
+ * （文案见 `domain/format.ts` 的 `fallbackNotice`）—— 地图停在一个点上却不说，
+ * 用户会以为「已经定位到那儿了」
+ */
+export const FALLBACK_PLACE = {
+  name: '合肥大学',
+  point: { lat: 31.752727, lng: 117.254098 },
+}
+
 /** 请求超时（毫秒）。失败重试 1 次 */
 export const REQUEST_TIMEOUT_MS = 3000
 

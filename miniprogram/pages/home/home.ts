@@ -1,5 +1,5 @@
-import { DEFAULT_RADIUS_M } from '../../config'
-import { SORT_LABELS, formatDistance, formatSpots, sourceNote } from '../../domain/format'
+import { DEFAULT_RADIUS_M, FALLBACK_PLACE } from '../../config'
+import { SORT_LABELS, fallbackNotice, formatDistance, formatSpots, sourceNote } from '../../domain/format'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
@@ -7,7 +7,7 @@ import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../doma
 import { fetchNearbyLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
 
-type ViewState = 'loading' | 'ready' | 'empty' | 'error' | 'no-location'
+type ViewState = 'loading' | 'ready' | 'empty' | 'error'
 
 /** 面板收起时露出的高度（px）：抓手 + 排序提示行 */
 const SHEET_PEEK = 112
@@ -82,12 +82,15 @@ Page({
     sortLabel: SORT_LABELS.composite.short,
     cards: [] as CardVM[],
     selectedId: '',
-    /** 定位被拒与定位失败的文案不同（见 services/location.ts 的 reason） */
-    noLocText: '',
-    noLocHint: '',
+    /**
+     * 定位失败/被拒时的兜底提示，正常定位下为空串。
+     * 文案按 reason 分开（被拒 vs 定位服务失败），见 domain/format.ts
+     */
+    fallbackText: '',
 
-    lat: 36.6512,
-    lng: 117.1201,
+    // 定位有结果前地图先停兜底点：这里是「还没定位」，不是「已经定位到这里」
+    lat: FALLBACK_PLACE.point.lat,
+    lng: FALLBACK_PLACE.point.lng,
     pins: [] as Pin[],
     markers: [] as unknown[],
 
@@ -143,36 +146,31 @@ Page({
   },
 
   async load() {
-    // 加载中/失败态要看得见，所以这段时间面板强制展开
-    this.setData({ state: 'loading', sheetY: 0 })
+    // 加载中/失败态要看得见，所以这段时间面板强制展开。
+    // 上一轮的兜底提示一并清掉：重试后可能已经拿到真定位，留着就是假话
+    this.setData({ state: 'loading', sheetY: 0, fallbackText: '' })
 
     const loc = await getCurrentPoint()
-    if (!loc.ok) {
-      this.setData({
-        state: 'no-location',
-        noLocText: loc.reason === 'denied' ? '未获取到定位授权' : '定位失败',
-        noLocHint:
-          loc.reason === 'denied'
-            ? '可在设置中开启定位，或直接搜索目的地'
-            : '请检查手机定位是否开启，或直接搜索目的地',
-      })
-      return
-    }
+    // 定位拿不到就用兜底点继续拉数据，而不是甩一个空面板：用户至少能看到
+    // 一个真实城市的真实车场，面板上的提示负责说清「这不是你的位置」
+    const point = loc.ok ? loc.point : FALLBACK_PLACE.point
+    const fallbackText = loc.ok ? '' : fallbackNotice(loc.reason, FALLBACK_PLACE.name)
 
     try {
-      const { lots } = await fetchNearbyLots(loc.point, DEFAULT_RADIUS_M)
+      const { lots } = await fetchNearbyLots(point, DEFAULT_RADIUS_M)
       if (lots.length === 0) {
-        this.setData({ state: 'empty' })
+        this.setData({ state: 'empty', fallbackText })
         return
       }
 
       this.recommendations = topRecommendations(lots, { userNeedsCharging: false }, lots.length)
 
-      this.setData({ lat: loc.point.lat, lng: loc.point.lng, state: 'ready' })
+      this.setData({ lat: point.lat, lng: point.lng, state: 'ready', fallbackText })
       this.applySort(this.data.sortKey)
       this.setData({ sheetY: this.data.collapsedY })
     } catch {
-      this.setData({ state: 'error' })
+      // 提示照样留着：兜底点这批车场也没拉到，用户更需要知道看的是哪儿
+      this.setData({ state: 'error', fallbackText })
     }
   },
 

@@ -31,6 +31,21 @@ export function sourceNote(lot: ParkingLot): string {
   return parts.length ? `${parts.join('、')}为估算` : ''
 }
 
+/**
+ * 定位失败 / 被拒时的兜底提示（首页把远端的兜底点当定位点用，必须说出来，
+ * 否则用户会以为自己就站在那批车场旁边）。
+ *
+ * 两种失败分开说：被拒要去设置页开授权，定位服务失败要去查手机的定位开关，
+ * 合成一句「定位不可用」两边都指不到路 —— 这正是 getCurrentPoint 要把
+ * reason 分出来的原因。
+ * `placeName` 由调用方传（兜底点定义在 config.ts），领域层不认具体是哪个城市
+ */
+export function fallbackNotice(reason: 'denied' | 'failed', placeName: string): string {
+  return reason === 'denied'
+    ? `未开启定位，默认显示${placeName}周边`
+    : `定位失败，默认显示${placeName}周边`
+}
+
 /** 数据缺失时的统一占位。0 与「未知」语义不同，不可混用 */
 const UNKNOWN = '--'
 

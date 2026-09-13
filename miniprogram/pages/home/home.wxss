@@ -77,6 +77,34 @@
   color: var(--color-text-weak);
 }
 
+/* 兜底提示：定位不可用时说清「看的是哪儿」。用 warning 色而不是 danger ——
+   这不是错误，是一份降级后仍然可用的数据 */
+.notice {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx var(--space-3);
+  margin-bottom: var(--space-2);
+  background: #fffbeb;
+  border: 2rpx solid #fde68a;
+  border-radius: var(--radius-card);
+}
+
+.notice__text {
+  flex: 1;
+  font-size: var(--font-sub);
+  color: var(--color-warning);
+}
+
+.notice__retry {
+  flex: none;
+  margin-left: var(--space-2);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
 .sheet__list {
   flex: 1;
   /* flex 子项默认高度是内容高度，不给 0 的话 scroll-view 会撑破面板 */
