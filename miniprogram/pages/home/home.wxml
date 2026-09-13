@@ -1,8 +1,9 @@
 <view class="wrap">
+  <!-- centerLat/centerLng 是地图中心，点卡片时会移到该车场；与「我的位置」是两件事 -->
   <map
     class="wrap__map"
-    latitude="{{lat}}"
-    longitude="{{lng}}"
+    latitude="{{centerLat}}"
+    longitude="{{centerLng}}"
     scale="15"
     show-location
     markers="{{markers}}"
@@ -57,16 +58,18 @@
       bind:action="onRetry"
     />
 
-    <scroll-view wx:else class="sheet__list" scroll-y>
-      <lot-card
-        wx:for="{{cards}}"
-        wx:key="lot.id"
-        item="{{item}}"
-        selected="{{item.lot.id === selectedId}}"
-        bind:cardtap="onCardTap"
-        bind:navigate="onNavigate"
-        bind:reserve="onReserve"
-      />
+    <scroll-view wx:else class="sheet__list" scroll-y scroll-into-view="{{intoView}}" scroll-with-animation>
+      <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
+      <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
+        <lot-card
+          item="{{item}}"
+          selected="{{item.lot.id === selectedId}}"
+          show-actions
+          bind:cardtap="onCardTap"
+          bind:navigate="onNavigate"
+          bind:reserve="onReserve"
+        />
+      </view>
       <view class="sheet__tail" />
     </scroll-view>
   </view>

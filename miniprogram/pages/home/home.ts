@@ -1,5 +1,6 @@
-import { DEFAULT_RADIUS_M, FALLBACK_PLACE } from '../../config'
+import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS } from '../../config'
 import { SORT_LABELS, fallbackNotice, formatDistance, formatSpots, sourceNote } from '../../domain/format'
+import { pickPins, pinLabel } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
@@ -88,9 +89,14 @@ Page({
      */
     fallbackText: '',
 
-    // 定位有结果前地图先停兜底点：这里是「还没定位」，不是「已经定位到这里」
-    lat: FALLBACK_PLACE.point.lat,
-    lng: FALLBACK_PLACE.point.lng,
+    /**
+     * **地图中心**，不是「我的位置」。定位有结果前先停兜底点（这里是「还没定位」，
+     * 不是「已经定位到这里」）；点卡片时会被移到该车场，所以不能与定位结果共用一个字段
+     */
+    centerLat: FALLBACK_PLACE.point.lat,
+    centerLng: FALLBACK_PLACE.point.lng,
+    /** 点图钉时把对应卡片滚进视野；scroll-into-view 只在值变化时才动，用完要清 */
+    intoView: '',
     pins: [] as Pin[],
     markers: [] as unknown[],
 
@@ -165,7 +171,7 @@ Page({
 
       this.recommendations = topRecommendations(lots, { userNeedsCharging: false }, lots.length)
 
-      this.setData({ lat: point.lat, lng: point.lng, state: 'ready', fallbackText })
+      this.setData({ centerLat: point.lat, centerLng: point.lng, state: 'ready', fallbackText })
       this.applySort(this.data.sortKey)
       this.setData({ sheetY: this.data.collapsedY })
     } catch {
@@ -176,11 +182,13 @@ Page({
 
   applySort(key: SortKey) {
     const sorted = sortLots(this.recommendations, key)
-    const pins: Pin[] = sorted.map(r => ({
+    // 图钉只画前 MAX_PINS 个（标签会互相压），列表仍是全部；
+    // 选中的那条被 pickPins 补回来，所以「点卡片 ↔ 点图钉」联动不会断
+    const pins: Pin[] = pickPins(sorted, this.data.selectedId, MAX_PINS).map(r => ({
       id: r.lot.id,
       latitude: r.lot.location.lat,
       longitude: r.lot.location.lng,
-      label: `¥${r.lot.pricing.firstHour} · ${formatDistance(r.lot.distanceM)}`,
+      label: pinLabel(r.lot),
       active: r.lot.id === this.data.selectedId,
     }))
     this.setData({
@@ -201,10 +209,36 @@ Page({
     if (!pin) return
     this.setData({ selectedId: pin.id })
     this.applySort(this.data.sortKey)
+    // 联动的另一半：把卡片滚进视野。面板收着时列表看不见，但滚到位了，
+    // 用户一拉上来就是那一张，不用自己翻
+    this.scrollToCard(pin.id)
   },
 
+  /** 把对应卡片滚进视野 */
+  scrollToCard(lotId: string) {
+    const index = this.data.cards.findIndex(c => c.lot.id === lotId)
+    if (index < 0) return
+    // scroll-into-view 只在**值变化**时才滚动，所以先清空、下一帧再设上 ——
+    // 否则连点同一个图钉（或点完卡片再点图钉）不会重新滚
+    this.setData({ intoView: '' })
+    wx.nextTick(() => this.setData({ intoView: `card${index}` }))
+  },
+
+  /**
+   * 点卡片 = 选中它 + 把地图移到它上面 + 面板收起露出地图（UI 稿 §5.1「点卡片与点图钉联动」）。
+   * 面板不收起来的话地图移了也看不见，用户会以为点了没反应。
+   * 进详情不在这里 —— 详情按 2026-09-13 的新决定做进面板内（见计划文件）
+   */
   onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
-    wx.navigateTo({ url: `/pages/lot-detail/lot-detail?id=${e.detail.id}` })
+    const rec = this.recommendations.find(r => r.lot.id === e.detail.id)
+    if (!rec) return
+    this.setData({
+      selectedId: rec.lot.id,
+      centerLat: rec.lot.location.lat,
+      centerLng: rec.lot.location.lng,
+      sheetY: this.data.collapsedY,
+    })
+    this.applySort(this.data.sortKey)
   },
 
   onNavigate(e: WechatMiniprogram.CustomEvent<{ id: string }>) {

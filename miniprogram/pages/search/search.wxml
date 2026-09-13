@@ -35,6 +35,7 @@
     longitude="{{centerLng}}"
     scale="15"
     markers="{{markers}}"
+    bindmarkertap="onPinTap"
   />
 
   <view class="chips-row" wx:if="{{state === 'ready'}}" style="top: {{chipsTop}}px">
@@ -67,17 +68,25 @@
       bind:action="onRetry"
     />
 
-    <scroll-view wx:elif="{{state === 'ready'}}" class="sheet__list" scroll-y>
+    <scroll-view
+      wx:elif="{{state === 'ready'}}"
+      class="sheet__list"
+      scroll-y
+      scroll-into-view="{{intoView}}"
+      scroll-with-animation
+    >
       <view class="sheet__hint">{{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
-      <lot-card
-        wx:for="{{cards}}"
-        wx:key="lot.id"
-        item="{{item}}"
-        show-actions
-        bind:cardtap="onCardTap"
-        bind:navigate="onNavigate"
-        bind:reserve="onReserve"
-      />
+      <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
+      <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
+        <lot-card
+          item="{{item}}"
+          selected="{{item.lot.id === selectedId}}"
+          show-actions
+          bind:cardtap="onCardTap"
+          bind:navigate="onNavigate"
+          bind:reserve="onReserve"
+        />
+      </view>
       <view class="sheet__tail" />
     </scroll-view>
   </view>

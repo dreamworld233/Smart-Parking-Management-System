@@ -35,26 +35,7 @@
   "simulatorPluginLibVersion": {},
   "condition": {
     "miniprogram": {
-      "list": [
-        {
-          "name": "首页（Task 13 人工校验）",
-          "pathName": "pages/home/home",
-          "query": "",
-          "scene": null
-        },
-        {
-          "name": "搜索页（Task 14 校验）",
-          "pathName": "pages/search/search",
-          "query": "",
-          "scene": null
-        },
-        {
-          "name": "Task 0 地图验证页（对照）",
-          "pathName": "pages/spike-map/spike-map",
-          "query": "",
-          "scene": null
-        }
-      ]
+      "list": []
     }
   },
   "srcMiniprogramRoot": "miniprogram/",

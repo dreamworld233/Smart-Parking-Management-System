@@ -1,5 +1,6 @@
-import { DEFAULT_RADIUS_M, FALLBACK_PLACE, SEARCH_BIAS_RADIUS_M } from '../../config'
+import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M } from '../../config'
 import { SORT_LABELS, formatDistance, formatSpots, searchLocationNotice, sourceNote } from '../../domain/format'
+import { pickPins, pinLabel } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
@@ -83,8 +84,13 @@ Page({
     cards: [] as CardVM[],
     /** 定位不可用时为空串，非空则面板顶部出兜底提示（同首页口径） */
     fallbackText: '',
+    /** 地图中心：检索成功后是目的地，点卡片时会移到该车场 */
     centerLat: FALLBACK_PLACE.point.lat,
     centerLng: FALLBACK_PLACE.point.lng,
+    /** 联动用的选中项（与 ★ 推荐的 topLotId 是两件事：那个不随点击变） */
+    selectedId: '',
+    /** 点图钉时把对应卡片滚进视野；scroll-into-view 只在值变化时才动，用完要清 */
+    intoView: '',
     pins: [] as Pin[],
     markers: [] as unknown[],
 
@@ -195,7 +201,14 @@ Page({
       // 时 ★ 会落到最近的那个车场头上，而它未必是推荐的那个
       this.topLotId = this.recommendations.length > 0 ? this.recommendations[0].lot.id : ''
 
-      this.setData({ centerLat: target.lat, centerLng: target.lng, state: 'ready', fallbackText })
+      // selectedId 一并清掉：上一轮选中的车场多半不在新结果里，留着会高亮到别的卡片上
+      this.setData({
+        centerLat: target.lat,
+        centerLng: target.lng,
+        selectedId: '',
+        state: 'ready',
+        fallbackText,
+      })
       this.applySort(this.data.sortKey)
     } catch {
       if (seq !== this.searchSeq) return
@@ -205,13 +218,15 @@ Page({
 
   applySort(key: SortKey) {
     const sorted = sortLots(this.recommendations, key)
-    const pins: Pin[] = sorted.map(r => {
+    // 图钉只画前 MAX_PINS 个，标签走与首页同一套短口径（车场名不进图钉，名字在卡片里）；
+    // ★ 推荐那条按综合分定、不随排序跑，切排序掉了出去会被 pickPins 补回来
+    const pins: Pin[] = pickPins(sorted, this.topLotId, MAX_PINS).map(r => {
       const recommended = r.lot.id === this.topLotId
       return {
         id: r.lot.id,
         latitude: r.lot.location.lat,
         longitude: r.lot.location.lng,
-        label: `${recommended ? '★ 推荐 · ' : ''}${r.lot.name} ¥${r.lot.pricing.firstHour}`,
+        label: pinLabel(r.lot, recommended),
         recommended,
       }
     })
@@ -228,8 +243,33 @@ Page({
     this.applySort(e.detail.key)
   },
 
+  /** 点卡片 = 选中它 + 把地图移到它上面（与首页同一套联动；详情按新决定做进面板内） */
   onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
-    wx.navigateTo({ url: `/pages/lot-detail/lot-detail?id=${e.detail.id}` })
+    const rec = this.recommendations.find(r => r.lot.id === e.detail.id)
+    if (!rec) return
+    this.setData({
+      selectedId: rec.lot.id,
+      centerLat: rec.lot.location.lat,
+      centerLng: rec.lot.location.lng,
+    })
+    this.applySort(this.data.sortKey)
+  },
+
+  onPinTap(e: WechatMiniprogram.CustomEvent<{ markerId: number }>) {
+    const pin = this.data.pins[e.detail.markerId]
+    if (!pin) return
+    this.setData({ selectedId: pin.id })
+    this.applySort(this.data.sortKey)
+    this.scrollToCard(pin.id)
+  },
+
+  /** 把对应卡片滚进视野 */
+  scrollToCard(lotId: string) {
+    const index = this.data.cards.findIndex(c => c.lot.id === lotId)
+    if (index < 0) return
+    // scroll-into-view 只在**值变化**时才滚动，所以先清空、下一帧再设上
+    this.setData({ intoView: '' })
+    wx.nextTick(() => this.setData({ intoView: `card${index}` }))
   },
 
   onNavigate(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
