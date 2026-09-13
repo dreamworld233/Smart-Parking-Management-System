@@ -1,6 +1,7 @@
 import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M } from '../../config'
-import { SORT_LABELS, formatDistance, formatSpots, searchLocationNotice, sourceNote } from '../../domain/format'
-import { pickPins, pinLabel } from '../../domain/pins'
+import { formatDistance, formatSpots, searchLocationNotice, sourceNote } from '../../domain/format'
+import { pickPins, pinOf, toMarkers } from '../../domain/pins'
+import type { MapMarker, MapPin } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
@@ -12,37 +13,12 @@ import { getSearchHistory, pushSearchHistory } from '../../services/storage'
 
 type ViewState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
-/** 面板至少占窗口的这么多，剩下的才留给地图（矮屏上地图先让路） */
+/**
+ * 面板占窗口的这么多，剩下的才留给地图（矮屏上地图先让路）。
+ * **面板固定停在这一位，不拖拽、不收起**（2026-09-13 用户拍板，与首页一致）：
+ * 收起态会在地图下沿与面板之间露出一条底色，看着像空白
+ */
 const MIN_SHEET_RATIO = 0.42
-
-/** map 组件的 marker.id 必须是数字，用数组下标做 id，再靠 pins 反查车场（同首页） */
-function toMarkers(pins: Pin[]) {
-  return pins.map((p, i) => ({
-    id: i,
-    latitude: p.latitude,
-    longitude: p.longitude,
-    width: 1,
-    height: 1,
-    label: {
-      content: p.label,
-      fontSize: 12,
-      color: p.recommended ? '#ffffff' : '#0f172a',
-      bgColor: p.recommended ? '#2563eb' : '#ffffff',
-      borderRadius: 11,
-      padding: 6,
-      textAlign: 'center',
-    },
-  }))
-}
-
-interface Pin {
-  id: string
-  latitude: number
-  longitude: number
-  label: string
-  /** 综合得分最高者：UI 稿 §5.2「推荐结果 pin 用主色高亮并带 ★ 推荐 前缀」 */
-  recommended: boolean
-}
 
 interface CardVM {
   lot: ParkingLot
@@ -80,34 +56,31 @@ Page({
     history: [] as string[],
     state: 'idle' as ViewState,
     sortKey: 'composite' as SortKey,
-    sortLabel: SORT_LABELS.composite.short,
     cards: [] as CardVM[],
     /** 定位不可用时为空串，非空则面板顶部出兜底提示（同首页口径） */
     fallbackText: '',
     /** 地图中心：检索成功后是目的地，点卡片时会移到该车场 */
     centerLat: FALLBACK_PLACE.point.lat,
     centerLng: FALLBACK_PLACE.point.lng,
-    /** 联动用的选中项（与 ★ 推荐的 topLotId 是两件事：那个不随点击变） */
+    /** 联动用的选中项。检索完成后自动落在第一条上（不再有单独的「推荐」标记） */
     selectedId: '',
     /** 点图钉时把对应卡片滚进视野；scroll-into-view 只在值变化时才动，用完要清 */
     intoView: '',
-    pins: [] as Pin[],
-    markers: [] as unknown[],
+    pins: [] as MapPin[],
+    markers: [] as MapMarker[],
 
     // 几何一律 px、由窗口尺寸算出，不写 rpx / vh：顶部高度写死会钻进胶囊下面，
     // 地图写死高度在大屏上会留一大块空白（首页同一套算法）
     searchTop: 100,
     mapTop: 0,
     mapHeight: 0,
-    chipsTop: 0,
-    sheetTop: 0,
+    /** 面板高度（px）。面板固定，没有位移 */
+    sheetHeight: 0,
     /** 安全区高度（px）：面板底部的呼吸空间让给 home indicator */
     safeBottom: 0,
   },
 
   recommendations: [] as Recommendation[],
-  /** 综合得分最高的车场 id，★ 标记跟着它走，不跟排序走 */
-  topLotId: '',
   /**
    * 检索序号。**加载中再点一次搜索**（回车 / 点历史词）会让两次检索交错，
    * 后 resolve 的旧请求会把新结果覆盖掉；旧请求若失败还会把新请求的 ready
@@ -124,24 +97,26 @@ Page({
     const rect = wx.getMenuButtonBoundingClientRect()
     const searchTop = rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100
     const barH = Math.round(80 * rpx)
-    // chips 行连它的下留白一起算，面板正好接在它下面
-    const chipsH = Math.round(64 * rpx)
     const gap = Math.round(16 * rpx)
 
     const mapTop = searchTop + barH + gap
     const minSheet = Math.round(info.windowHeight * MIN_SHEET_RATIO)
-    // 面板先占够 MIN_SHEET_RATIO，余下的才是地图高度；矮屏上算出来不够就按窗口的两成兜底
-    const room = info.windowHeight - mapTop - chipsH - gap * 3 - minSheet
+    // 面板先占够 MIN_SHEET_RATIO，余下的才是地图高度；矮屏上算出来不够就按窗口的两成兜底。
+    // chips 搬进面板后，地图头上那一整条（chipsH + gap）也归地图了
+    const room = info.windowHeight - mapTop - gap * 2 - minSheet
     const mapHeight = Math.max(Math.round(info.windowHeight * 0.2), room)
-    const chipsTop = mapTop + mapHeight + gap
+    // 面板顶到地图下沿，剩下的整块都是面板（首页那份 SHEET_HEIGHT_RATIO 就是照这个比例定的）。
+    // 面板是 bottom: 0 + padding-bottom: safeBottom 的贴底盒子，而 rendererOptions 里
+    // defaultContentBox 是 true —— padding 会加在 height 之外，所以这里要把安全区一起算进来，
+    // 否则面板顶会比预期高出一个安全区，压住地图下沿
+    const sheetHeight = info.windowHeight - mapTop - mapHeight - gap - safeBottom
 
     this.setData({
       history: getSearchHistory(),
       searchTop,
       mapTop,
       mapHeight,
-      chipsTop,
-      sheetTop: chipsTop + chipsH,
+      sheetHeight,
       safeBottom,
     })
   },
@@ -197,15 +172,15 @@ Page({
       }
 
       this.recommendations = topRecommendations(lots, { userNeedsCharging: false }, lots.length)
-      // 推荐身份按**综合得分最高**定，与当前排序无关。跟着排序跑的话，切到「距离最近」
-      // 时 ★ 会落到最近的那个车场头上，而它未必是推荐的那个
-      this.topLotId = this.recommendations.length > 0 ? this.recommendations[0].lot.id : ''
 
-      // selectedId 一并清掉：上一轮选中的车场多半不在新结果里，留着会高亮到别的卡片上
+      // 检索完**自动选中第一条**（2026-09-13 用户要求：取代原先那条单独的「★ 推荐」）。
+      // 按当前排序取首条 —— 用户看到的第一张卡片就是被选中的那张，两者对得上
+      const first = sortLots(this.recommendations, this.data.sortKey)[0]
+
       this.setData({
         centerLat: target.lat,
         centerLng: target.lng,
-        selectedId: '',
+        selectedId: first ? first.lot.id : '',
         state: 'ready',
         fallbackText,
       })
@@ -218,21 +193,14 @@ Page({
 
   applySort(key: SortKey) {
     const sorted = sortLots(this.recommendations, key)
-    // 图钉只画前 MAX_PINS 个，标签走与首页同一套短口径（车场名不进图钉，名字在卡片里）；
-    // ★ 推荐那条按综合分定、不随排序跑，切排序掉了出去会被 pickPins 补回来
-    const pins: Pin[] = pickPins(sorted, this.topLotId, MAX_PINS).map(r => {
-      const recommended = r.lot.id === this.topLotId
-      return {
-        id: r.lot.id,
-        latitude: r.lot.location.lat,
-        longitude: r.lot.location.lng,
-        label: pinLabel(r.lot, recommended),
-        recommended,
-      }
-    })
+    // 图钉只画前 MAX_PINS 个，标签走与首页同一套短口径（车场名不进图钉，名字在卡片里）。
+    // 选中项不随排序跑，切一次排序就可能掉出前 MAX_PINS，靠 pickPins 补回来
+    const { selectedId } = this.data
+    const pins = pickPins(sorted, [selectedId], MAX_PINS).map(r =>
+      pinOf(r, { selected: r.lot.id === selectedId }),
+    )
     this.setData({
       sortKey: key,
-      sortLabel: SORT_LABELS[key].short,
       cards: sorted.map(toVM),
       pins,
       markers: toMarkers(pins),

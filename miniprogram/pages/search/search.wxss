@@ -87,9 +87,10 @@
   width: 100%;
 }
 
+/* 排序 chips 在面板里，不再是浮在地图上的绝对定位层 */
 .chips-row {
-  position: absolute;
-  left: 28rpx;
+  flex: none;
+  margin-bottom: var(--space-3);
 }
 
 .sheet {
@@ -104,13 +105,13 @@
   flex-direction: column;
 }
 
-.sheet__handle {
-  width: 76rpx;
-  height: 8rpx;
-  border-radius: 4rpx;
-  background: #cbd5e1;
-  margin: 0 auto 20rpx;
+/* 面板标题行。原先这里还有个抓手横条，面板固定之后就删了 ——
+   居中一道灰色圆角条是「可以拖」的通用暗示，没有拖拽行为就不该摆 */
+.sheet__head {
   flex: none;
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+  margin-bottom: var(--space-3);
 }
 
 /* 与首页 .notice 同一套样式：两页各存一份是有意的 —— 见计划 Task 14 偏差说明，
@@ -127,12 +128,6 @@
 .notice__text {
   font-size: var(--font-sub);
   color: var(--color-warning);
-}
-
-.sheet__hint {
-  font-size: var(--font-sub);
-  color: var(--color-text-weak);
-  margin-bottom: 16rpx;
 }
 
 .sheet__list {

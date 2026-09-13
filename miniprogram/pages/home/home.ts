@@ -1,6 +1,7 @@
 import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS } from '../../config'
-import { SORT_LABELS, fallbackNotice, formatDistance, formatSpots, sourceNote } from '../../domain/format'
-import { pickPins, pinLabel } from '../../domain/pins'
+import { fallbackNotice, formatDistance, formatSpots, sourceNote } from '../../domain/format'
+import { pickPins, pinOf, toMarkers } from '../../domain/pins'
+import type { MapMarker, MapPin } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
@@ -10,40 +11,19 @@ import { getCurrentPoint, openNavigation } from '../../services/location'
 
 type ViewState = 'loading' | 'ready' | 'empty' | 'error'
 
-/** 面板收起时露出的高度（px）：抓手 + 排序提示行 */
-const SHEET_PEEK = 112
-/** 面板展开态占窗口高度的比例 */
-const SHEET_HEIGHT_RATIO = 0.62
+/**
+ * 面板占窗口高度的比例。
+ *
+ * **0.43 是照着搜索页的面板比例定的**（2026-09-13 用户要求两页一致）——
+ * 搜索页那边是算出来的：窗口高度减去顶部栏与地图之后剩下的那部分。
+ *
+ * **面板固定停在这一位，不拖拽、不收起**（同日用户拍板）：只有「居中」这一个状态，
+ * 既省掉不同拉伸下的定位问题，也保证地图始终露出来看得到定位效果。
+ * 早先试过两档吸附与自由拖拽，都被否了
+ */
+const SHEET_HEIGHT_RATIO = 0.43
 /** 与 tokens.wxss 的 --tabbar-h 一致（rpx）。面板要停在 tabBar 之上，不能压在它下面 */
 const TABBAR_H_RPX = 100
-
-interface Pin {
-  id: string
-  latitude: number
-  longitude: number
-  label: string
-  active: boolean
-}
-
-/** map 组件的 marker.id 必须是数字，所以用数组下标做 id，再靠 pins 反查车场 */
-function toMarkers(pins: Pin[]) {
-  return pins.map((p, i) => ({
-    id: i,
-    latitude: p.latitude,
-    longitude: p.longitude,
-    width: 1,
-    height: 1,
-    label: {
-      content: p.label,
-      fontSize: 12,
-      color: p.active ? '#ffffff' : '#0f172a',
-      bgColor: p.active ? '#2563eb' : '#ffffff',
-      borderRadius: 11,
-      padding: 6,
-      textAlign: 'center',
-    },
-  }))
-}
 
 interface CardVM {
   lot: ParkingLot
@@ -80,7 +60,6 @@ Page({
   data: {
     state: 'loading' as ViewState,
     sortKey: 'composite' as SortKey,
-    sortLabel: SORT_LABELS.composite.short,
     cards: [] as CardVM[],
     selectedId: '',
     /**
@@ -97,8 +76,8 @@ Page({
     centerLng: FALLBACK_PLACE.point.lng,
     /** 点图钉时把对应卡片滚进视野；scroll-into-view 只在值变化时才动，用完要清 */
     intoView: '',
-    pins: [] as Pin[],
-    markers: [] as unknown[],
+    pins: [] as MapPin[],
+    markers: [] as MapMarker[],
 
     /**
      * 浮层位置与面板几何一律用 px 由窗口尺寸算出来，不写 rpx / vh：
@@ -106,19 +85,14 @@ Page({
      * - 面板写 vh + 硬编码 translateY，在矮屏上会整块跑出屏幕（Task 0 验证时踩过）
      */
     searchTop: 100,
-    chipsTop: 160,
+    /** 地图高度（px）：只占面板上方露出来的那块，见 home.wxss 里的说明 */
+    mapHeight: 0,
     sheetHeight: 0,
     sheetBottom: 0,
-    collapsedY: 0,
-    sheetY: 0,
   },
 
   recommendations: [] as Recommendation[],
   loaded: false,
-  dragStartY: 0,
-  dragStartSheetY: 0,
-  /** 这一次触摸是否发生了拖动：拖动抬手后系统还会补一个 tap，要吃掉它 */
-  dragged: false,
 
   onLoad() {
     const info = wx.getWindowInfo()
@@ -126,7 +100,10 @@ Page({
     // safeArea 在极少数环境下缺字段，缺了就当没有安全区
     const safeBottom = info.safeArea ? Math.max(0, info.screenHeight - info.safeArea.bottom) : 0
     const sheetHeight = Math.round(info.windowHeight * SHEET_HEIGHT_RATIO)
-    const collapsedY = Math.max(0, sheetHeight - SHEET_PEEK)
+    const sheetBottom = Math.round(TABBAR_H_RPX * rpx + safeBottom)
+    // 地图只铺面板上方那块。地图的几何中心是它的正中间，铺满整页时中心会被面板盖住，
+    // 点卡片居中过去等于把图钉藏起来（2026-09-13 真机反馈「根本定位不到」）
+    const mapHeight = info.windowHeight - sheetBottom - sheetHeight
 
     // 胶囊下沿 + 8px。取不到胶囊信息时退回 100px
     const rect = wx.getMenuButtonBoundingClientRect()
@@ -134,11 +111,9 @@ Page({
 
     this.setData({
       searchTop,
-      chipsTop: searchTop + Math.round(80 * rpx) + 12,
+      mapHeight,
       sheetHeight,
-      sheetBottom: Math.round(TABBAR_H_RPX * rpx + safeBottom),
-      collapsedY,
-      sheetY: collapsedY,
+      sheetBottom,
     })
   },
 
@@ -152,9 +127,8 @@ Page({
   },
 
   async load() {
-    // 加载中/失败态要看得见，所以这段时间面板强制展开。
-    // 上一轮的兜底提示一并清掉：重试后可能已经拿到真定位，留着就是假话
-    this.setData({ state: 'loading', sheetY: 0, fallbackText: '' })
+    // 上一轮的兜底提示先清掉：重试后可能已经拿到真定位，留着就是假话
+    this.setData({ state: 'loading', fallbackText: '' })
 
     const loc = await getCurrentPoint()
     // 定位拿不到就用兜底点继续拉数据，而不是甩一个空面板：用户至少能看到
@@ -173,7 +147,6 @@ Page({
 
       this.setData({ centerLat: point.lat, centerLng: point.lng, state: 'ready', fallbackText })
       this.applySort(this.data.sortKey)
-      this.setData({ sheetY: this.data.collapsedY })
     } catch {
       // 提示照样留着：兜底点这批车场也没拉到，用户更需要知道看的是哪儿
       this.setData({ state: 'error', fallbackText })
@@ -184,16 +157,12 @@ Page({
     const sorted = sortLots(this.recommendations, key)
     // 图钉只画前 MAX_PINS 个（标签会互相压），列表仍是全部；
     // 选中的那条被 pickPins 补回来，所以「点卡片 ↔ 点图钉」联动不会断
-    const pins: Pin[] = pickPins(sorted, this.data.selectedId, MAX_PINS).map(r => ({
-      id: r.lot.id,
-      latitude: r.lot.location.lat,
-      longitude: r.lot.location.lng,
-      label: pinLabel(r.lot),
-      active: r.lot.id === this.data.selectedId,
-    }))
+    const selectedId = this.data.selectedId
+    const pins = pickPins(sorted, [selectedId], MAX_PINS).map(r =>
+      pinOf(r, { selected: r.lot.id === selectedId }),
+    )
     this.setData({
       sortKey: key,
-      sortLabel: SORT_LABELS[key].short,
       cards: sorted.map(toVM),
       pins,
       markers: toMarkers(pins),
@@ -209,8 +178,7 @@ Page({
     if (!pin) return
     this.setData({ selectedId: pin.id })
     this.applySort(this.data.sortKey)
-    // 联动的另一半：把卡片滚进视野。面板收着时列表看不见，但滚到位了，
-    // 用户一拉上来就是那一张，不用自己翻
+    // 联动的另一半：把卡片滚进视野，用户不用自己翻找
     this.scrollToCard(pin.id)
   },
 
@@ -225,9 +193,11 @@ Page({
   },
 
   /**
-   * 点卡片 = 选中它 + 把地图移到它上面 + 面板收起露出地图（UI 稿 §5.1「点卡片与点图钉联动」）。
-   * 面板不收起来的话地图移了也看不见，用户会以为点了没反应。
-   * 进详情不在这里 —— 详情按 2026-09-13 的新决定做进面板内（见计划文件）
+   * 点卡片 = 选中它 + 把地图移到它上面（UI 稿 §5.1「点卡片与点图钉联动」）。
+   *
+   * 面板固定不动：它始终占下半屏，上半屏的地图一直露着，所以居中效果直接看得见
+   * （早先面板会吸附收起，点一下卡片就弹回去，2026-09-13 真机反馈「很突兀」）。
+   * 进详情不在这里 —— 详情按 2026-09-13 的决定做进面板内（见计划文件）
    */
   onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
     const rec = this.recommendations.find(r => r.lot.id === e.detail.id)
@@ -236,7 +206,6 @@ Page({
       selectedId: rec.lot.id,
       centerLat: rec.lot.location.lat,
       centerLng: rec.lot.location.lng,
-      sheetY: this.data.collapsedY,
     })
     this.applySort(this.data.sortKey)
   },
@@ -260,41 +229,4 @@ Page({
     this.load()
   },
 
-  onGripTouchStart(e: WechatMiniprogram.TouchEvent) {
-    this.dragged = false
-    this.dragStartY = e.touches[0].clientY
-    this.dragStartSheetY = this.data.sheetY
-  },
-
-  onGripTouchMove(e: WechatMiniprogram.TouchEvent) {
-    const delta = e.touches[0].clientY - this.dragStartY
-    if (Math.abs(delta) > 4) this.dragged = true
-    const next = Math.min(this.data.collapsedY, Math.max(0, this.dragStartSheetY + delta))
-    this.setData({ sheetY: next })
-  },
-
-  onGripTouchEnd() {
-    this.snapSheet()
-  },
-
-  /** 触摸被系统取消时同样吸附，避免面板卡在半途 */
-  onGripTouchCancel() {
-    this.snapSheet()
-  },
-
-  onGripTap() {
-    // 拖完抬手系统会补一个 tap，不挡掉的话「刚拖到展开」会被立刻收回
-    if (this.dragged) {
-      this.dragged = false
-      return
-    }
-    this.setData({
-      sheetY: this.data.sheetY < this.data.collapsedY / 2 ? this.data.collapsedY : 0,
-    })
-  },
-
-  snapSheet() {
-    const { sheetY, collapsedY } = this.data
-    this.setData({ sheetY: sheetY < collapsedY / 2 ? 0 : collapsedY })
-  },
 })

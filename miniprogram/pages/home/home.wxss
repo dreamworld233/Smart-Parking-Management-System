@@ -7,15 +7,16 @@
   background: #eaefe9;
 }
 
-/* Skyline 不支持 position: fixed，地图与浮层只能用 absolute 铺在根节点上 */
+/* Skyline 不支持 position: fixed，地图与浮层只能用 absolute 铺在根节点上。
+   **高度只到面板上沿**，不铺满整页：地图的几何中心就是它的正中间，铺满整页时中心落在
+   下半屏、正好被面板盖住 —— 点卡片把地图居中过去，图钉藏在面板底下，看着像「没定位成功」。
+   高度由 home.ts 按「窗口高 − 面板底距 − 面板高」算成 px 内联传入（搜索页同一套思路） */
 .wrap__map {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
   width: 100%;
-  height: 100%;
 }
 
 .search {
@@ -41,9 +42,10 @@
   color: var(--color-primary);
 }
 
+/* 排序 chips 在面板里，不再是浮在地图上的绝对定位层 */
 .chips-row {
-  position: absolute;
-  left: 28rpx;
+  flex: none;
+  margin-bottom: var(--space-3);
 }
 
 .sheet {
@@ -59,22 +61,13 @@
   /* 高度、bottom、translateY 由 home.ts 按窗口尺寸算出后内联传入 */
 }
 
-.grip {
+/* 面板标题行。原先这里还有个抓手横条，面板固定之后就删了 ——
+   居中一道灰色圆角条是「可以拖」的通用暗示，没有拖拽行为就不该摆 */
+.sheet__head {
   flex: none;
-  padding-bottom: 20rpx;
-}
-
-.grip__handle {
-  width: 76rpx;
-  height: 8rpx;
-  border-radius: 4rpx;
-  background: #cbd5e1;
-  margin: 0 auto 20rpx;
-}
-
-.grip__hint {
   font-size: var(--font-sub);
   color: var(--color-text-weak);
+  margin-bottom: var(--space-3);
 }
 
 /* 兜底提示：定位不可用时说清「看的是哪儿」。用 warning 色而不是 danger ——

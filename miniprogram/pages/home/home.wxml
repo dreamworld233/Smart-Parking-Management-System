@@ -1,7 +1,9 @@
 <view class="wrap">
-  <!-- centerLat/centerLng 是地图中心，点卡片时会移到该车场；与「我的位置」是两件事 -->
+  <!-- centerLat/centerLng 是地图中心，点卡片时会移到该车场；与「我的位置」是两件事。
+       高度只到面板上沿，地图中心才落在露出来的那块里 -->
   <map
     class="wrap__map"
+    style="height: {{mapHeight}}px"
     latitude="{{centerLat}}"
     longitude="{{centerLng}}"
     scale="15"
@@ -16,21 +18,13 @@
     <text class="search__map">地图</text>
   </view>
 
-  <view class="chips-row" style="top: {{chipsTop}}px">
-    <sort-chips value="{{sortKey}}" bind:change="onSortChange" />
-  </view>
+  <!-- 面板固定停在这一位：不拖拽、不收起，只有「居中」一个状态（与搜索页同一套） -->
+  <view class="sheet" style="height: {{sheetHeight}}px; bottom: {{sheetBottom}}px">
+    <view class="sheet__head" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场</view>
 
-  <view class="sheet" style="height: {{sheetHeight}}px; bottom: {{sheetBottom}}px; transform: translateY({{sheetY}}px)">
-    <view
-      class="grip"
-      bindtouchstart="onGripTouchStart"
-      bindtouchmove="onGripTouchMove"
-      bindtouchend="onGripTouchEnd"
-      bindtouchcancel="onGripTouchCancel"
-      bindtap="onGripTap"
-    >
-      <view class="grip__handle" />
-      <view class="grip__hint" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
+    <!-- 排序 chips 放进面板（与搜索页统一，也让出上面一整条给地图） -->
+    <view class="chips-row" wx:if="{{state === 'ready'}}">
+      <sort-chips value="{{sortKey}}" bind:change="onSortChange" />
     </view>
 
     <view wx:if="{{fallbackText}}" class="notice" bindtap="onRetry">

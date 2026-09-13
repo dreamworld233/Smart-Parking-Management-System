@@ -38,13 +38,18 @@
     bindmarkertap="onPinTap"
   />
 
-  <view class="chips-row" wx:if="{{state === 'ready'}}" style="top: {{chipsTop}}px">
-    <!-- 长标签：UI 稿 §5.2 是「综合推荐 / 距离最近 / 费用最低 / 空位最多」，首页才用短的那套 -->
-    <sort-chips variant="long" value="{{sortKey}}" bind:change="onSortChange" />
-  </view>
+  <view
+    class="sheet"
+    wx:if="{{state !== 'idle'}}"
+    style="height: {{sheetHeight}}px; padding-bottom: {{safeBottom}}px"
+  >
+    <view class="sheet__head" wx:if="{{state === 'ready'}}">{{cards.length}} 个车场</view>
 
-  <view class="sheet" wx:if="{{state !== 'idle'}}" style="top: {{sheetTop}}px; padding-bottom: {{safeBottom}}px">
-    <view class="sheet__handle" />
+    <!-- 排序 chips 放进面板（与首页统一） -->
+    <view class="chips-row" wx:if="{{state === 'ready'}}">
+      <!-- 长标签：UI 稿 §5.2 是「综合推荐 / 距离最近 / 费用最低 / 空位最多」，首页才用短的那套 -->
+      <sort-chips variant="long" value="{{sortKey}}" bind:change="onSortChange" />
+    </view>
 
     <view class="notice" wx:if="{{fallbackText}}">
       <text class="notice__text">{{fallbackText}}</text>
@@ -75,7 +80,6 @@
       scroll-into-view="{{intoView}}"
       scroll-with-animation
     >
-      <view class="sheet__hint">{{cards.length}} 个车场 · 已按{{sortLabel}}排序</view>
       <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
       <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
         <lot-card
