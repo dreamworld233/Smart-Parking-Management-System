@@ -9,6 +9,17 @@ exports.main = async () => {
   const db = cloud.database()
   const users = db.collection('users')
 
+  // 新用户的初始形状只此一份：add 写入的 data 与插入后返回的身份共用它。
+  // 分开写两份的话，将来给初始 credit 加字段只改一处 —— 而「新用户第一次登录」
+  // 这条路径最难被注意到，字段静默 undefined 也不会有人报错
+  const FRESH = {
+    role: 'driver',
+    nickname: '',
+    avatar: '',
+    phone: '',
+    credit: { violationCount: 0, bannedUntil: null },
+  }
+
   let u = (await users.where({ _openid: OPENID }).limit(1).get()).data[0]
   if (!u) {
     try {
@@ -16,18 +27,9 @@ exports.main = async () => {
       // 同一人拿到两个身份（onLaunch 的建档还没返回时，角色页再调一次就会撞上）。
       // 用主键唯一性把这条路堵死 —— 冲突即「已存在」，回查即可
       await users.add({
-        data: {
-          _id: OPENID,
-          _openid: OPENID,
-          role: 'driver',
-          nickname: '',
-          avatar: '',
-          phone: '',
-          credit: { violationCount: 0, bannedUntil: null },
-          createdAt: Date.now(),
-        },
+        data: { ...FRESH, _id: OPENID, _openid: OPENID, createdAt: Date.now() },
       })
-      u = { role: 'driver', credit: { violationCount: 0, bannedUntil: null } }
+      u = FRESH
     } catch (e) {
       // 并发的那一次刚插进去：回查已存在的那条。查不到说明 add 是真失败（例如服务端不接受
       // 自定义 _id），此时**原样重抛**，别把真错误吞成「已存在」
