@@ -108,20 +108,29 @@
 ### `reservations`
 `orderNo`、`userId`、`lotId`、`lotName`（快照，车场改名不影响历史单）、`plateNo`、
 `arriveTime`、`enterDeadline`（= 到达 + 15 分钟）、`status`、`verifyCode`（核销用）、
-`prepaidParkingFee`、`serviceFee`、`totalAmount`、改签字段（`rescheduledAt`、`rescheduleCount`，BR-03）、
+`prepaidParkingFee`、`serviceFee`、`totalAmount`、
+退款字段（`refundParking`、`refundService`、`refundTotal`、`refundAt`，口径见 §5.8）、
 `entryMethod`（实际生效的核销方式，与 `entry_logs.method` 对应）、`plateSource`（`'manual'` 手输 / `'ocr'` 识别，见 §10）、
-时间戳组（`createdAt` / `paidAt` / `enteredAt` / `releasedAt`）。
+时间戳组（`createdAt` / `paidAt` / `enteredAt` / `cancelledAt` / `releasedAt`）。
 索引：`(userId, createdAt)`、`orderNo` 唯一、`(lotId, status)`（车场端看板用）。
 安全规则：前端只读自己的 —— `doc.userId == auth.openid`（`userId` 存 openid）。
 
 ### `orders`
-`reservationId`、`userId`、`lotId`、`amount`、`type`（`'prepaid'` 预支停车费 / `'service'` 平台服务费）、
-`status`、`paidAt`。索引：`(lotId, paidAt)`（对账结算按车场聚合）、`reservationId`。
+`reservationId`、`userId`、`lotId`、`amount`、
+`type`（`'prepaid'` 预支停车费 / `'service'` 平台服务费 / `'refund'` 退款）、
+`status`、`paidAt`。
+退款也落 `orders` 一条（`type: 'refund'`、`amount` 为负），**不为退款单开新集合** ——
+车场结算与平台收入都按同一张流水聚合，正负相抵天然正确。
+索引：`(lotId, paidAt)`（对账结算按车场聚合）、`reservationId`。
 
 ### `payments`
 `orderId`、`channel`、`amount`、`status`、`tradeNo`。
-**唯一必要模拟点**：没有微信支付商户号（学生主体拿不到），支付回调由云函数模拟。
+**唯一必要模拟点**：没有微信支付商户号（学生主体拿不到），支付与退款回调均由云函数模拟。
 必须在界面与文档里说清「支付为模拟」，不可含糊成「已支付」。
+
+**平台不做二次扣款**：没有自动扣费、没有免密签约、没有钱包余额。
+预支停车费与平台服务费在预约时一次收清；入场后的实际停放费由车场闸机自行计收，
+平台不代收、不抵扣、不追缴（见 §5.8）。
 
 ### `reviews`
 `reservationId`（唯一，一单一评）、`userId`、`lotId`、`score`(1–5)、`tags[]`、`content`、`createdAt`。
@@ -141,8 +150,10 @@
 答辩讲降级链时这是证据。索引：`(lotId, at)`、`reservationId`。
 
 ### `violations`
-`userId`、`reservationId`、`type`（`'no_show'`）、`occurredAt`、`penalty`。
+`userId`、`reservationId`、`type`（`'no_show'` 到达 + 缓冲后仍未核销 / `'late_cancel'` 晚于到达时刻才取消）、
+`occurredAt`、`penalty`。
 独立成表而非只累加计数，是为了可审计、能算梯度。
+两种 `type` 都对应同一件事「没有及时到场」，区别只在用户是取消了还是压根没管。
 
 ### 不建的表
 - `lot_admins`：`users.role` + `lots.adminUserId` 足够
@@ -182,15 +193,18 @@ where({ _id: lotId, reservedCount: _.lt(reservableTotal) })
 沿用小程序 `domain/types.ts` 已有的六态，但**把 `violated` 从状态里去掉**：
 
 ```
-pending_entry ──核销──▶ entered ──出场结算──▶ completed
+pending_entry ──核销──▶ entered ──▶ completed
       │
-      ├──用户取消──▶ cancelled
-      └──超时未入场──▶ released ──▶ 写 violations + users.credit.violationCount++
+      ├──用户取消──▶ cancelled ──▶ 退款见 §5.8；晚于到达时刻则同时写 violations('late_cancel')
+      └──到达 + 缓冲后仍未核销──▶ released ──▶ 写 violations('no_show') + users.credit.violationCount++
 ```
 
 理由：「车位被释放」与「用户记违约」是两件事，一次超时同时发生。状态只表达车位侧的结果（`released`），
 用户侧后果进 `violations`（可审计、能算梯度）。
 代价：改 `domain/types.ts` 与相关测试 —— 列入 Plan 2 第 0 项一起做。
+
+`entered` 之后的**没有入场侧出口**：出场由车场闸机掌握，平台收不到这个事件，也不需要有（§5.8）。
+`completed` 因此是「预约时段正常走完」的终态，不由出场触发。
 
 ### 5.3 附近查询
 
@@ -244,6 +258,47 @@ POI 只用于「搜任意目的地」，首页「我附近的签约车场」直�
 冷启动期**不做任何补数**，如实显示积累中 —— 这条正是 BR-05「预测降级需界面显著标注」的落地，
 答辩时是加分项而不是缺陷。
 
+### 5.8 支付与退费（2026-09-14 定稿口径）
+
+**平台只收两笔，预约时一次收清：**
+
+| 款项 | 金额 | 归属 |
+|---|---|---|
+| 预支停车费 | `ceil(预约时长) × 车场首小时标准价` | 代收后转付车场 |
+| 平台服务费 | ¥2（`PLATFORM_SERVICE_FEE`） | **平台唯一收入** |
+
+**预支停车费是锁位费，不是停车费的首付。** 预约成立那一刻车位即视为被占用，按这段时长计费。
+入场后实际停放多久、闸机收多少，是车场与车主之间的另一笔账 ——
+**平台不代收、不抵扣、不追缴**。所以 `reservations` 不需要出场事件，
+`completed` 不由出场触发（§5.2）。
+
+**退款（纯函数 `domain/pricing.ts` 的 `cancelRefund`，已单测）：**
+
+```
+已占用时长 = 取消时刻 − 下单时刻        向上取整，不足 1 小时按 1 小时计
+退还       = max(0, (预约时长 − 已占用时长)) × 首小时单价
+```
+
+| 取消时刻 | 退还 |
+|---|---|
+| 下单后 ≤ 10 分钟 | **全额**，含服务费 |
+| 下单后 > 10 分钟 | 按上式退预支停车费，服务费不退 |
+
+`max(0, …)` 就是「不追缴」的落点：已占用向上取整后可能超过预约时长，负数一律压到 0。
+
+**违约**（写 `violations` + 扣 `users.credit`）：
+
+- `no_show`：到达 + 15 分钟缓冲后仍未核销（走 `released`）
+- `late_cancel`：取消时刻晚于到达时刻
+
+两者是同一件事「没有及时到场」的两种表现。注意**退款为 0 ≠ 违约**：
+预约 1 小时、11 分钟后取消同样退 0，但取消时离到达还早，不算违约 ——
+那是「不足 1 小时按 1 小时计」对用户的代价，是刻意的。判定要用 `cancelRefund().isBreach`，
+不要图省事写成 `totalRefund === 0`。
+
+**没有的东西**：自动扣费、免密签约、钱包余额、改签。
+早期 PM 的 BR-03 改签规则与 `t_bind_pay` / `t_wallet` 一起作废 —— 需要改时间就取消再下单。
+
 ## 6. 与已交文档的差异（必须同步改口）
 
 | 已交架构图 §2.4 / 外部服务 | 本方案 | 处理 |
@@ -254,7 +309,7 @@ POI 只用于「搜任意目的地」，首页「我附近的签约车场」直�
 | 定时任务（超时释放 · 违约结算） | 云函数定时触发器 | 原样成立 |
 | 腾讯云托管 | 不需要（云函数即承载） | §3 加一行 |
 | 短信服务（FR-U01 手机号验证码） | 微信身份为主，手机号退为可选 | PM 的 FR-U01 与架构图外部服务都要改 |
-| 微信支付（订金与停车费） | 无商户号 → 模拟支付 | 文档与界面都必须写明「模拟」 |
+| 微信支付（订金与停车费） | 无商户号 → 模拟支付；且**只收预约时的两笔**（锁位费 + 服务费），不做自动扣费 | 文档与界面都必须写明「模拟」；见 §5.8 |
 | 车牌识别 / 道闸硬件 | **车牌识别走腾讯云 OCR（云函数调用）**，道闸不做 | §3 加一行：设备侧降级为「车牌识别 API + 扫码核销」两级 |
 | （新增，图上没有）平台运营后台 | 云开发静态网站托管 + `@cloudbase/js-sdk`，复用同一套云函数与数据库 | §2.5 基础设施层与 §2.6 外部服务都要补：这是**图上没画但存在的东西**，不补就是文档与实现对不上 |
 
@@ -308,6 +363,10 @@ Plan 3（车场端）依赖本方案的 `lot_admin` 角色、余位上报与看�
 ```
 
 **扫核销码那一级必须实现**，OCR 是加分项 —— 这条决定了 OCR 接口哪天不可用也不会挡住答辩。
+
+**只做入场，不做出场。** 平台不参与资金闭环的二次扣款（§5.8），出场就没有触发点，
+也不需要有 —— 出场识别（同链路加一个 `direction: 'exit'` 分支）列入后续扩展，
+用来让车场端提前回补预约额度，不做不影响闭环。
 
 **两个入口，一个云函数**
 
