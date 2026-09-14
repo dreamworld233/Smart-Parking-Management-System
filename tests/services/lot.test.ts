@@ -4,14 +4,30 @@ import { fetchSignedLots } from '../../miniprogram/services/lot'
 
 interface QueryCaptured {
   cond: Record<string, unknown>
+  limit: number
+}
+
+interface ReqOption {
+  url: string
+  success: (res: { data: unknown }) => void
+  fail: (err: { errMsg: string }) => void
 }
 
 let docs: Record<string, unknown>[] = []
 const captured: QueryCaptured[] = []
+/** 每次矩阵请求带的目的地坐标，如 `['31.753,117.254098']` */
+let matrixTos: string[][] = []
+/**
+ * 矩阵桩下发的真实路线，键为 `lat,lng`。
+ * **没登记的坐标一律当作「查不到」**（elements 缺项 → null），
+ * 这样「降级为估算值」是一条被刻意走到的分支，而不是因为桩发不出请求才碰巧走到的
+ */
+let routes: Record<string, { distance: number; duration: number }> = {}
 
 function stubCloud(): void {
   const g = globalThis as unknown as {
     wx: {
+      request: (o: ReqOption) => void
       cloud: {
         init: () => void
         callFunction: () => Promise<{ result: unknown }>
@@ -26,6 +42,17 @@ function stubCloud(): void {
     }
   }
   g.wx = {
+    request: o => {
+      const to = decodeURIComponent(o.url).match(/[?&]to=([^&]*)/)?.[1] ?? ''
+      const keys = to.split(';').filter(Boolean)
+      matrixTos.push(keys)
+      // 腾讯的两个信封不一致：路径矩阵的结果在顶层 result，不在 data
+      const elements = keys.map(k => {
+        const r = routes[k]
+        return r ? { distance: r.distance, duration: r.duration } : undefined
+      })
+      o.success({ data: { status: 0, message: 'query ok', result: { rows: [{ elements }] } } })
+    },
     cloud: {
       init: () => undefined,
       callFunction: () => Promise.resolve({ result: {} }),
@@ -34,9 +61,13 @@ function stubCloud(): void {
           if (name !== 'lots') throw new Error(`unexpected collection ${name}`)
           return {
             where: (cond: Record<string, unknown>) => {
-              captured.push({ cond })
+              const entry: QueryCaptured = { cond, limit: -1 }
+              captured.push(entry)
               return {
-                limit: () => ({ get: () => Promise.resolve({ data: docs }) }),
+                limit: (n: number) => {
+                  entry.limit = n
+                  return { get: () => Promise.resolve({ data: docs }) }
+                },
               }
             },
           }
@@ -66,9 +97,11 @@ describe('fetchSignedLots', () => {
   const CENTER = { lat: 31.752727, lng: 117.254098 }
 
   beforeEach(() => {
-    stubCloud()
     docs = []
     captured.length = 0
+    matrixTos = []
+    routes = {}
+    stubCloud()
   })
 
   it('只查签约车场：查询条件带 contract.status', async () => {
@@ -76,6 +109,8 @@ describe('fetchSignedLots', () => {
     await fetchSignedLots(CENTER)
     expect(captured).toHaveLength(1)
     expect(captured[0].cond).toEqual({ 'contract.status': 'signed' })
+    // limit 20 是自保护的帽（签约车场个位数），桩必须把参数记下来才管得住
+    expect(captured[0].limit).toBe(20)
   })
 
   it('返回文档映射出的车场并带上估算距离', async () => {
@@ -83,18 +118,21 @@ describe('fetchSignedLots', () => {
     const lots = await fetchSignedLots(CENTER)
     expect(lots).toHaveLength(1)
     expect(lots[0].id).toBe('lot1')
+    // 桩没有登记这家车场的路线，走的是「查不到就保留估算值」的降级分支
     expect(lots[0].distanceSource).toBe('estimated')
     expect(lots[0].distanceM).toBeGreaterThan(0)
     expect(lots[0].walkMinutes).toBeGreaterThan(0)
   })
 
   it('按距离升序、半径外的丢弃', async () => {
+    // 入参故意不按距离排列：升序必须是排出来的，不是碰巧照抄了输入顺序
     docs = [
       doc({ _id: 'far', location: { lat: 31.78, lng: 117.28 } }),
+      doc({ _id: 'mid', location: { lat: 31.7545, lng: 117.2545 } }),
       doc({ _id: 'near', location: { lat: 31.753, lng: 117.2545 } }),
     ]
     const lots = await fetchSignedLots(CENTER, 1000)
-    expect(lots.map(l => l.id)).toEqual(['near'])
+    expect(lots.map(l => l.id)).toEqual(['near', 'mid'])
   })
 
   it('perHourAfter 缺省回落到 firstHour', async () => {
@@ -114,6 +152,45 @@ describe('fetchSignedLots', () => {
     const lots = await fetchSignedLots(CENTER)
     const straight = haversineM(CENTER, { lat: 31.75121, lng: 117.25325 })
     expect(lots[0].distanceM).toBe(Math.round(straight * WALK_DETOUR_FACTOR))
+  })
+
+  it('路线覆盖只作用于最近的 Top N，且用接口耗时当步行时长', async () => {
+    // 四家的直线距离递增：lotA < lotB < lotC < lotD，Top N=3 只该问前三家
+    docs = [
+      doc({ _id: 'lotA', location: { lat: 31.753, lng: 117.254098 } }),
+      doc({ _id: 'lotB', location: { lat: 31.754, lng: 117.254098 } }),
+      doc({ _id: 'lotC', location: { lat: 31.755, lng: 117.254098 } }),
+      doc({ _id: 'lotD', location: { lat: 31.756, lng: 117.254098 } }),
+    ]
+    // 真实路线故意把「直线最近的那家」推到最远：绕街区、绕河道时很常见。
+    // 覆盖之后若不再排一次，返回顺序就是 A(1200) B(950) C(1300) D(473)
+    routes = {
+      '31.753,117.254098': { distance: 1200, duration: 1500 },
+      '31.754,117.254098': { distance: 950, duration: 1140 },
+      '31.755,117.254098': { distance: 1300, duration: 1560 },
+    }
+
+    const lots = await fetchSignedLots(CENTER)
+
+    // 「最近」的判定用的是覆盖前的直线距离，所以 lotD 根本没被问过路线
+    expect(matrixTos).toEqual([
+      ['31.753,117.254098', '31.754,117.254098', '31.755,117.254098'],
+    ])
+
+    const byId = new Map(lots.map(l => [l.id, l]))
+    expect(byId.get('lotA')).toMatchObject({
+      distanceSource: 'route',
+      distanceM: 1200,
+      // 接口给了耗时就用接口的：1200 米 ÷ 80 米/分是 15 分钟，这里必须是 25
+      walkMinutes: 25,
+    })
+    expect(byId.get('lotB')).toMatchObject({ distanceSource: 'route', distanceM: 950 })
+    expect(byId.get('lotC')).toMatchObject({ distanceSource: 'route', distanceM: 1300 })
+    expect(byId.get('lotD')).toMatchObject({ distanceSource: 'estimated' })
+
+    // 覆盖后重排：lotD(473) 比 lotB(950) 近，必须排在它前面
+    expect(lots.map(l => l.id)).toEqual(['lotD', 'lotB', 'lotA', 'lotC'])
+    expect(lots.map(l => l.distanceM)).toEqual([...lots.map(l => l.distanceM)].sort((a, b) => a - b))
   })
 
   it('环境未配置时抛出明确错误', async () => {

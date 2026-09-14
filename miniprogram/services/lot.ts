@@ -85,7 +85,9 @@ function withDistance(lot: ParkingLot, center: GeoPoint): ParkingLot {
  * 按半径过滤、距离升序；**距离最近的 Top N 再查真实步行路线覆盖**
  * （路径矩阵按目的地计费的约束没有变）。查不到路线保留估算值并如实标注。
  *
- * 库为空 / 环境未配置时返回空数组，不抛错 —— 面板的空态文案负责解释
+ * 库里没有签约车场时返回空数组，由面板的空态文案负责解释 —— 「附近还没有
+ * 签约车场」是正常业务状态，不该表现成错误。**环境未配置则不在此列**：那是
+ * 配置错误，抛明确错误让调用方进错误态，不伪装成空态把问题藏起来
  */
 export async function fetchSignedLots(
   center: GeoPoint,
@@ -95,13 +97,16 @@ export async function fetchSignedLots(
   if (!db) throw new Error('云开发未初始化：请检查 config.local.ts 的 CLOUD_ENV')
 
   const res = await db.collection('lots').where({ 'contract.status': 'signed' }).limit(20).get()
+  const byDistance = (a: ParkingLot, b: ParkingLot) => a.distanceM - b.distanceM
   const lots = res.data
     .map(doc => toParkingLot(String(doc._id ?? ''), doc))
     .filter((l): l is ParkingLot => l !== null)
     .filter(l => haversineM(center, l.location) <= radiusM)
     .map(l => withDistance(l, center))
-    .sort((a, b) => a.distanceM - b.distanceM)
+    .sort(byDistance)
 
+  // Top N 的选取必须基于**覆盖前**的估算距离：「离我最近」由直线距离判定，
+  // 而不是等查完路线才知道谁近（那时已经花掉配额了）
   const top = lots.slice(0, WALK_LOOKUP_TOP_N)
   if (top.length === 0) return lots
   const walked = await walkingDistances(center, top.map(l => l.location))
@@ -113,5 +118,8 @@ export async function fetchSignedLots(
     lot.walkMinutes = w.durationMin
     lot.distanceSource = 'route'
   })
+  // 真实路线可能比估算更长也可能更短（绕街区、绕河道），覆盖后必须重排一次 ——
+  // 否则「按距离升序」只是覆盖前的性质，调用方按返回顺序取最近那条会取错
+  lots.sort(byDistance)
   return lots
 }
