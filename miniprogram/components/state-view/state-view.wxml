@@ -1,0 +1,17 @@
+<view class="sv">
+  <view class="sv__skel" wx:if="{{kind === 'loading'}}">
+    <view class="sv__bar" wx:for="{{skeletonRows}}" wx:key="*this" />
+  </view>
+
+  <block wx:else>
+    <view class="sv__text">{{text}}</view>
+    <view class="sv__hint" wx:if="{{hint}}">{{hint}}</view>
+    <view
+      class="sv__action"
+      wx:if="{{actionText}}"
+      bindtap="onAction"
+      aria-role="button"
+      aria-label="{{actionText}}"
+    >{{actionText}}</view>
+  </block>
+</view>

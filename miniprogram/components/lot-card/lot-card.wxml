@@ -1,0 +1,40 @@
+<view class="card {{selected ? 'card--on' : ''}}" bindtap="onCardTap">
+  <view class="card__head">
+    <view class="card__name">{{item.lot.name}}</view>
+    <view class="card__price">
+      <text class="tnum">¥{{item.lot.pricing.firstHour}}</text>
+      <text class="card__unit">/时</text>
+    </view>
+  </view>
+
+  <view class="card__meta">
+    <text>{{item.distanceText}}</text>
+    <text class="card__dot">·</text>
+    <text>步行 {{item.walkText}}</text>
+    <text class="card__dot">·</text>
+    <text>余位 <text class="card__free {{item.freeClass}}">{{item.spotsText}}</text></text>
+    <text class="card__dot">·</text>
+    <text>综合 <text class="card__score tnum">{{item.score}}</text> 分</text>
+  </view>
+
+  <view class="card__tags" wx:if="{{item.estimateText || item.reasons.length}}">
+    <!-- 数据来源标注：车位数/余位/收费等都是估算，课程要求逐处标注来源 -->
+    <view class="tag source" wx:if="{{item.estimateText}}">{{item.estimateText}}</view>
+
+    <!--
+      循环变量必须改名：默认的 `item` 会盖住外层的 item 属性，
+      写成 `{{item.tone}}` 取到的是理由字符串，class 会静默变空、标签全掉色
+    -->
+    <view
+      wx:for="{{item.reasons}}"
+      wx:for-item="reason"
+      wx:key="*this"
+      class="tag {{item.tone}}"
+    >{{reason}}</view>
+  </view>
+
+  <view class="card__actions" wx:if="{{showActions}}">
+    <view class="act act--ghost" catchtap="onNavigate">导航前往</view>
+    <view class="act act--primary" catchtap="onReserve">预约车位</view>
+  </view>
+</view>

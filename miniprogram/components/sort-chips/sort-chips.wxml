@@ -1,0 +1,11 @@
+<view class="chips">
+  <view
+    wx:for="{{options}}"
+    wx:key="key"
+    class="chip {{value === item.key ? 'chip--on' : ''}}"
+    data-key="{{item.key}}"
+    bindtap="onTap"
+    aria-role="button"
+    aria-label="{{variant === 'long' ? item.long : item.short}}"
+  >{{variant === 'long' ? item.long : item.short}}</view>
+</view>

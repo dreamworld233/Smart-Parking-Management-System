@@ -1,0 +1,122 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  /* 面板收起时靠 translateY 移出屏外，这里必须裁掉，否则会撑出页面滚动 */
+  overflow: hidden;
+  background: #eaefe9;
+}
+
+/* Skyline 不支持 position: fixed，地图与浮层只能用 absolute 铺在根节点上。
+   **高度只到面板上沿**，不铺满整页：地图的几何中心就是它的正中间，铺满整页时中心落在
+   下半屏、正好被面板盖住 —— 点卡片把地图居中过去，图钉藏在面板底下，看着像「没定位成功」。
+   高度由 home.ts 按「窗口高 − 面板底距 − 面板高」算成 px 内联传入（搜索页同一套思路） */
+.wrap__map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+.search {
+  position: absolute;
+  left: 28rpx;
+  right: 28rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 26rpx;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  font-size: var(--font-body);
+  color: var(--color-text-weak);
+}
+
+.search__icon { margin-right: 12rpx; }
+.search__ph { flex: 1; }
+.search__map {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* 排序 chips 在面板里，不再是浮在地图上的绝对定位层 */
+.chips-row {
+  flex: none;
+  margin-bottom: var(--space-3);
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--color-surface);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.16);
+  padding: 18rpx 28rpx 0;
+  display: flex;
+  flex-direction: column;
+  /* 高度、bottom、translateY 由 home.ts 按窗口尺寸算出后内联传入 */
+}
+
+/* 面板标题行。原先这里还有个抓手横条，面板固定之后就删了 ——
+   居中一道灰色圆角条是「可以拖」的通用暗示，没有拖拽行为就不该摆 */
+.sheet__head {
+  flex: none;
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+  margin-bottom: var(--space-3);
+}
+
+/* 兜底提示：定位不可用时说清「看的是哪儿」。用 warning 色而不是 danger ——
+   这不是错误，是一份降级后仍然可用的数据 */
+.notice {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx var(--space-3);
+  margin-bottom: var(--space-2);
+  background: #fffbeb;
+  border: 2rpx solid #fde68a;
+  border-radius: var(--radius-card);
+}
+
+.notice__text {
+  flex: 1;
+  font-size: var(--font-sub);
+  color: var(--color-warning);
+}
+
+.notice__retry {
+  flex: none;
+  margin-left: var(--space-2);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.sheet__list {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不给 0 的话 scroll-view 会撑破面板 */
+  height: 0;
+}
+
+.sheet__list lot-card {
+  display: block;
+  margin-bottom: 18rpx;
+}
+
+/* 面板 bottom 已让开 tabBar，这里只留一点呼吸空间 */
+.sheet__tail { height: 24rpx; }
+
+/* 详情视图直接当面板的 flex 子项：撑满面板剩余高度，内部自己滚。
+   宿主设成 flex 行容器，组件根节点的 flex: 1 与父级默认的 stretch 才拿得到完整高度
+   （Skyline 不支持 position: fixed，面板里也不能再绝对定位铺一层） */
+.sheet lot-detail {
+  flex: 1;
+  height: 0;
+  display: flex;
+}

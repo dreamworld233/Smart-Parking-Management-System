@@ -1,0 +1,19 @@
+/* 推荐理由标签。抽成共用文件是因为卡片（lot-card）与详情（lot-detail）要画同一批理由，
+   两边各写一份配色后，同一句「空位充足」会在点进详情的一瞬间换个颜色 */
+.tag {
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: var(--font-tag);
+}
+
+.tag.info { background: #dbeafe; color: #1d4ed8; }
+.tag.good { background: #dcfce7; color: #15803d; }
+.tag.bad { background: #fee2e2; color: #b91c1c; }
+.tag.plain { background: #f1f5f9; color: #475569; }
+
+/* 数据来源标注：虚线边框，与「推荐理由」标签区分开 */
+.tag.source {
+  background: #f8fafc;
+  border: 2rpx dashed #cbd5e1;
+  color: var(--color-text-sub);
+}

@@ -1,0 +1,153 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* 顶栏与地图、面板一样用 px 定位（top 由 search.ts 按胶囊下沿算好内联传入）：
+   写死 88rpx 的状态栏占位在带胶囊的真机上会让返回键钻进胶囊下面 */
+.bar {
+  position: absolute;
+  /* z-index 必须写：Skyline 没有 Web 的层叠上下文，且所有节点默认 position: relative，
+     兄弟之间纯按 DOM 顺序绘制。下面的 .hist 排在顶栏之后，它的盒子从 y=0 起、铺满整宽
+     （padding-top 只推内容，不推盒子），会把整条顶栏盖住 —— 透明所以看得见、点不动。
+     Skyline 的 z-index 只对同级兄弟有效，顶栏与 .hist 正是同级 */
+  z-index: 1;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.bar__input {
+  flex: 1;
+  height: 72rpx;
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0 24rpx;
+  font-size: 26rpx;
+}
+
+.bar__cancel {
+  font-size: 26rpx;
+  color: var(--color-text-weak);
+}
+
+/* 顶部留白由 search.ts 算成 px 内联传入（要刚好让开绝对定位的顶栏） */
+.hist {
+  padding: 0 28rpx;
+}
+
+.hist__title {
+  font-size: 23rpx;
+  color: var(--color-text-weak);
+  margin-bottom: 20rpx;
+}
+
+.hist__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.hist__item {
+  padding: 12rpx 28rpx;
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.hist__empty {
+  padding: 40rpx 0;
+  text-align: center;
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
+
+/* 高度与 top 由 search.ts 算成 px 内联传入。
+   width 必须显式写：map 是 Skyline 的原生 canvas 组件，只给 left/right 它不会把宽度撑开，
+   会按默认宽度从左边起画 —— 真机上表现为地图左移、右侧空一条（首页那份一直有 width，所以没事） */
+.wrap__map {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+/* 排序 chips 在面板里，不再是浮在地图上的绝对定位层 */
+.chips-row {
+  flex: none;
+  margin-bottom: var(--space-3);
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-bg);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  padding: 18rpx 28rpx 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 面板标题行。原先这里还有个抓手横条，面板固定之后就删了 ——
+   居中一道灰色圆角条是「可以拖」的通用暗示，没有拖拽行为就不该摆 */
+.sheet__head {
+  flex: none;
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+  margin-bottom: var(--space-3);
+}
+
+/* 与首页 .notice 同一套样式：两页各存一份是有意的 —— 见计划 Task 14 偏差说明，
+   合并要等 Skyline 页面级 @import 验证过再说 */
+.notice {
+  flex: none;
+  padding: 14rpx var(--space-3);
+  margin-bottom: var(--space-2);
+  background: #fffbeb;
+  border: 2rpx solid #fde68a;
+  border-radius: var(--radius-card);
+}
+
+.notice__text {
+  font-size: var(--font-sub);
+  color: var(--color-warning);
+}
+
+.sheet__list {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不给 0 的话 scroll-view 会撑破面板 */
+  height: 0;
+}
+
+.sheet__list lot-card {
+  display: block;
+  margin-bottom: 18rpx;
+}
+
+.sheet__tail { height: 40rpx; }
+
+/* 详情视图直接当面板的 flex 子项：撑满面板剩余高度，内部自己滚。
+   宿主设成 flex 行容器，组件根节点的 flex: 1 与父级默认的 stretch 才拿得到完整高度
+   （Skyline 不支持 position: fixed，面板里也不能再绝对定位铺一层） */
+.sheet lot-detail {
+  flex: 1;
+  height: 0;
+  display: flex;
+}

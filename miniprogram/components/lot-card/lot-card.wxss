@@ -1,0 +1,93 @@
+@import "../../styles/tags.wxss";
+
+.card {
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.card--on {
+  border-color: var(--color-primary);
+  box-shadow: 0 4rpx 18rpx rgba(37, 99, 235, 0.16);
+}
+
+.card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card__name {
+  flex: 1;
+  margin-right: var(--space-2);
+  font-size: var(--font-card-title);
+  font-weight: 600;
+}
+
+.card__price {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -1rpx;
+  white-space: nowrap;
+}
+
+.card__unit {
+  font-size: var(--font-micro);
+  font-weight: 400;
+}
+
+.card__meta {
+  margin-top: 10rpx;
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+}
+
+.card__dot {
+  margin: 0 6rpx;
+}
+
+.card__free.ok { color: var(--color-success); }
+.card__free.warn { color: var(--color-warning); }
+.card__free.bad { color: var(--color-danger); }
+
+.card__score {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.card__tags {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+  flex-wrap: wrap;
+}
+
+.card__actions {
+  display: flex;
+  gap: 18rpx;
+  margin-top: 22rpx;
+}
+
+.act {
+  flex: 1;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sub);
+  font-weight: 600;
+}
+
+.act--ghost {
+  border: 2rpx solid #cbd5e1;
+  color: var(--color-text);
+}
+
+.act--primary {
+  flex: 1.2;
+  background: var(--color-primary);
+  color: #fff;
+}

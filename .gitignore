@@ -17,11 +17,13 @@ build/
 __pycache__/
 *.pyc
 *.class
+*.tsbuildinfo
 
 # 日志 / 临时文件
 *.log
 *.tmp
 *.bak
+logs/
 
 # 环境与密钥（务必保密）
 .env
@@ -31,17 +33,12 @@ application-local.yml
 application-local.yaml
 application-local.properties
 
-# Android
-*.apk
-*.aab
-*.ap_
-*.dex
-/build/
-/app/build/
-.gradle/
-/local.properties
-captures/
-.cxx/
-.externalNativeBuild/
-*.keystore
-!debug.keystore
+# 微信开发者工具
+miniprogram_npm/
+project.private.config.json
+
+# 本地私密配置：腾讯位置服务 Key（本仓库公开，Key 不得提交）
+miniprogram/config.local.ts
+
+# brainstorming 可视化伴侣产物
+.superpowers/

@@ -1,0 +1,76 @@
+.page {
+  min-height: 100vh;
+  padding: 200rpx 52rpx 52rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.page__title {
+  font-size: 50rpx;
+  font-weight: 700;
+  letter-spacing: -1rpx;
+}
+
+.page__subtitle {
+  font-size: 25rpx;
+  color: var(--color-text-weak);
+  margin-top: 18rpx;
+}
+
+.role {
+  margin-top: 40rpx;
+  border: 4rpx solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 28rpx;
+  padding: 48rpx 40rpx;
+  text-align: left;
+}
+
+.role--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.role__emoji {
+  font-size: 60rpx;
+  line-height: 1;
+}
+
+.role__name {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: #334155;
+  margin-top: 24rpx;
+}
+
+.role--on .role__name {
+  color: #1d4ed8;
+}
+
+.role__desc {
+  font-size: 25rpx;
+  color: #475569;
+  line-height: 1.85;
+  margin-top: 16rpx;
+}
+
+.page__spacer {
+  flex: 1;
+}
+
+.enter {
+  height: 96rpx;
+  line-height: 96rpx;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.enter--disabled {
+  background: #cbd5e1;
+}

@@ -1,0 +1,45 @@
+/* Skyline 下框架的 tabBar 根节点不给定位也不给指针事件：
+   - 不支持 position: fixed，必须用 absolute 贴页面根节点（框架把它挂在页面根下）
+   - 根节点默认 pointer-events: none，不显式打开则整条 tab 点不动
+   代价是 tabBar 会盖住页面，tab 页各自用 --tabbar-h 让出底部高度 */
+.tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: auto;
+  display: flex;
+  /* 全部带兜底值：本组件由框架单独挂载，取不到 app.wxss 里定义在 `page` 上的变量时
+     var() 会让整条声明失效 —— 背景没了，底下的地图直接透上来（真机上看着像导航栏被地图盖住）。
+     兜底值要与 styles/tokens.wxss 保持一致 */
+  height: var(--tabbar-h, 100rpx);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--color-surface, #ffffff);
+  border-top: 2rpx solid var(--color-border, #e2e8f0);
+}
+
+.tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  font-size: 21rpx;
+  color: var(--color-text-weak, #94a3b8);
+}
+
+.tabbar__item--on {
+  color: var(--color-primary, #2563eb);
+  font-weight: 600;
+}
+
+.tabbar__icon {
+  font-size: 36rpx;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.tabbar__item--on .tabbar__icon {
+  opacity: 1;
+}

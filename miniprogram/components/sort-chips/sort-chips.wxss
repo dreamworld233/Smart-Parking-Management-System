@@ -1,0 +1,21 @@
+.chips {
+  display: flex;
+  gap: 14rpx;
+}
+
+.chip {
+  padding: 10rpx 26rpx;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  font-size: var(--font-tag);
+  color: var(--color-text-sub);
+  white-space: nowrap;
+}
+
+.chip--on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}

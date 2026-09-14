@@ -1,0 +1,69 @@
+<view class="detail">
+  <!-- 返回行取代了拖拽时代的「再点一次面板」：面板固定，没有可「收起」的状态 -->
+  <view class="detail__back" bindtap="onBack">‹ 附近车场</view>
+
+  <scroll-view class="detail__body" scroll-y>
+    <view class="card">
+      <view class="card__head">
+        <view class="card__name">{{vm.lot.name}}</view>
+        <view class="card__rating">★ {{vm.lot.rating}}</view>
+      </view>
+      <view class="card__addr">{{vm.lot.address}} · 步行 {{vm.walkText}} · {{vm.distanceText}}</view>
+
+      <view class="stats">
+        <view class="stat">
+          <view class="stat__k">实时余位</view>
+          <view class="stat__v {{vm.freeClass}}">{{vm.spotsText}}</view>
+        </view>
+        <view class="stat">
+          <view class="stat__k">标准收费</view>
+          <view class="stat__v primary">¥{{vm.firstHourText}}<text class="stat__u">/时</text></view>
+        </view>
+        <view class="stat">
+          <view class="stat__k">综合评分</view>
+          <view class="stat__v">{{vm.score}}</view>
+        </view>
+      </view>
+
+      <view class="card__tags" wx:if="{{vm.estimateText || vm.reasons.length}}">
+        <!-- 数据来源标注：车位数/余位/收费都是估算，课程要求逐处标注来源 -->
+        <view class="tag source" wx:if="{{vm.estimateText}}">{{vm.estimateText}}</view>
+
+        <!--
+          循环变量必须改名：默认的 `item` 会盖住外层作用域，
+          写成 `{{item.tone}}` 反而取到理由字符串，class 静默变空、标签全掉色
+          （lot-card.wxml 里踩过同一个坑）
+        -->
+        <view
+          wx:for="{{vm.reasons}}"
+          wx:for-item="reason"
+          wx:key="*this"
+          class="tag {{vm.tone}}"
+        >{{reason}}</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="card__title">收费规则</view>
+      <view class="row"><text class="row__k">首小时</text><text>¥{{vm.firstHourText}}</text></view>
+      <view class="row"><text class="row__k">后续每小时</text><text>¥{{vm.nextHourText}}</text></view>
+      <view class="row"><text class="row__k">计费步长</text><text>{{vm.stepText}}</text></view>
+      <view class="row"><text class="row__k">单日封顶</text><text>¥{{vm.capText}}</text></view>
+      <view class="row"><text class="row__k">夜间 22:00–08:00</text><text>{{vm.nightText}}</text></view>
+    </view>
+
+    <view class="card">
+      <view class="card__title">可预约额度</view>
+      <view class="quota">本车场已开放 <text class="primary bold">{{vm.quotaText}}</text> 个预约车位</view>
+      <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
+    </view>
+
+    <view class="tail" />
+  </scroll-view>
+
+  <!-- 双按钮吸在面板底：面板只有窗口的 0.43，跟着内容滚就永远够不着 -->
+  <view class="detail__bar">
+    <view class="detail__ghost" bindtap="onNavigate">导航前往</view>
+    <view class="detail__primary" bindtap="onReserve">预约车位</view>
+  </view>
+</view>

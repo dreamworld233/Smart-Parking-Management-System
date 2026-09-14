@@ -1,0 +1,55 @@
+{
+  "pages": [
+    "pages/role-select/role-select",
+    "pages/spike-map/spike-map",
+    "pages/home/home",
+    "pages/search/search",
+    "pages/orders/orders",
+    "pages/profile/profile",
+    "pages/owner/dashboard/dashboard",
+    "pages/owner/reservations/reservations",
+    "pages/owner/lot/lot",
+    "pages/owner/profile/profile"
+  ],
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "首页" },
+      { "pagePath": "pages/orders/orders", "text": "订单" },
+      { "pagePath": "pages/profile/profile", "text": "我的" },
+      { "pagePath": "pages/owner/dashboard/dashboard", "text": "看板" },
+      { "pagePath": "pages/owner/reservations/reservations", "text": "预约" },
+      { "pagePath": "pages/owner/lot/lot", "text": "车场" },
+      { "pagePath": "pages/owner/profile/profile", "text": "车场我的" }
+    ]
+  },
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom",
+    "backgroundColor": "#f8fafc"
+  },
+  "requiredPrivateInfos": ["getLocation"],
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于查询并推荐您当前位置周边的停车场"
+    }
+  },
+  "style": "v2",
+  "renderer": "skyline",
+  "rendererOptions": {
+    "skyline": {
+      "defaultDisplayBlock": true,
+      "defaultContentBox": true,
+      "tagNameStyleIsolation": "legacy",
+      "disableABTest": true,
+      "sdkVersionBegin": "3.0.0",
+      "sdkVersionEnd": "15.255.255"
+    }
+  },
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}
