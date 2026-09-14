@@ -1,253 +1,126 @@
-import { SEARCH_CACHE_TTL_MS, WALK_DETOUR_FACTOR } from '../../miniprogram/config'
-import { fetchNearbyLots } from '../../miniprogram/services/lot'
-import type { PoiItem } from '../../miniprogram/services/qqmap'
+import { WALK_DETOUR_FACTOR } from '../../miniprogram/config'
+import { haversineM } from '../../miniprogram/domain/geo'
+import { fetchSignedLots } from '../../miniprogram/services/lot'
 
-interface ReqOption {
-  url: string
-  success: (res: { data: unknown }) => void
-  fail: (err: { errMsg: string }) => void
+interface QueryCaptured {
+  cond: Record<string, unknown>
 }
 
-let searchCalls = 0
-let matrixCalls = 0
-/** 每次矩阵请求带的目的地个数 */
-let matrixPoints: number[] = []
-let storage: Record<string, unknown> = {}
+let docs: Record<string, unknown>[] = []
+const captured: QueryCaptured[] = []
 
-function rawPoi(id: string, title: string, distanceM: number): Record<string, unknown> {
-  return { id, title, address: `${title}的地址`, location: { lat: 36.6, lng: 117.1 }, _distance: distanceM }
-}
-
-function searchBody(items: Array<Record<string, unknown>>): unknown {
-  return { status: 0, message: 'query ok', count: items.length, data: items }
-}
-
-function matrixBody(points: number): unknown {
-  return {
-    status: 0,
-    message: 'query ok',
-    result: {
-      rows: [{ elements: Array.from({ length: points }, (_, i) => ({ distance: 400 + i * 10, duration: 300 + i * 60 })) }],
-    },
-  }
-}
-
-interface StubOptions {
-  /** 搜索返回的 POI；默认 5 个，方便观察「只有 Top3 查矩阵」 */
-  items?: Array<Record<string, unknown>>
-  /** 矩阵请求一律失败 */
-  matrixFails?: boolean
-}
-
-function installWx(opts: StubOptions = {}): void {
-  searchCalls = 0
-  matrixCalls = 0
-  matrixPoints = []
-  const items = opts.items ?? [1, 2, 3, 4, 5].map(i => rawPoi(`p${i}`, `第${i}停车场`, 300 + i * 50))
-
+function stubCloud(): void {
   const g = globalThis as unknown as {
     wx: {
-      request: (o: ReqOption) => void
-      getStorageSync: (k: string) => unknown
-      setStorageSync: (k: string, v: unknown) => void
+      cloud: {
+        init: () => void
+        callFunction: () => Promise<{ result: unknown }>
+        database: () => {
+          collection: (name: string) => {
+            where: (cond: Record<string, unknown>) => {
+              limit: (n: number) => { get: () => Promise<{ data: Record<string, unknown>[] }> }
+            }
+          }
+        }
+      }
     }
   }
   g.wx = {
-    request: o => {
-      if (o.url.indexOf('/ws/place/v1/search') >= 0) {
-        searchCalls++
-        o.success({ data: searchBody(items) })
-        return
-      }
-      matrixCalls++
-      const to = decodeURIComponent(o.url).match(/to=([^&]*)/)?.[1] ?? ''
-      const n = to.split(';').filter(Boolean).length
-      matrixPoints.push(n)
-      if (opts.matrixFails) o.fail({ errMsg: 'request:fail timeout' })
-      else o.success({ data: matrixBody(n) })
-    },
-    getStorageSync: k => storage[k],
-    setStorageSync: (k, v) => {
-      storage[k] = v
+    cloud: {
+      init: () => undefined,
+      callFunction: () => Promise.resolve({ result: {} }),
+      database: () => ({
+        collection: (name: string) => {
+          if (name !== 'lots') throw new Error(`unexpected collection ${name}`)
+          return {
+            where: (cond: Record<string, unknown>) => {
+              captured.push({ cond })
+              return {
+                limit: () => ({ get: () => Promise.resolve({ data: docs }) }),
+              }
+            },
+          }
+        },
+      }),
     },
   }
 }
 
-const CENTER = { lat: 36.65, lng: 117.12 }
+function doc(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    _id: 'lot1',
+    name: '测试车场',
+    address: '测试地址',
+    location: { lat: 31.7527, lng: 117.2541 },
+    pricing: { firstHour: 5, perHourAfter: 4, stepMinutes: 60, capPerDay: 40, source: 'public' },
+    availability: { freeSpots: null, totalSpots: 300, source: 'ops' },
+    reservableQuota: 20,
+    ratingSummary: null,
+    facilities: ['充电桩'],
+    contract: { status: 'signed' },
+    ...overrides,
+  }
+}
 
-beforeEach(() => {
-  storage = {}
-  jest.useRealTimers()
-})
+describe('fetchSignedLots', () => {
+  const CENTER = { lat: 31.752727, lng: 117.254098 }
 
-describe('fetchNearbyLots · 估算字段', () => {
-  it('估算出来的字段一律标 estimated，不冒充真实数据', async () => {
-    installWx({ matrixFails: true })
-
-    const { lots } = await fetchNearbyLots(CENTER)
-
-    expect(lots.length).toBe(5)
-    for (const lot of lots) {
-      expect(lot.pricing.source).toBe('estimated')
-      expect(lot.availability.source).toBe('ops')
-      expect(lot.distanceSource).toBe('estimated')
-    }
+  beforeEach(() => {
+    stubCloud()
+    docs = []
+    captured.length = 0
   })
 
-  it('估算值落在各自声明区间内，不产出不可能的车场', async () => {
-    installWx({ matrixFails: true })
-
-    const { lots } = await fetchNearbyLots(CENTER)
-
-    for (const lot of lots) {
-      expect(lot.availability.freeSpots).toBeGreaterThanOrEqual(0)
-      expect(lot.availability.freeSpots).toBeLessThanOrEqual(lot.availability.totalSpots)
-      expect(lot.ratingSummary).toBeNull()
-      expect(lot.reservableQuota).toBeGreaterThanOrEqual(40)
-      expect(lot.reservableQuota).toBeLessThanOrEqual(160)
-      expect(lot.pricing.stepMinutes).toBe(15)
-      expect(lot.pricing.perHourAfter).toBeGreaterThanOrEqual(1)
-      expect(lot.walkMinutes).toBeGreaterThanOrEqual(1)
-    }
+  it('只查签约车场：查询条件带 contract.status', async () => {
+    docs = [doc({})]
+    await fetchSignedLots(CENTER)
+    expect(captured).toHaveLength(1)
+    expect(captured[0].cond).toEqual({ 'contract.status': 'signed' })
   })
 
-  it('同一 POI 的估算值稳定，刷新列表不会数字乱跳', async () => {
-    installWx({ matrixFails: true })
-    const first = (await fetchNearbyLots(CENTER)).lots
-
-    storage = {}
-    installWx({ matrixFails: true })
-    const second = (await fetchNearbyLots(CENTER)).lots
-
-    expect(second.map(l => [l.id, l.reservableQuota, l.availability.freeSpots])).toEqual(
-      first.map(l => [l.id, l.reservableQuota, l.availability.freeSpots]),
-    )
+  it('返回文档映射出的车场并带上估算距离', async () => {
+    docs = [doc({})]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots).toHaveLength(1)
+    expect(lots[0].id).toBe('lot1')
+    expect(lots[0].distanceSource).toBe('estimated')
+    expect(lots[0].distanceM).toBeGreaterThan(0)
+    expect(lots[0].walkMinutes).toBeGreaterThan(0)
   })
 
-  it('名称里的业态会影响估算（医院床位多、封顶低）', async () => {
-    installWx({
-      items: [rawPoi('h1', '市立医院地下停车场', 400), rawPoi('m1', '某某停车场', 400)],
-      matrixFails: true,
-    })
-
-    const { lots } = await fetchNearbyLots(CENTER)
-    const hospital = lots.find(l => l.id === 'h1')
-    const plain = lots.find(l => l.id === 'm1')
-
-    expect(hospital?.availability.totalSpots).toBe(800)
-    expect(hospital?.pricing.capPerDay).toBe(30)
-    expect(plain?.pricing.capPerDay).toBe(40)
-  })
-})
-
-describe('fetchNearbyLots · 步行路线只查 Top N', () => {
-  it('只发一次矩阵请求，且只带 3 个目的地', async () => {
-    // 矩阵按目的地计费、实测约 5 点/秒：给 5 个车场逐个并发查询会吃限流，
-    // 结果是配额花得更多、真实数据拿得更少
-    installWx()
-
-    await fetchNearbyLots(CENTER)
-
-    expect(matrixCalls).toBe(1)
-    expect(matrixPoints).toEqual([3])
+  it('按距离升序、半径外的丢弃', async () => {
+    docs = [
+      doc({ _id: 'far', location: { lat: 31.78, lng: 117.28 } }),
+      doc({ _id: 'near', location: { lat: 31.753, lng: 117.2545 } }),
+    ]
+    const lots = await fetchSignedLots(CENTER, 1000)
+    expect(lots.map(l => l.id)).toEqual(['near'])
   })
 
-  it('Top3 拿真实路线，其余保持估算', async () => {
-    installWx()
-
-    const { lots } = await fetchNearbyLots(CENTER)
-    const route = lots.filter(l => l.distanceSource === 'route')
-
-    expect(route.length).toBe(3)
-    // 矩阵 stub 给的第一个目的地是 400 米 / 300 秒 → 5 分钟
-    expect(route.every(l => l.walkMinutes >= 1)).toBe(true)
-    expect(lots.filter(l => l.distanceSource === 'estimated').length).toBe(2)
+  it('perHourAfter 缺省回落到 firstHour', async () => {
+    docs = [doc({ pricing: { firstHour: 5, stepMinutes: 60, capPerDay: 40, source: 'ops' } })]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots[0].pricing.perHourAfter).toBe(5)
   })
 
-  it('未查路线的车场按绕行系数折算，系数不是装饰', async () => {
-    installWx()
-
-    const { lots } = await fetchNearbyLots(CENTER)
-    const estimated = lots.filter(l => l.distanceSource === 'estimated')
-    // POI 直线 550 米（第 5 个）→ 估算应为 round(550 × 1.3)
-    const far = estimated.find(l => l.id === 'p5')
-
-    expect(far?.distanceM).toBe(Math.round(550 * WALK_DETOUR_FACTOR))
+  it('形状坏的文档整条丢弃，不炸整批', async () => {
+    docs = [doc({}), doc({ _id: 'bad', name: 123 }), doc({})]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots).toHaveLength(2)
   })
 
-  it('矩阵失败时全部退回估算，且不抛异常', async () => {
-    installWx({ matrixFails: true })
-
-    const { lots, hasEstimatedDistance } = await fetchNearbyLots(CENTER)
-
-    expect(lots.every(l => l.distanceSource === 'estimated')).toBe(true)
-    expect(hasEstimatedDistance).toBe(true)
+  it('估算距离是直线距离乘绕行系数的四舍五入', async () => {
+    docs = [doc({ location: { lat: 31.75121, lng: 117.25325 } })]
+    const lots = await fetchSignedLots(CENTER)
+    const straight = haversineM(CENTER, { lat: 31.75121, lng: 117.25325 })
+    expect(lots[0].distanceM).toBe(Math.round(straight * WALK_DETOUR_FACTOR))
   })
 
-  it('车场不足 Top N 个时不多问几个目的地', async () => {
-    installWx({ items: [rawPoi('only', '唯一停车场', 400)] })
-
-    await fetchNearbyLots(CENTER)
-
-    expect(matrixPoints).toEqual([1])
-  })
-})
-
-describe('fetchNearbyLots · 搜索缓存', () => {
-  it('同参数再次调用不再打搜索接口', async () => {
-    // 地点搜索额度约 200 次/天，每次刷新都重查的话开发期几天就打光
-    installWx()
-    await fetchNearbyLots(CENTER)
-    const afterFirst = searchCalls
-
-    installWx()
-    const { lots } = await fetchNearbyLots(CENTER)
-
-    expect(afterFirst).toBe(1)
-    expect(searchCalls).toBe(0)
-    expect(lots.length).toBe(5)
-  })
-
-  it('超过 TTL 后重新搜索', async () => {
-    installWx()
-    const t0 = new Date('2026-09-12T10:00:00Z').getTime()
-    await fetchNearbyLots(CENTER, undefined, undefined, t0)
-
-    installWx()
-    await fetchNearbyLots(CENTER, undefined, undefined, t0 + SEARCH_CACHE_TTL_MS + 1)
-
-    expect(searchCalls).toBe(1)
-  })
-
-  it('位置变远（超出坐标取整精度）时不命中缓存', async () => {
-    installWx()
-    const t0 = new Date('2026-09-12T10:00:00Z').getTime()
-    await fetchNearbyLots(CENTER, undefined, undefined, t0)
-
-    installWx()
-    await fetchNearbyLots({ lat: 36.7, lng: 117.2 }, undefined, undefined, t0)
-
-    expect(searchCalls).toBe(1)
-  })
-
-  it('缓存形状不对时忽略它并重新搜索，不把脏数据喂进列表', async () => {
-    storage['qnt.poiCache'] = { key: 'someone-else', at: Date.now(), pois: [{ id: 'x' }] }
-    installWx()
-
-    const { lots } = await fetchNearbyLots(CENTER)
-
-    expect(searchCalls).toBe(1)
-    expect(lots.length).toBe(5)
-  })
-
-  it('缓存时钟被回拨过（age 为负）时按失效处理', async () => {
-    installWx()
-    const t0 = new Date('2026-09-12T10:00:00Z').getTime()
-    await fetchNearbyLots(CENTER, undefined, undefined, t0)
-
-    installWx()
-    await fetchNearbyLots(CENTER, undefined, undefined, t0 - 60_000)
-
-    expect(searchCalls).toBe(1)
+  it('环境未配置时抛出明确错误', async () => {
+    const g = globalThis as unknown as { wx?: unknown }
+    const saved = g.wx
+    g.wx = {}
+    await expect(fetchSignedLots(CENTER)).rejects.toThrow('云开发未初始化')
+    g.wx = saved
   })
 })

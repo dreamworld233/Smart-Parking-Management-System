@@ -8,7 +8,7 @@ import { availabilityLevel, freeRate, topRecommendations } from '../../domain/sc
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
-import { fetchNearbyLots } from '../../services/lot'
+import { fetchSignedLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
 import { searchDestination } from '../../services/qqmap'
 import { getSearchHistory, pushSearchHistory } from '../../services/storage'
@@ -174,7 +174,7 @@ Page({
       }
       const target = pois[0].location
 
-      const { lots } = await fetchNearbyLots(target, DEFAULT_RADIUS_M)
+      const lots = await fetchSignedLots(target, DEFAULT_RADIUS_M)
       if (seq !== this.searchSeq) return
       if (lots.length === 0) {
         this.setData({ state: 'empty', fallbackText })

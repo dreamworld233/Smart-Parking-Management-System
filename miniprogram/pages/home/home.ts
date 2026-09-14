@@ -8,7 +8,7 @@ import { availabilityLevel, freeRate, topRecommendations } from '../../domain/sc
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
-import { fetchNearbyLots } from '../../services/lot'
+import { fetchSignedLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
 
 type ViewState = 'loading' | 'ready' | 'empty' | 'error'
@@ -145,7 +145,7 @@ Page({
     const fallbackText = loc.ok ? '' : fallbackNotice(loc.reason, FALLBACK_PLACE.name)
 
     try {
-      const { lots } = await fetchNearbyLots(point, DEFAULT_RADIUS_M)
+      const lots = await fetchSignedLots(point, DEFAULT_RADIUS_M)
       if (lots.length === 0) {
         this.setData({ state: 'empty', fallbackText })
         return

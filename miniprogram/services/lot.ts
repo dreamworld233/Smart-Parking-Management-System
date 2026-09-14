@@ -1,184 +1,117 @@
 import {
   DEFAULT_RADIUS_M,
-  SEARCH_CACHE_TTL_MS,
   WALK_DETOUR_FACTOR,
   WALK_LOOKUP_TOP_N,
   WALK_METERS_PER_MINUTE,
 } from '../config'
-import { topRecommendations } from '../domain/scoring'
+import { haversineM } from '../domain/geo'
 import type { GeoPoint, ParkingLot } from '../domain/types'
-import { searchNearby, walkingDistances, type PoiItem } from './qqmap'
-
-const CACHE_KEY = 'qnt.poiCache'
+import { getCloudApi } from './cloud'
+import { walkingDistances } from './qqmap'
 
 /**
- * 由 POI id 稳定派生估算字段。
+ * lots 集合文档 → ParkingLot。
  *
- * 用 id 做种子而不是随机数：同一车场每次进 App 看到的估算值必须一致，
- * 否则列表一刷新数字就跳，既不像真实数据，也没法在演示时对同一车场讲第二遍
+ * **逐条校验、坏一条丢一条**，与 format/cache 各处对存储污染的口径一致：
+ * 手工在控制台改文档是常态，一条脏数据不该让整个面板白屏。
+ * 字段缺失返回 null，调用方过滤 —— 宁可少显示一家，不显示半个「--」怪胎
  */
-function seedOf(poiId: string): number {
-  let h = 2166136261
-  for (let i = 0; i < poiId.length; i++) {
-    h ^= poiId.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return Math.abs(h)
-}
-
-function pick(seed: number, min: number, max: number): number {
-  return min + (seed % (max - min + 1))
-}
-
-/** 名称里能看出业态的，按业态给一套更像样的估算值 */
-const NAME_HINTS: Array<{ match: string; firstHour: number; totalSpots: number }> = [
-  { match: '医院', firstHour: 4, totalSpots: 800 },
-  { match: '商城', firstHour: 5, totalSpots: 300 },
-  { match: '广场', firstHour: 5, totalSpots: 420 },
-  { match: '万象', firstHour: 6, totalSpots: 500 },
-]
-
-const DEFAULT_HINT = { firstHour: 5, totalSpots: 260 }
-
-function pricingHint(title: string): { firstHour: number; totalSpots: number } {
-  return NAME_HINTS.find(h => title.indexOf(h.match) >= 0) ?? DEFAULT_HINT
-}
-
-function walkMinutesFor(distanceM: number): number {
-  return Math.max(1, Math.round(distanceM / WALK_METERS_PER_MINUTE))
-}
-
-/**
- * POI → ParkingLot。POI 只有名称、地址、坐标、直线距离，
- * 其余（车位、收费、评分、可预约额度）都是本地估算，**一律标 'estimated'**，
- * 页面上要如实标注来源 —— 拿估算值冒充真实数据是课程红线
- */
-function toParkingLot(poi: PoiItem): ParkingLot {
-  const seed = seedOf(poi.id)
-  const hint = pricingHint(poi.title)
-  const isHospital = poi.title.indexOf('医院') >= 0
-  // 空闲率 3%–57%：下限留几个空位，上限不封满，免得整片列表都是「空位充足」
-  const estimatedFreeRate = 0.03 + (seed % 55) / 100
-  const freeSpots = Math.max(0, Math.round(hint.totalSpots * estimatedFreeRate))
-  // 直线距离先按绕行系数折算，等拿到真实路线再覆盖（只覆盖得起少数几个）
-  const estimatedM = Math.max(0, Math.round(poi.distanceM * WALK_DETOUR_FACTOR))
+function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | null {
+  const loc = doc.location as { lat?: unknown; lng?: unknown } | undefined
+  const pricing = doc.pricing as Record<string, unknown> | undefined
+  const availability = doc.availability as Record<string, unknown> | undefined
+  const summary = doc.ratingSummary as Record<string, unknown> | null | undefined
+  if (typeof doc.name !== 'string' || typeof doc.address !== 'string') return null
+  if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return null
+  if (!pricing || typeof pricing.firstHour !== 'number') return null
+  if (!availability || typeof availability.totalSpots !== 'number') return null
+  const freeSpots = availability.freeSpots
+  if (freeSpots !== null && typeof freeSpots !== 'number') return null
+  if (typeof doc.reservableQuota !== 'number') return null
+  const pricingSource = pricing.source
+  if (pricingSource !== 'public' && pricingSource !== 'ops' && pricingSource !== 'estimated') return null
+  const spotsSource = availability.source
+  if (spotsSource !== 'public' && spotsSource !== 'ops') return null
 
   return {
-    id: poi.id,
-    name: poi.title,
-    address: poi.address,
-    location: poi.location,
-    distanceM: estimatedM,
-    walkMinutes: walkMinutesFor(estimatedM),
+    id,
+    name: doc.name,
+    address: doc.address,
+    location: { lat: loc.lat, lng: loc.lng },
+    // 距离先按 0 占位，distanceM 在 fetchSignedLots 里统一计算
+    distanceM: 0,
+    walkMinutes: 0,
     distanceSource: 'estimated',
     pricing: {
-      firstHour: hint.firstHour,
-      perHourAfter: Math.max(1, hint.firstHour - 1),
-      stepMinutes: 15,
-      capPerDay: isHospital ? 30 : 40,
-      nightRate: 3,
-      source: 'estimated',
+      firstHour: pricing.firstHour,
+      perHourAfter: typeof pricing.perHourAfter === 'number' ? pricing.perHourAfter : pricing.firstHour,
+      stepMinutes: pricing.stepMinutes === 15 || pricing.stepMinutes === 30 ? pricing.stepMinutes : 60,
+      capPerDay: typeof pricing.capPerDay === 'number' ? pricing.capPerDay : 0,
+      nightRate: typeof pricing.nightRate === 'number' ? pricing.nightRate : undefined,
+      source: pricingSource,
     },
     availability: {
       freeSpots,
-      totalSpots: hint.totalSpots,
-      // 哈希派生字段在 Task 3 整体退役；这里只用 'ops' 占位让旧代码过编译，
-      // 真实来源由 cloud 库的 availability.source 决定
-      source: 'ops',
+      totalSpots: availability.totalSpots,
+      source: spotsSource,
     },
-    reservableQuota: pick(seed, 40, 160),
-    ratingSummary: null,
-    facilities: seed % 3 === 0 ? ['充电桩'] : [],
+    reservableQuota: doc.reservableQuota,
+    ratingSummary:
+      summary && typeof summary.score === 'number' && typeof summary.count === 'number'
+        ? { score: summary.score, count: summary.count }
+        : null,
+    facilities: Array.isArray(doc.facilities)
+      ? (doc.facilities as unknown[]).filter((f): f is string => typeof f === 'string')
+      : [],
   }
 }
 
-interface CacheEntry {
-  key: string
-  at: number
-  pois: PoiItem[]
-}
-
-function cacheKeyOf(keyword: string, center: GeoPoint, radiusM: number): string {
-  // 坐标保留 3 位小数（约 100 米）：GPS 微动不该让整次搜索重来。
-  // 地点搜索的每日额度很小，缓存是配额保护而不是性能优化
-  return `${keyword}|${center.lat.toFixed(3)},${center.lng.toFixed(3)}|${radiusM}`
-}
-
-/**
- * 读缓存。存储可能被旧版本或手工改动污染，形状不对就当没缓存 ——
- * 宁可多花一次配额，也不能把脏数据喂进列表
- */
-function readCache(key: string, nowMs: number): PoiItem[] | null {
-  const raw: unknown = wx.getStorageSync(CACHE_KEY)
-  if (!raw || typeof raw !== 'object') return null
-  const entry = raw as Partial<CacheEntry>
-  if (entry.key !== key || typeof entry.at !== 'number' || !Array.isArray(entry.pois)) return null
-  const age = nowMs - entry.at
-  // age 为负说明时钟被回拨过，同样按失效处理
-  if (!Number.isFinite(age) || age < 0 || age > SEARCH_CACHE_TTL_MS) return null
-  return entry.pois as PoiItem[]
-}
-
-function writeCache(key: string, pois: PoiItem[], nowMs: number): void {
-  wx.setStorageSync(CACHE_KEY, { key, at: nowMs, pois } satisfies CacheEntry)
-}
-
-/** 带缓存的周边检索。缓存只认「同关键词 + 同位置 + 同半径」 */
-async function searchNearbyCached(
-  keyword: string,
-  center: GeoPoint,
-  radiusM: number,
-  nowMs: number,
-): Promise<PoiItem[]> {
-  const key = cacheKeyOf(keyword, center, radiusM)
-  const cached = readCache(key, nowMs)
-  if (cached) return cached
-
-  const pois = await searchNearby(keyword, center, radiusM)
-  writeCache(key, pois, nowMs)
-  return pois
-}
-
-export interface NearbyResult {
-  lots: ParkingLot[]
-  /** 是否有车场用的是估算距离（页面据此决定要不要整体提示「距离为估算」） */
-  hasEstimatedDistance: boolean
+function withDistance(lot: ParkingLot, center: GeoPoint): ParkingLot {
+  // 直线 × 绕行系数，与退役前 POI 兜底同口径；Top N 车场随后被真实路线覆盖
+  const straight = haversineM(center, lot.location)
+  const estimatedM = Math.max(0, Math.round(straight * WALK_DETOUR_FACTOR))
+  return {
+    ...lot,
+    distanceM: estimatedM,
+    walkMinutes: Math.max(1, Math.round(estimatedM / WALK_METERS_PER_MINUTE)),
+    distanceSource: 'estimated',
+  }
 }
 
 /**
- * 取周边车场：真实 POI 打底，估算字段补齐，再给**推荐靠前的少数几个**
- * 查真实步行路线。
+ * 拉取周边**签约**车场（数据模型 §4：库里只存已签约、可预约的车场）。
  *
- * 只查 Top N 不是偷懒：路径矩阵按目的地计费，实测每秒约 5 点、单次最多 5 点。
- * 20 个车场逐个并发查询会有大半吃限流（status 120）而静默退回估算，
- * 结果是「花的配额更多、拿到的真实数据更少」。其余车场标 estimated 由页面如实展示。
+ * 普通查询全量拉（签约车场个位数，limit 20 是自保护的帽），本地算直线距离、
+ * 按半径过滤、距离升序；**距离最近的 Top N 再查真实步行路线覆盖**
+ * （路径矩阵按目的地计费的约束没有变）。查不到路线保留估算值并如实标注。
+ *
+ * 库为空 / 环境未配置时返回空数组，不抛错 —— 面板的空态文案负责解释
  */
-export async function fetchNearbyLots(
+export async function fetchSignedLots(
   center: GeoPoint,
   radiusM: number = DEFAULT_RADIUS_M,
-  keyword = '停车场',
-  nowMs: number = Date.now(),
-): Promise<NearbyResult> {
-  const pois = await searchNearbyCached(keyword, center, radiusM, nowMs)
-  const lots = pois.map(toParkingLot)
+): Promise<ParkingLot[]> {
+  const db = getCloudApi()?.database()
+  if (!db) throw new Error('云开发未初始化：请检查 config.local.ts 的 CLOUD_ENV')
 
-  const topIds = topRecommendations(lots, { userNeedsCharging: false }, WALK_LOOKUP_TOP_N).map(
-    r => r.lot.id,
-  )
-  const topLots = lots.filter(l => topIds.indexOf(l.id) >= 0)
+  const res = await db.collection('lots').where({ 'contract.status': 'signed' }).limit(20).get()
+  const lots = res.data
+    .map(doc => toParkingLot(String(doc._id ?? ''), doc))
+    .filter((l): l is ParkingLot => l !== null)
+    .filter(l => haversineM(center, l.location) <= radiusM)
+    .map(l => withDistance(l, center))
+    .sort((a, b) => a.distanceM - b.distanceM)
 
-  const walked = await walkingDistances(center, topLots.map(l => l.location))
+  const top = lots.slice(0, WALK_LOOKUP_TOP_N)
+  if (top.length === 0) return lots
+  const walked = await walkingDistances(center, top.map(l => l.location))
   walked.forEach((w, i) => {
-    const lot = topLots[i]
-    // 查不到就保留估算值，不把 null 写进去
+    const lot = top[i]
+    // 查不到就保留估算值，不把 null 写进去（与退役前同一口径）
     if (!lot || !w) return
     lot.distanceM = w.distanceM
     lot.walkMinutes = w.durationMin
     lot.distanceSource = 'route'
   })
-
-  return {
-    lots,
-    hasEstimatedDistance: lots.some(l => l.distanceSource === 'estimated'),
-  }
+  return lots
 }
