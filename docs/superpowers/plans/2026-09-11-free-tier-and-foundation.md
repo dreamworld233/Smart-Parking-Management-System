@@ -4143,7 +4143,22 @@ import type { LotDetailVM } from '../../domain/detail'
     this.setData({ state: 'loading', fallbackText: '', detail: null })
 ```
 
-4. 新增共用入口，并改掉 `onCardTap` / `onReserve`：
+4. `applySort` 加第二个参数，**选中 id 由调用方显式传入**：
+
+```ts
+  applySort(key: SortKey, nextSelectedId?: string) {
+    const selectedId = nextSelectedId ?? this.data.selectedId
+    ...
+  },
+```
+
+> **为什么**：真机上同一次 `setData` 批里「改 `selectedId` + 重建卡片」时，
+> `this.data.selectedId` 取到的可能还是上一屏的值 —— 2026-09-14 真机反馈「在详情里点别的图钉，
+> 面板定位过去了但那张卡片没有蓝框」，就是高亮被落在旧的那张卡上。
+> **参数不能用默认值写 `this.data.selectedId`**：默认参数位置上出现 `this` 会让 `Page({})`
+> 的上下文类型推断失效，报 `TS2683: 'this' implicitly has type 'any'`（本次踩到）。
+
+5. 新增共用入口，并改掉 `onCardTap` / `onReserve`：
 
 ```ts
   /**
@@ -4160,7 +4175,7 @@ import type { LotDetailVM } from '../../domain/detail'
       centerLng: rec.lot.location.lng,
       detail: toDetailVM(rec),
     })
-    this.applySort(this.data.sortKey)
+    this.applySort(this.data.sortKey, rec.lot.id)
   },
 
   onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
@@ -4172,25 +4187,39 @@ import type { LotDetailVM } from '../../domain/detail'
     wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
   },
 
+  /**
+   * 返回列表：卡片还留着选中态，但面板停在列表顶部 —— 用户得自己往下翻才找得到
+   * 刚才看的那家（2026-09-14 真机反馈）。列表是这一屏新渲染出来的，所以等渲染完再滚
+   */
   onDetailBack() {
     this.setData({ detail: null })
+    wx.nextTick(() => this.scrollToCard(this.data.selectedId))
   },
 ```
 
 原 `onCardTap`（只选中 + 居中）与 `onReserve`（`wx.navigateTo` 到已不存在的 `/pages/lot-detail`）整段删掉。
 
-5. `onPinTap` 里加一句：**详情态下点图钉 = 回列表看那张卡片**。详情是「这个车场」的独占视图，图钉联动要看到卡片才有意义。`wx.nextTick` 由 `scrollToCard` 内部负责，列表渲染完才滚。
+6. `onPinTap`：**详情态下点图钉 = 回列表看那张卡片**（详情是「这个车场」的独占视图，图钉联动要看到卡片才有意义）。**回列表那一步必须分两拍**：
 
 ```ts
   onPinTap(e: WechatMiniprogram.CustomEvent<{ markerId: number }>) {
     const pin = this.data.pins[e.detail.markerId]
     if (!pin) return
-    // 先退出详情：列表要先渲染出来，scroll-into-view 才有目标可找
-    this.setData({ selectedId: pin.id, detail: null })
-    this.applySort(this.data.sortKey)
-    this.scrollToCard(pin.id)
+    const leavingDetail = !!this.data.detail
+    // 面板切回列表时卡片是**新创建**的：选中态不能与「切回列表」挤在同一次 setData 里，
+    // 否则卡片拿到的还是上一屏的 selectedId、没有蓝框（2026-09-14 真机反馈）
+    if (leavingDetail) this.setData({ detail: null })
+    const land = () => {
+      this.setData({ selectedId: pin.id })
+      this.applySort(this.data.sortKey, pin.id)
+      this.scrollToCard(pin.id)
+    }
+    if (leavingDetail) wx.nextTick(land)
+    else land()
   },
 ```
+
+> **两页都要这一条**，且**只有在详情态才分两拍**：列表里点图钉本来就是既有行为（卡片早渲染好了），多绕一帧只会平白慢一下。
 
 `miniprogram/pages/home/home.wxml`：把面板内部整段包进 `wx:else`，详情占满面板：
 
@@ -4241,7 +4270,7 @@ import type { LotDetailVM } from '../../domain/detail'
     this.setData({ history: pushSearchHistory(keyword), state: 'loading', fallbackText: '', detail: null })
 ```
 
-2. 检索成功后的 `setData` 里**不要**碰 `detail`；`onCardTap` / `onReserve` 同样换成 `openDetail(e.detail.id)`，`onPinTap` 同样先清 `detail`。
+2. 检索成功后的 `setData` 里**不要**碰 `detail`；`onCardTap` / `onReserve` 同样换成 `openDetail(e.detail.id)`；`applySort` / `onPinTap` / `onDetailBack` 三处照 Step 5 的 4/5/6 条改（显式传 `selectedId`、详情态分两拍、返回时滚到选中卡）—— 这两页的联动逻辑必须一字不差地对齐，差一处就是「一页好一页坏」
 
 `miniprogram/pages/search/search.wxml`：面板里加详情分支，其余包 `wx:else`：
 
@@ -4272,8 +4301,8 @@ import type { LotDetailVM } from '../../domain/detail'
 Expected（**必须真机**，devtools 的 glass-easel 与真机在 flex 尺寸上会给出不同结果）：
 - 首页点一张卡片 → 面板内容切成详情、地图居中到该车场、卡片仍是选中态（蓝色图钉）
 - 详情里能上下滚动，滚到底看得到「可预约额度」整张卡；底部的「导航前往 / 预约车位」一直在
-- 点「‹ 附近车场」回到列表，列表保持原来的排序与滚动位置
-- 搜索页同上；点图钉 → 从详情回到列表并滚到那张卡片
+- 点「‹ 附近车场」回到列表，列表保持原来的排序；**面板要自己把刚才看的那家滚到眼前**，不用用户下划（09-14 首轮真机反馈）
+- 搜索页同上；**详情态点别的图钉 → 回列表、滚到那张卡片、卡片有蓝框**（09-14 首轮漏了蓝框）
 - 定位失败时（关掉微信定位权限）进详情，卡片上的「距离、收费为估算」标注仍在
 - 「导航前往」调起微信内置地图；「预约车位」给出下一阶段提示，**不再跳页**
 
