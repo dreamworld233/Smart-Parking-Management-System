@@ -14,13 +14,54 @@
 
 ---
 
-## 执行进度（2026-09-14 晚）
+## 执行进度（2026-09-14 夜，更新至 Task 4）
 
-- **Task 2 完成并提交**（commit 51b2b96）：tsc exit 0、jest 12 套件 202 测试全绿。Task 0/1/3/4/5/6 仍待云开发环境 ID（用户手动步骤）。
+**本文件的 `- [ ]` 是原始步骤清单，不随执行翻勾**；实际进度以本节为准（Task 2 起一直这么做）。
+
+| Task | 状态 | 提交 |
+|---|---|---|
+| Task 0 云开发开通与地基 | ✅ | `48f2558` |
+| Task 1 initDb + 集合与安全规则 | ✅ | `0f6fdad` |
+| Task 2 领域层真实化 | ✅ | `51b2b96` |
+| Task 3 geo.ts + lot.ts 重写 | ✅ | `4fed08a`、`5ca38eb`（复核后修复） |
+| Task 4 login + ensureLogin | ✅ | `7674d36`、`78e00a8`、`3d120f4` |
+| Task 5 seedLots 种子 | **挂起** —— 待用户实地核实 5 家车场的公示价（用户 2026-09-14 夜决定） | — |
+| Task 6 页面接入 + 真机验收 | 未开始（需用户在场） | — |
+
+**云上现状**（这些只存在于云开发控制台，不在 git 里，换环境要重建）：环境 `cloud1-d8gzxlbnq9a5cbf75`；11 个集合已建；**安全规则 11 条已按 Task 1 Step 4 口径配好**；`login` 已部署并端到端验收（`users` 出现一条文档，`_id` 与 `_openid` **都等于用户 openid**、`role: 'driver'`，重编译两次仍只有一条）。
+
+**全量验证**：`npx tsc --noEmit` exit 0；`npx jest` 14 套件 205 用例全绿。已 `git push origin main`（`2f43ffc..3d120f4`）。
+
+### Task 2 的两个坑
+
 - **计划里的两个坑，当场修正而非照抄**（符合「计划规格必须先验算」约定）：
   1. 计划 Step 10 的「余位未上报」测试 `scoreLot(l, { allLots: [l], userNeedsCharging: false })` **漏了 `hasCharging` 形参**，编译不过；且断言 100 分需以 `lot()` 默认 `ratingSummary: null` 为前提，与同批「部分因子缺失」测试显式传 `ratingSummary: null` 矛盾。已定 `lot()` 默认 `ratingSummary: null` 并补 `hasCharging: false`。
   2. 计划 `sourceNotes` 的实现对 `pricing.source === 'public'` 也出「收费来源于车场公示价」标注（三种收费来源各有标签），因此「全真实为空数组」这条**不可达**、与实现矛盾。已把该测试改为「距离估算 + 收费公示价各自独立标注」，断言非空。
 - **桥接超出了计划 Task 2 的文件清单**：`LotAvailability.source` 收窄到 `'public' | 'ops'` 后，旧 `services/lot.ts` 的 `source: 'estimated'` 过不了编译。为让 Task 2 独立提交且全绿，桥接把 `services/lot.ts` 的 `availability.source` 改 `'ops'`、`rating→ratingSummary: null`、`tags→facilities`，并同步改了 `tests/services/lot.test.ts` 的 3 处断言（计划把它俩都留给 Task 3）。Task 3 会整个重写 lot.ts。
+
+### Task 3 的两个坑（派活前验算出来的）
+
+1. **`cloudApi` 这个符号早已不存在**：本文件 Task 3 Step 5 写 `import { cloudApi } from './cloud'`、`const db = cloudApi?.database()`，但 `services/cloud.ts` 在 Task 0 里实际落成的是**懒取函数** `getCloudApi()`（注释写明：测试在 `beforeEach` 才 stub 全局 `wx`，模块加载时快照会让 stub 永不生效）。照抄会编译不过，已统一改成 `getCloudApi()?.database()`。
+2. **测试桩漏了 `where`**：本文件 Task 3 Step 6 的 `collection()` 只挂了 `limit`，而实现是 `.where({'contract.status':'signed'}).limit(20).get()` —— 照抄则**每个用例都 `TypeError: ...where is not a function`**。已补上 `where`，并**补了一条断言「查询条件确实带 `contract.status`」**（原文从没验证过签约过滤，而那正是本任务的全部意义）。
+
+### Task 3 复核后补的修复（`5ca38eb`）
+
+- **路线覆盖会破坏「按距离升序」**：原实现是「估算排序 → 取 Top N → 原地覆盖 `distanceM` → 直接返回」，覆盖后没有重排。绕街区时真实路线可以比直线远得多，返回值就不再升序。今天两页拿到后会自己 `sortLots` 重排所以看不出来，但任何按返回顺序取「最近」的调用方会取错。已在覆盖后补一次排序（Top N 的选取依据仍是覆盖前的估算距离，所以是**排两次**）。
+- **覆盖分支零测试覆盖、且靠巧合通过**：测试环境没有 `wx.request`，`qqmap.matrixChunk` 的 `catch` 会把 TypeError 吞掉返回 `[null]`，于是「路线覆盖」整段没被任何断言保护。已在桩里补 `wx.request`（按 `to` 参数下发，**未登记坐标下发缺项 → null**，让降级分支被刻意走到），补上「Top N 变 `route`、其外用接口耗时、Top N 之外仍是 `estimated`」的用例，并让矩阵数据**故意把顺序翻转**以钉住上式那条重排。复核员用变异测试独立验证：删掉重排那行，用例变红且输出与缺陷场景逐字吻合。
+
+### Task 4 的坑（派活前验算出来的）
+
+- **测试里 `data` 的必填/可选写反了**：本文件 Task 4 Step 1 把 `lastCall` 与 `respond` 的 `data` 写成必填，而 `CloudApi['callFunction']` 的 `data` 是可选的，照抄四处 TS2322。已把两者收成同一个 data 可选的类型。同批把 `NO_CLOUD` 分支也补了用例（那是「基础库过低」的真实降级路径，原计划没测）。
+
+### Task 4 评审揪出的两处必须修
+
+1. **`userId` 返回的是 `users` 文档 `_id`，语义错了。** 设计稿 §4 第 116 行与 Task 1 Step 4 已配好的安全规则都要求 `userId` **存 openid**（`cars`/`reservations`/`orders`/`reviews` 的规则是 `doc.userId == auth.openid`）。2b 照「以 `ensureLogin()` 返回的 `userId` 为身份前提」写预约，安全规则会**永远比不中**，而 CloudBase 规则不能跨集合查 `users`，只能现在统一。已改成两个分支都返回 `OPENID`。
+2. **`_openid` 上没有唯一索引，「先查后插」并发下建两条、同一人两个身份。** `onLaunch` 的建档还没返回时角色页再调一次就会撞上（云函数冷启约 1s，这是常态）。身份分叉的后果是预约挂 A 条、`credit` 从 B 条读，**封禁静默失效**。已改成 `add` 时把 `_id` 钉成 `OPENID`，用主键唯一性堵死；冲突走回查，**查不到说明是真失败则原样重抛**（不吞成「已存在」）。`users._id` 从此等于 openid，**2b 不要再用 `doc(_id)` 当身份**。
+
+### Task 4 部署时踩的两个坑
+
+- `cloud.callFunction:fail errCode: -501000 FunctionName parameter could not be found`（`FUNCTION_NOT_FOUND`）= **那个环境里没有这个云函数**，不是环境配错（环境错会报环境找不到）。按序查：工具左侧树有没有该目录（没有 = 工具不认新加的目录，完全退出工具重开项目）→ 控制台云函数列表里有没有 → 是不是部署到了别的环境。
+- **部署完云函数后要在工具里点一次「编译」再测**。本次就是漏了这步，看到 `FUNCTION_NOT_FOUND` 误以为部署失败。
 
 ---
 
