@@ -35,7 +35,7 @@
 | `miniprogram/pages/role-select/*` | 身份选择 |
 | `miniprogram/pages/home/*` | 首页 |
 | `miniprogram/pages/search/*` | 搜索 |
-| `miniprogram/pages/lot-detail/*` | 车场详情 |
+| `miniprogram/components/lot-detail/*` | 面板内的车场详情视图（Task 15 改为组件，不再是页面） |
 
 **删除**：`miniprogram/pages/index/`、`miniprogram/pages/logs/`（模板页，Task 1 清理）。
 
@@ -3640,285 +3640,397 @@ git commit -m "feat: implement search page with map and recommendations"
 | 16 | 面板两个停靠位的比例：首页写死 `SHEET_HEIGHT_RATIO = 0.43`，**搜索页那边是算出来的**（窗口高 − 顶部栏 − 地图 − 间距）。两处各写一份，改一处忘另一处就会不一致 —— 若之后还要调，考虑把「0.43」提成一个共享常量 | ⚠️ 已知隐患 |
 | 7 | **搜索页标出目的地**：终点用另一种图钉，让用户直观看到车场与目的地的距离（`fetchNearbyLots` 的 `distanceM` 本来就是相对目的地算的，只是没说清） | ⬜ |
 | 8 | **图钉标签重叠** —— 已把标签砍短 + 封顶 8 个，仍有残余遮挡。**用户要和组员讨论更好的方案，暂时搁置** | ⏸ 搁置 |
-| 9 | 面板内详情视图（见下面 Task 15 的形态变更说明） | ⬜ 依赖 Task 15 重写 |
+| 9 | 面板内详情视图（见下面 Task 15 的形态变更说明） | ✅ 已实现，规格 2026-09-14 重写 |
 
-## Task 15: 车场详情页
+## Task 15: 面板内车场详情
 
-> **⚠️ 本任务的形态在 2026-09-13 被用户推翻，下面的规格整体作废 —— 不要照抄。**
+> **2026-09-14 重写。原规格（独立页面 + `navigationStyle: custom` + 页面级 `onLoad` 收 `id`）整体作废。**
 >
-> 用户决定：**详情不再做成独立页面，做进主页/搜索页的底部下拉框**。点卡片 → 面板内容从「车场列表」切成「该车场详情」，地图同步定位；用户想看全自己把面板拉长；**再点一次面板收起回列表**。首页与搜索页共用同一个详情视图组件。
+> 用户在 09-14 拍板两件事，二者共同约束本任务：
 >
-> 于是：
-> - **取消 `/pages/lot-detail`**，`app.json` 不需要注册该页；首页与搜索页里 `wx.navigateTo({ url: '/pages/lot-detail/...' })` 的引用（`onReserve` 里的）要一并改掉
-> - `预约车位` 不再跳页，改为进面板内详情；**付费层的「预约确认」屏仍是独立页**（计划 2）
-> - 详情内容（信息卡 / 空闲预测柱状图 / 收费规则 / 可预约额度 / 双按钮）**照 §5.3 原样搬进面板**，只是没有了「顶部地图缩略 + 悬浮返回」这两样
-> - UI 稿 `docs/superpowers/specs/2026-09-11-smart-parking-miniprogram-ui-design.md` §5.3 已同步
+> 1. **面板已定成固定高度、不拖拽**（09-13 决定），所以详情**在固定面板内滚动**，面板高度一个像素都不变 —— 不选「进详情临时加高」那条路，它会把「面板高度可变」重新引回来（09-13 否掉拖拽的理由之一就是「只有居中一个状态省心」）
+> 2. **详情顶部加一行「‹ 附近车场」返回列表** —— 原规格「再点一次面板收起回列表」是拖拽时代的说法，固定面板没有可「收起」的状态
 >
-> **重写这个任务前先读 §5.3 的改动说明**，并按 [[plan-specs-need-verification]] 的先例逐条验算 —— 本任务原有规格里的代码块是按「独立页面 + `navigationStyle: custom` + 页面级 `onLoad` 收 `id`」写的，搬到面板里这些前提全变。
+> **同时砍掉「未来 2 小时空闲预测」柱状图。** 原规格的算法是拿当前空闲率乘一条写死的形状数组编出来的：
+>
+> ```ts
+> const shape = [1.0, 0.82, 0.62, 0.4, 0.66, 0.88]
+> return shape.map(s => Math.max(6, Math.min(100, Math.round(rate * 100 * s * 3.2))))
+> ```
+>
+> 两处问题：**其一，这是编的数据** —— 课程硬约束「真题真做，不允许随意模拟数据」，PM BR-05 也要求预测降级必须显著标注，一张纯造出来的曲线两头都撞；**其二，它数学上也算不出形状** —— `rate * 100 * s * 3.2` 在空闲率 0.4 时首柱得 128，被夹到 100，于是 `1.0` 与 `0.82` 两根柱子都是 100，`0.88` 那根也是 100。等有真预测源再上（记在「已知未完成」）。
+
+**形态**：首页与搜索页共用同一个详情组件；点卡片 / 点卡片上的「预约车位」都切进详情，地图同步定位（同 §5.1 既有联动）；详情占满面板，内容自己在面板内滚，双按钮吸在面板底。
 
 **Files:**
-- Create: `miniprogram/pages/lot-detail/*`
-- Modify: `miniprogram/app.json`
+- Create: `miniprogram/domain/detail.ts`、`tests/domain/detail.test.ts`
+- Create: `miniprogram/components/lot-detail/lot-detail.{json,ts,wxml,wxss}`
+- Create: `miniprogram/styles/tags.wxss`
+- Modify: `miniprogram/components/lot-card/lot-card.wxss`（把 `.tag` 系列抽去共用文件）
+- Modify: `miniprogram/pages/home/home.{ts,wxml,wxss,json}`
+- Modify: `miniprogram/pages/search/search.{ts,wxml,wxss,json}`
+- **不动**：`miniprogram/app.json` —— 详情不再是页面，没有 `pages/lot-detail/lot-detail` 可注册
 
-- [ ] **Step 1: 写页面**
+---
 
-`miniprogram/pages/lot-detail/lot-detail.json`：
+- [ ] **Step 1: 领域层 —— 先写测试**
 
-```json
-{
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "state-view": "/components/state-view/state-view"
+`tests/domain/detail.test.ts`：
+
+```ts
+import { toDetailVM } from '../../miniprogram/domain/detail'
+import type { ParkingLot, Recommendation } from '../../miniprogram/domain/types'
+
+function lot(over: Partial<ParkingLot> = {}): ParkingLot {
+  return {
+    id: 'L1',
+    name: '万象城地下停车场',
+    address: '历下区经十路 1234 号',
+    location: { lat: 36.65, lng: 117.12 },
+    distanceM: 320,
+    walkMinutes: 4,
+    distanceSource: 'estimated',
+    pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
+    // 空闲率 0.4：高于饱和下限 0.15、也高于 warn 上界 0.3，落 ok 档
+    availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
+    reservableQuota: 120,
+    rating: 4.8,
+    tags: [],
+    ...over,
+  }
+}
+
+function rec(over: Partial<ParkingLot> = {}): Recommendation {
+  return { lot: lot(over), score: 88, factors: {} as never, reasons: ['空位充足'], tone: 'good' }
+}
+
+describe('toDetailVM', () => {
+  it('把金额与档位转成展示串，且档位与列表卡片同源', () => {
+    const vm = toDetailVM(rec())
+    expect(vm.firstHourText).toBe('6.00')
+    expect(vm.nextHourText).toBe('5.00')
+    expect(vm.capText).toBe('40.00')
+    expect(vm.stepText).toBe('15 分钟')
+    expect(vm.spotsText).toBe('200/500')
+    expect(vm.distanceText).toBe('320m')
+    expect(vm.walkText).toBe('4 分钟')
+    expect(vm.freeClass).toBe('ok')
+    expect(vm.quotaText).toBe('120')
+  })
+
+  it('空闲率低于饱和线下调档到 bad，与 availabilityLevel 同一判定', () => {
+    // 50/500 = 0.1，落在饱和区间内
+    const vm = toDetailVM(rec({ availability: { freeSpots: 50, totalSpots: 500, source: 'estimated' } }))
+    expect(vm.freeClass).toBe('bad')
+  })
+
+  it('缺夜间价时显示占位，而不是把 undefined 拼进「¥/时」', () => {
+    expect(toDetailVM(rec()).nightText).toBe('--')
+    const withNight = rec()
+    withNight.lot.pricing.nightRate = 3
+    expect(toDetailVM(withNight).nightText).toBe('¥3.00/时')
+  })
+
+  it('可预约额度非有限值时显示占位：Math.max(0, NaN) 仍是 NaN', () => {
+    expect(toDetailVM(rec({ reservableQuota: Number.NaN })).quotaText).toBe('--')
+    // 脏数据里的负数按 0 报，与 formatSpots 同向
+    expect(toDetailVM(rec({ reservableQuota: -5 })).quotaText).toBe('0')
+  })
+
+  it('逐条标注数据来源，字段齐全时为空串', () => {
+    // fixture 三个来源都是 estimated，所以三个都进标注 —— sourceNote 是逐条判的
+    expect(toDetailVM(rec()).estimateText).toBe('距离、收费、余位为估算')
+    const real = rec()
+    real.lot.distanceSource = 'route'
+    real.lot.pricing.source = 'rule'
+    real.lot.availability.source = 'poi'
+    expect(toDetailVM(real).estimateText).toBe('')
+  })
+})
+```
+
+- [ ] **Step 2: 领域层 —— 实现**
+
+`miniprogram/domain/detail.ts`：
+
+```ts
+import { formatAmount, formatDistance, formatSpots, sourceNote } from './format'
+import { availabilityLevel, freeRate } from './scoring'
+import type { AvailabilityLevel } from './scoring'
+import type { ParkingLot, ReasonTone, Recommendation } from './types'
+
+/**
+ * 详情视图的全部展示字段。与 `LotCardItem` 同一套路：组件不做格式化、不读时钟，
+ * 只渲染页面预先算好的字符串 —— 详情与卡片住在同一个面板里，两处各算一遍
+ * 必然出现「卡片写 6.00、详情写 6」这种同一笔钱两种写法
+ */
+export interface LotDetailVM {
+  lot: ParkingLot
+  score: number
+  reasons: string[]
+  tone: ReasonTone
+  distanceText: string
+  walkText: string
+  spotsText: string
+  /** 余位配色档位，由 `availabilityLevel(freeRate)` 产出，与列表卡片同一函数 */
+  freeClass: AvailabilityLevel
+  firstHourText: string
+  nextHourText: string
+  stepText: string
+  capText: string
+  /** 整串自带单位，如 `¥3.00/时`；缺夜间价时为 `--` */
+  nightText: string
+  quotaText: string
+  /** 数据来源标注；空串则不渲染该行 */
+  estimateText: string
+}
+
+/** 数据缺失时的统一占位，与 format.ts 的 UNKNOWN 同口径（0 与「未知」语义不同） */
+const UNKNOWN = '--'
+
+export function toDetailVM(rec: Recommendation): LotDetailVM {
+  const { lot } = rec
+  const nightRate = lot.pricing.nightRate
+  return {
+    lot,
+    score: rec.score,
+    reasons: rec.reasons,
+    tone: rec.tone,
+    distanceText: formatDistance(lot.distanceM),
+    walkText: `${lot.walkMinutes} 分钟`,
+    spotsText: formatSpots(lot.availability.freeSpots, lot.availability.totalSpots),
+    // 档位只由领域层判：页面自定 0.1 / 0.25 会让色条与评分对同一车场给出相反结论
+    freeClass: availabilityLevel(freeRate(lot.availability)),
+    firstHourText: formatAmount(lot.pricing.firstHour),
+    nextHourText: formatAmount(lot.pricing.perHourAfter),
+    stepText: `${lot.pricing.stepMinutes} 分钟`,
+    capText: formatAmount(lot.pricing.capPerDay),
+    // 这一格自带单位，与其他几个纯金额字段不同：夜间价可缺省，
+    // 分开渲染会出来「¥--/时」这种半句话
+    nightText: typeof nightRate === 'number' ? `¥${formatAmount(nightRate)}/时` : UNKNOWN,
+    // Math.max(0, NaN) 还是 NaN，不挡会在详情里渲染成「已开放 NaN 个预约车位」
+    quotaText: Number.isFinite(lot.reservableQuota) ? String(Math.max(0, lot.reservableQuota)) : UNKNOWN,
+    estimateText: sourceNote(lot),
   }
 }
 ```
 
-`miniprogram/pages/lot-detail/lot-detail.ts`：
+> **验算：** `formatAmount(6)` → `'6.00'`（cents = 600）；`formatSpots(200,500)` → `'200/500'`；`availabilityLevel(0.4)`：`FREE_FLOOR = 0.15`，`0.4 > 0.15` 且 `0.4 > 0.3` → `'ok'`；`50/500 = 0.1 ≤ 0.15` → `'bad'`；`sourceNote` 逐条判「距离 / 收费 / 余位」，fixture 三个来源都是 `estimated`，产出 `'距离、收费、余位为估算'`（**这条我在写规格时判漏了余位一项，跑测试才暴露** —— 下笔时的验算只能覆盖算术，覆盖不到 fixture 自身带的字段）。`AvailabilityLevel` 与 `ReasonTone` 都从各自模块导入，不从 `types.ts` 取 `AvailabilityLevel`（它定义在 `scoring.ts`）。
+
+- [ ] **Step 3: 共用标签样式**
+
+`miniprogram/styles/tags.wxss`：
+
+```css
+/* 推荐理由标签。抽成共用文件是因为卡片（lot-card）与详情（lot-detail）都要画同一批理由，
+   两边各写一份配色后，同一句「空位充足」会在点进详情的一瞬间换个颜色 */
+.tag {
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: var(--font-tag);
+}
+
+.tag.info { background: #dbeafe; color: #1d4ed8; }
+.tag.good { background: #dcfce7; color: #15803d; }
+.tag.bad { background: #fee2e2; color: #b91c1c; }
+.tag.plain { background: #f1f5f9; color: #475569; }
+
+/* 数据来源标注：虚线边框，与「推荐理由」标签区分开 */
+.tag.source {
+  background: #f8fafc;
+  border: 2rpx dashed #cbd5e1;
+  color: var(--color-text-sub);
+}
+```
+
+`miniprogram/components/lot-card/lot-card.wxss`：把上面这一段（`.tag` / `.tag.info` / `.tag.good` / `.tag.bad` / `.tag.plain` / `.tag.source` 六条规则）删掉，文件**首行**加：
+
+```css
+@import "../../styles/tags.wxss";
+```
+
+（`app.wxss` 已经在用同级写法 `@import "./styles/tokens.wxss";`，路径从 `components/lot-card/` 上溯两级到 `miniprogram/`）
+
+- [ ] **Step 4: 详情组件**
+
+`miniprogram/components/lot-detail/lot-detail.json`：
+
+```json
+{
+  "component": true,
+  "styleIsolation": "apply-shared",
+  "usingComponents": {}
+}
+```
+
+`miniprogram/components/lot-detail/lot-detail.ts`：
 
 ```ts
-import { DEFAULT_RADIUS_M } from '../../config'
-import { formatAmount, formatDistance, formatSpots } from '../../domain/format'
-import { availabilityLevel, freeRate, scoreLot } from '../../domain/scoring'
-import type { ParkingLot } from '../../domain/types'
-import { fetchNearbyLots } from '../../services/lot'
-import { getCurrentPoint, openNavigation } from '../../services/location'
+import type { LotDetailVM } from '../../domain/detail'
 
-Page({
-  data: {
-    state: 'loading' as 'loading' | 'ready' | 'error',
-    lot: null as ParkingLot | null,
-    /** 地图默认中心，避免 lot 未就绪时 map 组件拿到 undefined 坐标 */
-    lat: 36.6512,
-    lng: 117.1201,
-    score: 0,
-    reasons: [] as string[],
-    distanceText: '',
-    walkText: '',
-    spotsText: '',
-    freeClass: 'ok',
-    freeRatePercent: 0,
-    priceText: '',
-    nextHourText: '',
-    capText: '',
-    nightText: '',
-    /** 未来 2 小时预测柱，高 0–100 */
-    forecast: [] as number[],
-    forecastLabels: [] as string[],
+function readVM(ctx: { data: { vm?: unknown } }): LotDetailVM | null {
+  // properties 里声明成 Object 时 data.vm 被推成 never（value: null 推不出元素类型），
+  // 在这里收窄一次，避免每处 this.data.vm.lot 都报 TS2339（与 lot-card 的 readItem 同一处妥协）
+  return (ctx.data.vm as unknown as LotDetailVM | null) || null
+}
+
+Component({
+  properties: {
+    /** 由页面用 `toDetailVM(rec)` 算好；组件不格式化、不读时钟 */
+    vm: { type: Object, value: null },
   },
 
-  intent: '' as '' | 'reserve',
-
-  onLoad(query: Record<string, string>) {
-    this.intent = query.intent === 'reserve' ? 'reserve' : ''
-    this.load(query.id)
-  },
-
-  async load(id: string) {
-    this.setData({ state: 'loading' })
-    try {
-      const loc = await getCurrentPoint()
-      const center = loc.ok ? loc.point : { lat: 36.6512, lng: 117.1201 }
-
-      const { lots } = await fetchNearbyLots(center, DEFAULT_RADIUS_M)
-      const lot = lots.find(l => l.id === id)
-      if (!lot) {
-        this.setData({ state: 'error' })
-        return
-      }
-
-      const rec = scoreLot(lot, { allLots: lots, hasCharging: lot.tags.includes('充电桩'), userNeedsCharging: false })
-      const free = lot.availability.freeSpots
-      const total = lot.availability.totalSpots
-      const rate = freeRate(lot.availability)
-
-      this.setData({
-        state: 'ready',
-        lot,
-        lat: lot.location.lat,
-        lng: lot.location.lng,
-        score: rec.score,
-        reasons: rec.reasons,
-        distanceText: formatDistance(lot.distanceM),
-        walkText: `${lot.walkMinutes} 分钟`,
-        spotsText: formatSpots(free, total),
-        // 档位由领域层判定，页面不自定阈值：自定 0.1 / 0.25 会让色条与评分对同一车场给出相反结论
-        freeClass: availabilityLevel(rate),
-        freeRatePercent: Math.round(rate * 100),
-        priceText: formatAmount(lot.pricing.firstHour),
-        nextHourText: formatAmount(lot.pricing.perHourAfter),
-        capText: formatAmount(lot.pricing.capPerDay),
-        nightText: lot.pricing.nightRate ? formatAmount(lot.pricing.nightRate) : '--',
-        forecast: this.buildForecast(rate),
-        forecastLabels: ['现在', '+30分', '+1时', '+1.5时', '+2时', '+2.5时'],
-      })
-    } catch {
-      this.setData({ state: 'error' })
-    }
-  },
-
-  /** 由当前空闲率推出一条 6 点的占位预测曲线，接入真实预测服务后替换 */
-  buildForecast(rate: number): number[] {
-    const shape = [1.0, 0.82, 0.62, 0.4, 0.66, 0.88]
-    return shape.map(s => Math.max(6, Math.min(100, Math.round(rate * 100 * s * 3.2))))
-  },
-
-  onNavigate() {
-    const lot = this.data.lot
-    if (!lot) return
-    openNavigation(lot.location, lot.name, lot.address)
-  },
-
-  onReserve() {
-    wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
-  },
-
-  onBack() {
-    wx.navigateBack()
-  },
-
-  onRetry() {
-    const lot = this.data.lot
-    if (lot) this.load(lot.id)
+  methods: {
+    onBack() {
+      this.triggerEvent('back')
+    },
+    onNavigate() {
+      const vm = readVM(this)
+      if (vm) this.triggerEvent('navigate', { id: vm.lot.id })
+    },
+    onReserve() {
+      const vm = readVM(this)
+      if (vm) this.triggerEvent('reserve', { id: vm.lot.id })
+    },
   },
 })
 ```
 
-`miniprogram/pages/lot-detail/lot-detail.wxml`：
+`miniprogram/components/lot-detail/lot-detail.wxml`：
 
 ```xml
-<view class="wrap">
-  <map
-    class="hero"
-    latitude="{{lat}}"
-    longitude="{{lng}}"
-    scale="16"
-  />
-  <view class="hero__back" bindtap="onBack">‹ 返回</view>
+<view class="detail">
+  <!-- 返回行取代了拖拽时代的「再点一次面板」：面板固定，没有可「收起」的状态 -->
+  <view class="detail__back" bindtap="onBack">‹ 附近车场</view>
 
-  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="加载车场信息…" />
-  <state-view
-    wx:elif="{{state === 'error'}}"
-    kind="error"
-    text="车场信息加载失败"
-    hint="请检查网络后重试"
-    action-text="重试"
-    bind:action="onRetry"
-  />
+  <scroll-view class="detail__body" scroll-y>
+    <view class="card">
+      <view class="card__head">
+        <view class="card__name">{{vm.lot.name}}</view>
+        <view class="card__rating">★ {{vm.lot.rating}}</view>
+      </view>
+      <view class="card__addr">{{vm.lot.address}} · 步行 {{vm.walkText}} · {{vm.distanceText}}</view>
 
-  <block wx:else>
-    <scroll-view class="body" scroll-y>
-      <view class="card card--lift">
-        <view class="card__head">
-          <view class="card__name">{{lot.name}}</view>
-          <view class="card__rating">★ {{lot.rating}}</view>
+      <view class="stats">
+        <view class="stat">
+          <view class="stat__k">实时余位</view>
+          <view class="stat__v {{vm.freeClass}}">{{vm.spotsText}}</view>
         </view>
-        <view class="card__addr">{{lot.address}} · 步行 {{walkText}}</view>
-
-        <view class="stats">
-          <view class="stat">
-            <view class="stat__k">实时余位</view>
-            <view class="stat__v {{freeClass}}">{{spotsText}}</view>
-          </view>
-          <view class="stat">
-            <view class="stat__k">标准收费</view>
-            <view class="stat__v primary">¥{{priceText}}<text class="stat__u">/时</text></view>
-          </view>
-          <view class="stat">
-            <view class="stat__k">综合评分</view>
-            <view class="stat__v">{{score}}</view>
-          </view>
+        <view class="stat">
+          <view class="stat__k">标准收费</view>
+          <view class="stat__v primary">¥{{vm.firstHourText}}<text class="stat__u">/时</text></view>
+        </view>
+        <view class="stat">
+          <view class="stat__k">综合评分</view>
+          <view class="stat__v">{{vm.score}}</view>
         </view>
       </view>
 
-      <view class="card">
-        <view class="card__title">未来 2 小时空闲预测</view>
-        <view class="bars">
-          <view
-            wx:for="{{forecast}}"
-            wx:key="index"
-            class="bars__col"
-          >
-            <view class="bars__bar {{item < 25 ? 'bars__bar--bad' : ''}}" style="height: {{item}}%;" />
-          </view>
-        </view>
-        <view class="bars__labels">
-          <view wx:for="{{forecastLabels}}" wx:key="*this" class="bars__label">{{item}}</view>
-        </view>
+      <view class="card__tags" wx:if="{{vm.estimateText || vm.reasons.length}}">
+        <view class="tag source" wx:if="{{vm.estimateText}}">{{vm.estimateText}}</view>
+        <!--
+          循环变量必须改名：默认的 `item` 会盖住外层作用域，
+          写成 `{{vm.tone}}` 反而取到理由字符串，class 静默变空、标签全掉色
+          （lot-card.wxml 里踩过同一个坑）
+        -->
+        <view
+          wx:for="{{vm.reasons}}"
+          wx:for-item="reason"
+          wx:key="*this"
+          class="tag {{vm.tone}}"
+        >{{reason}}</view>
       </view>
-
-      <view class="card">
-        <view class="card__title">收费规则</view>
-        <view class="row"><text class="row__k">首小时</text><text>¥{{priceText}}</text></view>
-        <view class="row"><text class="row__k">后续每小时</text><text>¥{{nextHourText}}</text></view>
-        <view class="row"><text class="row__k">计费步长</text><text>15 分钟</text></view>
-        <view class="row"><text class="row__k">单日封顶</text><text>¥{{capText}}</text></view>
-        <view class="row"><text class="row__k">夜间 22:00–08:00</text><text>¥{{nightText}}/时</text></view>
-      </view>
-
-      <view class="card">
-        <view class="card__title">可预约额度</view>
-        <view class="quota">本车场已开放 <text class="primary bold">{{lot.reservableQuota}}</text> 个预约车位</view>
-        <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
-      </view>
-
-      <view class="tail" />
-    </scroll-view>
-
-    <view class="bottom">
-      <view class="bottom__ghost" bindtap="onNavigate">导航前往</view>
-      <view class="bottom__primary" bindtap="onReserve">预约车位</view>
     </view>
-  </block>
+
+    <view class="card">
+      <view class="card__title">收费规则</view>
+      <view class="row"><text class="row__k">首小时</text><text>¥{{vm.firstHourText}}</text></view>
+      <view class="row"><text class="row__k">后续每小时</text><text>¥{{vm.nextHourText}}</text></view>
+      <view class="row"><text class="row__k">计费步长</text><text>{{vm.stepText}}</text></view>
+      <view class="row"><text class="row__k">单日封顶</text><text>¥{{vm.capText}}</text></view>
+      <view class="row"><text class="row__k">夜间 22:00–08:00</text><text>{{vm.nightText}}</text></view>
+    </view>
+
+    <view class="card">
+      <view class="card__title">可预约额度</view>
+      <view class="quota">本车场已开放 <text class="primary bold">{{vm.quotaText}}</text> 个预约车位</view>
+      <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
+    </view>
+
+    <view class="tail" />
+  </scroll-view>
+
+  <!-- 双按钮吸在面板底：面板只有窗口的 0.43，跟着内容滚就永远够不着 -->
+  <view class="detail__bar">
+    <view class="detail__ghost" bindtap="onNavigate">导航前往</view>
+    <view class="detail__primary" bindtap="onReserve">预约车位</view>
+  </view>
 </view>
 ```
 
-`miniprogram/pages/lot-detail/lot-detail.wxss`：
+`miniprogram/components/lot-detail/lot-detail.wxss`：
 
 ```css
-.wrap {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--color-bg);
+@import "../../styles/tags.wxss";
+
+.detail {
+  /* 宿主 lot-detail 由页面定成 flex 行容器（flex: 1; height: 0; display: flex），
+     这里靠 flex: 1 拿满宽度、靠父级默认的 stretch 拿满高度，再自己竖排 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.hero {
-  width: 100%;
-  height: 420rpx;
+.detail__back {
+  flex: none;
+  padding-bottom: var(--space-2);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
-.hero__back {
-  position: absolute;
-  top: 104rpx;
-  left: 28rpx;
-  background: rgba(255, 255, 255, 0.94);
+.detail__body {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不设 0 时 scroll-view 会撑破面板（.sheet__list 同款坑） */
+  height: 0;
+}
+
+.detail__bar {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.detail__ghost,
+.detail__primary {
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
   border-radius: var(--radius-pill);
-  padding: 10rpx 26rpx;
-  font-size: 25rpx;
+  font-size: var(--font-sub);
+  font-weight: 600;
 }
 
-.body {
-  position: absolute;
-  top: 380rpx;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 0 28rpx;
-  box-sizing: border-box;
+.detail__ghost {
+  flex: 1;
+  border: 2rpx solid #cbd5e1;
+  color: var(--color-text);
+}
+
+.detail__primary {
+  flex: 1.4;
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .card {
   background: var(--color-surface);
   border: 2rpx solid var(--color-border);
   border-radius: var(--radius-card);
-  padding: 28rpx;
-  margin-bottom: 20rpx;
-}
-
-.card--lift {
-  margin-top: -32rpx;
-  box-shadow: var(--shadow-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .card__head {
@@ -3928,33 +4040,41 @@ Page({
 }
 
 .card__name {
-  font-size: 38rpx;
-  font-weight: 700;
   flex: 1;
+  margin-right: var(--space-2);
+  font-size: var(--font-title);
+  font-weight: 700;
 }
 
 .card__rating {
-  font-size: 25rpx;
+  font-size: var(--font-sub);
   font-weight: 700;
   color: #f59e0b;
 }
 
 .card__addr {
-  font-size: 24rpx;
+  margin-top: 10rpx;
+  font-size: var(--font-sub);
   color: var(--color-text-sub);
-  margin-top: 12rpx;
 }
 
 .card__title {
-  font-size: 27rpx;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-card-title);
   font-weight: 700;
-  margin-bottom: 18rpx;
+}
+
+.card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
 }
 
 .stats {
   display: flex;
-  gap: 16rpx;
-  margin-top: 24rpx;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .stat {
@@ -3964,123 +4084,204 @@ Page({
   padding: 18rpx 20rpx;
 }
 
-.stat__k { font-size: 21rpx; color: var(--color-text-weak); }
-.stat__v { font-size: 36rpx; font-weight: 700; margin-top: 6rpx; letter-spacing: -1rpx; }
-.stat__u { font-size: 20rpx; font-weight: 400; color: var(--color-text-weak); }
+.stat__k { font-size: var(--font-micro); color: var(--color-text-weak); }
+.stat__v { margin-top: 6rpx; font-size: 36rpx; font-weight: 700; letter-spacing: -1rpx; }
+.stat__u { font-size: var(--font-micro); font-weight: 400; color: var(--color-text-weak); }
 
-.ok { color: var(--color-success); }
-.warn { color: var(--color-warning); }
-.bad { color: var(--color-danger); }
-.primary { color: var(--color-primary); }
-.bold { font-weight: 700; }
-
-.bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 12rpx;
-  height: 140rpx;
-}
-
-.bars__col {
-  flex: 1;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.bars__bar {
-  background: #93c5fd;
-  border-radius: 4rpx;
-}
-
-.bars__bar--bad { background: #fca5a5; }
-
-.bars__labels {
-  display: flex;
-  gap: 12rpx;
-  margin-top: 10rpx;
-}
-
-.bars__label {
-  flex: 1;
-  text-align: center;
-  font-size: 19rpx;
-  color: var(--color-text-weak);
-}
+/* 余位档位配色与 lot-card 的 .card__free 同源（都由 availabilityLevel 产出） */
+.stat__v.ok { color: var(--color-success); }
+.stat__v.warn { color: var(--color-warning); }
+.stat__v.bad { color: var(--color-danger); }
+.stat__v.primary { color: var(--color-primary); }
 
 .row {
   display: flex;
   justify-content: space-between;
-  font-size: 25rpx;
   padding: 8rpx 0;
+  font-size: var(--font-body);
 }
 
 .row__k { color: var(--color-text-sub); }
 
-.quota { font-size: 25rpx; color: var(--color-text-sub); }
+.quota { font-size: var(--font-body); color: var(--color-text-sub); }
 
 .quota__note {
-  font-size: 21rpx;
-  color: var(--color-text-weak);
-  margin-top: 16rpx;
+  margin-top: var(--space-2);
+  font-size: var(--font-micro);
   line-height: 1.7;
+  color: var(--color-text-weak);
 }
 
-.tail { height: 140rpx; }
+.primary { color: var(--color-primary); }
+.bold { font-weight: 700; }
 
-.bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  gap: 20rpx;
-  padding: 22rpx 28rpx calc(22rpx + env(safe-area-inset-bottom));
-  background: var(--color-surface);
-  border-top: 2rpx solid var(--color-border);
-}
+/* 面板底部已让开 tabBar，这里只留一点呼吸空间 */
+.tail { height: var(--space-4); }
+```
 
-.bottom__ghost,
-.bottom__primary {
-  height: 92rpx;
-  line-height: 92rpx;
-  text-align: center;
-  border-radius: var(--radius-pill);
-  font-size: 29rpx;
-  font-weight: 600;
-}
+- [ ] **Step 5: 首页接线**
 
-.bottom__ghost {
+`miniprogram/pages/home/home.ts`：
+
+1. 顶部 import 加 `toDetailVM` 与类型：
+
+```ts
+import { toDetailVM } from '../../domain/detail'
+import type { LotDetailVM } from '../../domain/detail'
+```
+
+2. `data` 里加（放在 `selectedId` 之后）：
+
+```ts
+    /** 非空 = 面板正在显示该车场的详情；面板高度不变，只有内容切换 */
+    detail: null as LotDetailVM | null,
+```
+
+3. `load()` 的**开头**那句 `setData` 加 `detail: null`：重试会换一批数据，留着上一批的详情就是在说假话。
+
+```ts
+    this.setData({ state: 'loading', fallbackText: '', detail: null })
+```
+
+4. 新增共用入口，并改掉 `onCardTap` / `onReserve`：
+
+```ts
+  /**
+   * 进详情：选中它 + 地图移到它 + 面板内容切成详情（UI 稿 §5.1 / §5.3）。
+   * 点整张卡片与点卡片上的「预约车位」走同一条路 —— 付费层（预约确认页）在计划 2，
+   * 这里只把用户的意图带进详情
+   */
+  openDetail(id: string) {
+    const rec = this.recommendations.find(r => r.lot.id === id)
+    if (!rec) return
+    this.setData({
+      selectedId: rec.lot.id,
+      centerLat: rec.lot.location.lat,
+      centerLng: rec.lot.location.lng,
+      detail: toDetailVM(rec),
+    })
+    this.applySort(this.data.sortKey)
+  },
+
+  onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
+    this.openDetail(e.detail.id)
+  },
+
+  /** 详情里的「预约车位」：付费链路在计划 2，这里先给出提示 */
+  onDetailReserve() {
+    wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
+  },
+
+  onDetailBack() {
+    this.setData({ detail: null })
+  },
+```
+
+原 `onCardTap`（只选中 + 居中）与 `onReserve`（`wx.navigateTo` 到已不存在的 `/pages/lot-detail`）整段删掉。
+
+5. `onPinTap` 里加一句：**详情态下点图钉 = 回列表看那张卡片**。详情是「这个车场」的独占视图，图钉联动要看到卡片才有意义。`wx.nextTick` 由 `scrollToCard` 内部负责，列表渲染完才滚。
+
+```ts
+  onPinTap(e: WechatMiniprogram.CustomEvent<{ markerId: number }>) {
+    const pin = this.data.pins[e.detail.markerId]
+    if (!pin) return
+    // 先退出详情：列表要先渲染出来，scroll-into-view 才有目标可找
+    this.setData({ selectedId: pin.id, detail: null })
+    this.applySort(this.data.sortKey)
+    this.scrollToCard(pin.id)
+  },
+```
+
+`miniprogram/pages/home/home.wxml`：把面板内部整段包进 `wx:else`，详情占满面板：
+
+```xml
+  <!-- 面板固定停在这一位：不拖拽、不收起，只有「居中」一个状态（与搜索页同一套） -->
+  <view class="sheet" style="height: {{sheetHeight}}px; bottom: {{sheetBottom}}px">
+    <!-- 详情占满面板，高度不变，内容在里面滚（2026-09-14 决定） -->
+    <lot-detail
+      wx:if="{{detail}}"
+      vm="{{detail}}"
+      bind:back="onDetailBack"
+      bind:navigate="onNavigate"
+      bind:reserve="onDetailReserve"
+    />
+
+    <block wx:else>
+      <!-- 原有的 sheet__head / chips-row / notice / state-view / scroll-view 全部缩进到这里，内容不变 -->
+    </block>
+  </view>
+```
+
+`miniprogram/pages/home/home.wxss` 末尾加：
+
+```css
+/* 详情视图直接当面板的 flex 子项：撑满面板剩余高度，内部自己滚。
+   宿主设成 flex 行容器，组件根节点的 flex: 1 + 父级默认 stretch 才拿得到完整高度
+   （Skyline 不支持 position: fixed，面板里不能再用绝对定位铺一层） */
+.sheet lot-detail {
   flex: 1;
-  border: 2rpx solid #cbd5e1;
-  color: #334155;
-}
-
-.bottom__primary {
-  flex: 1.5;
-  background: var(--color-primary);
-  color: #fff;
+  height: 0;
+  display: flex;
 }
 ```
 
-- [ ] **Step 2: 注册页面**
+`miniprogram/pages/home/home.json` 的 `usingComponents` 加：
 
-`miniprogram/app.json` 的 `pages` 加入 `"pages/lot-detail/lot-detail"`。
+```json
+    "lot-detail": "/components/lot-detail/lot-detail"
+```
 
-- [ ] **Step 3: 人工验证**
+- [ ] **Step 6: 搜索页接线**
 
-Expected:
-- 从首页或搜索页点卡片进入详情，顶部地图定位到该车场
-- 信息卡显示真实车场名与地址，余位/收费为估算值
-- 收费规则、预测柱、可预约额度三张卡正常渲染
-- 底部「导航前往」调起微信内置地图，「预约车位」给出下一阶段提示
+与首页同一套，差异只有两处：
 
-- [ ] **Step 4: 提交**
+1. `search()` 开头那句 `setData` 加 `detail: null`（重新检索会换一批车场，留旧详情同样是说假话）：
+
+```ts
+    this.setData({ history: pushSearchHistory(keyword), state: 'loading', fallbackText: '', detail: null })
+```
+
+2. 检索成功后的 `setData` 里**不要**碰 `detail`；`onCardTap` / `onReserve` 同样换成 `openDetail(e.detail.id)`，`onPinTap` 同样先清 `detail`。
+
+`miniprogram/pages/search/search.wxml`：面板里加详情分支，其余包 `wx:else`：
+
+```xml
+  <view
+    class="sheet"
+    wx:if="{{state !== 'idle'}}"
+    style="height: {{sheetHeight}}px; padding-bottom: {{safeBottom}}px"
+  >
+    <lot-detail
+      wx:if="{{detail}}"
+      vm="{{detail}}"
+      bind:back="onDetailBack"
+      bind:navigate="onNavigate"
+      bind:reserve="onDetailReserve"
+    />
+
+    <block wx:else>
+      <!-- 原有的 sheet__head / chips-row / notice / state-view / scroll-view 全部缩进到这里，内容不变 -->
+    </block>
+  </view>
+```
+
+`miniprogram/pages/search/search.wxss` 末尾加 `.sheet lot-detail { flex: 1; height: 0; display: flex; }`（同首页那段注释），`search.json` 的 `usingComponents` 加同一个组件。
+
+- [ ] **Step 7: 人工验证**
+
+Expected（**必须真机**，devtools 的 glass-easel 与真机在 flex 尺寸上会给出不同结果）：
+- 首页点一张卡片 → 面板内容切成详情、地图居中到该车场、卡片仍是选中态（蓝色图钉）
+- 详情里能上下滚动，滚到底看得到「可预约额度」整张卡；底部的「导航前往 / 预约车位」一直在
+- 点「‹ 附近车场」回到列表，列表保持原来的排序与滚动位置
+- 搜索页同上；点图钉 → 从详情回到列表并滚到那张卡片
+- 定位失败时（关掉微信定位权限）进详情，卡片上的「距离、收费为估算」标注仍在
+- 「导航前往」调起微信内置地图；「预约车位」给出下一阶段提示，**不再跳页**
+
+- [ ] **Step 8: 提交**
 
 ```bash
-git add miniprogram/pages/lot-detail miniprogram/app.json
-git commit -m "feat: implement lot detail page"
+git add miniprogram/domain/detail.ts tests/domain/detail.test.ts miniprogram/components miniprogram/styles miniprogram/pages
+git commit -m "feat(ui): move the lot detail into the fixed sheet"
 ```
 
 ---
@@ -4092,7 +4293,7 @@ git commit -m "feat: implement lot detail page"
 1. 首次启动停在身份选择页，选车主后进入 3 tab 的主界面
 2. 首页自动定位并列出周边**真实**车场（腾讯 POI），支持综合/距离/价格/空位四种排序
 3. 搜索页可搜目的地或车场名，展示推荐结果并标出推荐理由
-4. 车场详情展示余位、收费规则、预测曲线、可预约额度
+4. 点卡片进面板内详情，展示余位、收费规则、可预约额度；返回行回列表（预测曲线见「已知未完成」）
 5. 每个车场都有「导航前往」（免费）与「预约车位」（占位）两个动作
 6. `npm test` 全绿
 
@@ -4100,13 +4301,13 @@ git commit -m "feat: implement lot detail page"
 
 - 预约确认、预约凭证、订单中心、我的、我的车辆、信用与违约 → 计划 2
 - 车场端全部页面 → 计划 3
-- 真实车流预测服务：当前 `buildForecast` 是由实时空闲率推导的占位曲线，接入后替换
+- **未来 2 小时空闲预测**：原 Task 15 里那段 `buildForecast` 是拿当前空闲率乘写死形状数组编出来的（且 `rate * 100 * s * 3.2` 在常见空闲率下会被夹到顶），2026-09-14 连同详情里的预测柱整块砍掉 —— 撞课程红线「真题真做，不允许随意模拟数据」。**接入真实预测源后再补 UI**，届时按 PM BR-05 显著标注降级
 - 登录与会话：`app.ts` 本阶段不做 `wx.login`，`services/api.ts` 在计划 2 需要后端时再引入
-- 详情页（Task 15）的估算字段标注：卡片已在 Task 12 补了 `estimateText` 标签，详情页的三统计块与收费规则卡尚未逐处标注
+- ~~详情页（Task 15）的估算字段标注~~ **已结（2026-09-14）**：详情信息卡底部与卡片用同一个 `sourceNote` 标注（`estimateText`），收费规则卡逐行都是真实字段值，未标注处只剩「计费步长」这种规则常量
 
 **首页遗留问题（2026-09-12 发现，Task 13 的人工校验尚未做）：**
 
 - ~~**地图没能正常显示**~~ **已结案（2026-09-13）：是开发者工具的限制，不是代码问题。** 工具控制台原文：`[Component] <map>: 开发者工具暂未支持 Skyline 下的 canvas 组件调试，请先到真机上预览调试。` 真机上地图与卡片均正常。**教训**：这条在 Task 0 就有机会暴露——Task 0 的结论是按**真机**记的（spec D1「真机验证通过」），工具里的空白被当成了同一现象，于是在首页上又排查了一轮。以后 `map` / 其他 Skyline 原生组件的验收**默认只在真机做**，工具里的异常先看控制台有没有「开发者工具暂未支持…」这类原文
 - ~~**定位失败 / 被拒时的兜底位置未定**~~ **已于 2026-09-13 拍板并实现**：兜底点 = 合肥大学（南艳湖校区），且**兜底即当定位点继续拉周边车场**（不是只挪地图坐标），面板顶部出提示条 + 「重新定位」。见本文件 Task 13 顶部偏差第 7 条
 - 首页其余待人工校验项：面板拖拽与吸附、chips 切换排序、图钉 ↔ 卡片选中联动、定位失败两种文案（被拒 vs 定位服务失败）、骨架屏与错误态
-- `/pages/search/search`（Task 14）、`/pages/lot-detail/lot-detail`（Task 15）尚未注册，首页的搜索入口与卡片点击在它们落地前会 `navigateTo` 失败 —— 预期中间态
+- ~~`/pages/search/search`（Task 14）、`/pages/lot-detail/lot-detail`（Task 15）尚未注册~~ **已结（2026-09-14）**：搜索页已注册；详情按 09-13 的决定做进面板，**不再有 `/pages/lot-detail` 这个页面**，两页的 `navigateTo` 已全部改成 `openDetail()`
