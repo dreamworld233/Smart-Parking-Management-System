@@ -2,6 +2,19 @@
 -- 智慧停车管理系统 建表脚本（幂等：全部 IF NOT EXISTS）
 -- 统一 utf8mb4，id 雪花算法（MyBatis-Plus ASSIGN_ID），时间 DATETIME
 -- ============================================================
+--
+-- ⚠️ 本文件是 Spring Boot + MySQL 时代的留痕，**当前未接入**（移动端走微信云开发）。
+-- 2026-09-14 已删除 5 张随架构作废的表：t_parking_area / t_space / t_wallet /
+-- t_member / t_bind_pay —— 对应原因是没有会员卡、没有钱包余额、没有免密代扣，
+-- 且车位粒度从「单个车位」改为「车场级可预约额度」。
+--
+-- 已知残留漂移，**留给 Plan 2 重写时处理**，不要在这里打补丁：
+--   t_user.member_type      无会员业务
+--   t_user.car_no           遗留单车牌字段，新业务用 t_car
+--   t_reservation.space_id  车位级 → 应改车场级（lots._id）
+--   t_parking_record.space_id  同上
+-- 现行数据模型见 docs/superpowers/specs/2026-09-14-smart-parking-data-model-design.md
+-- ============================================================
 
 -- 用户表：手机号唯一凭证（无用户名）
 CREATE TABLE IF NOT EXISTS t_user (
@@ -23,26 +36,6 @@ CREATE TABLE IF NOT EXISTS t_car (
     car_no      VARCHAR(20) NOT NULL UNIQUE,
     create_time DATETIME,
     INDEX idx_car_user (user_id)
-);
-
--- 停车场表：南 / 北区
-CREATE TABLE IF NOT EXISTS t_parking_area (
-    id          BIGINT PRIMARY KEY,
-    name        VARCHAR(20) NOT NULL,
-    code        VARCHAR(20),           -- 南=SOUTH / 北=NORTH
-    create_time DATETIME
-);
-
--- 车位表：属某停车场，type 固定/临时，status 空闲/预约/占用/停用
-CREATE TABLE IF NOT EXISTS t_space (
-    id          BIGINT PRIMARY KEY,
-    area_id     BIGINT NOT NULL,
-    space_no    VARCHAR(20) NOT NULL,
-    space_type  VARCHAR(20),           -- FIXED 固定 / TEMP 临时
-    status      VARCHAR(20) NOT NULL DEFAULT 'FREE',  -- FREE/OCCUPIED/RESERVED/DISABLED
-    car_no      VARCHAR(20),           -- 当前占用/预约车牌（可为空）
-    create_time DATETIME,
-    UNIQUE KEY uk_space (area_id, space_no)
 );
 
 -- 预约表：状态 FREE→RESERVED(用户预约)→USED(入场核销)/CANCELED(取消)/TIMEOUT(超时释放)
@@ -73,26 +66,6 @@ CREATE TABLE IF NOT EXISTS t_parking_record (
     INDEX idx_record_car (car_no)
 );
 
--- 钱包表：模拟余额扣款
-CREATE TABLE IF NOT EXISTS t_wallet (
-    id          BIGINT PRIMARY KEY,
-    user_id     BIGINT NOT NULL UNIQUE,
-    balance     DECIMAL(10,2) DEFAULT 0,
-    update_time DATETIME
-);
-
--- 会员表：月/年卡
-CREATE TABLE IF NOT EXISTS t_member (
-    id          BIGINT PRIMARY KEY,
-    user_id     BIGINT NOT NULL,
-    member_type VARCHAR(20),           -- MONTH 月 / YEAR 年
-    car_no      VARCHAR(20),
-    start_date  DATE,
-    end_date    DATE,
-    pay_status  VARCHAR(20) DEFAULT 'UNPAID',
-    create_time DATETIME
-);
-
 -- 支付流水表：订单级记录
 CREATE TABLE IF NOT EXISTS t_payment (
     id          BIGINT PRIMARY KEY,
@@ -101,15 +74,5 @@ CREATE TABLE IF NOT EXISTS t_payment (
     amount      DECIMAL(10,2) DEFAULT 0,
     biz_type    VARCHAR(20),           -- PARKING 停车费 / MEMBER 会员
     status      VARCHAR(20) DEFAULT 'PAID',    -- PAID/REFUNDED/FAILED
-    create_time DATETIME
-);
-
--- 支付签约表：模拟微信/支付宝签约 + 免密额度
-CREATE TABLE IF NOT EXISTS t_bind_pay (
-    id          BIGINT PRIMARY KEY,
-    user_id     BIGINT NOT NULL,
-    pay_type    VARCHAR(20),           -- WECHAT/ALIPAY/WALLET
-    status      VARCHAR(20) DEFAULT 'ACTIVE',   -- ACTIVE/UNBOUND
-    auto_max    DECIMAL(10,2) DEFAULT 100,      -- 免密额度上限
     create_time DATETIME
 );
