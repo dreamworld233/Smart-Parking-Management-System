@@ -201,11 +201,16 @@ Page({
     }
   },
 
-  applySort(key: SortKey) {
+  /**
+   * `selectedId` 由调用方显式传入，不从 `this.data` 里读：真机上同一次 setData 批里
+   * 「改 selectedId + 重建卡片」时，`this.data.selectedId` 取到的可能还是上一屏的值，
+   * 于是高亮留在旧的那张卡上（2026-09-14 真机反馈「定位了但没有蓝框」）
+   */
+  applySort(key: SortKey, nextSelectedId?: string) {
+    const selectedId = nextSelectedId ?? this.data.selectedId
     const sorted = sortLots(this.recommendations, key)
     // 图钉只画前 MAX_PINS 个，标签走与首页同一套短口径（车场名不进图钉，名字在卡片里）。
     // 选中项不随排序跑，切一次排序就可能掉出前 MAX_PINS，靠 pickPins 补回来
-    const { selectedId } = this.data
     const pins = pickPins(sorted, [selectedId], MAX_PINS).map(r =>
       pinOf(r, { selected: r.lot.id === selectedId }),
     )
@@ -235,7 +240,16 @@ Page({
       centerLng: rec.lot.location.lng,
       detail: toDetailVM(rec),
     })
-    this.applySort(this.data.sortKey)
+    this.applySort(this.data.sortKey, rec.lot.id)
+  },
+
+  /**
+   * 返回列表：卡片还留着选中态，但面板停在列表顶部 —— 用户得自己往下翻才找得到
+   * 刚才看的那家（2026-09-14 真机反馈）。列表是这一屏新渲染出来的，所以等渲染完再滚
+   */
+  onDetailBack() {
+    this.setData({ detail: null })
+    wx.nextTick(() => this.scrollToCard(this.data.selectedId))
   },
 
   onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
@@ -245,10 +259,18 @@ Page({
   onPinTap(e: WechatMiniprogram.CustomEvent<{ markerId: number }>) {
     const pin = this.data.pins[e.detail.markerId]
     if (!pin) return
-    // 详情态下点图钉 = 回列表看那张卡片：先退出详情，列表渲染出来 scroll-into-view 才有目标
-    this.setData({ selectedId: pin.id, detail: null })
-    this.applySort(this.data.sortKey)
-    this.scrollToCard(pin.id)
+    // 详情态下点图钉 = 回列表看那张卡片（与首页同一套）
+    const leavingDetail = !!this.data.detail
+    // 面板切回列表时卡片是**新创建**的：选中态不能与「切回列表」挤在同一次 setData 里，
+    // 否则卡片拿到的还是上一屏的 selectedId、没有蓝框（2026-09-14 真机反馈）
+    if (leavingDetail) this.setData({ detail: null })
+    const land = () => {
+      this.setData({ selectedId: pin.id })
+      this.applySort(this.data.sortKey, pin.id)
+      this.scrollToCard(pin.id)
+    }
+    if (leavingDetail) wx.nextTick(land)
+    else land()
   },
 
   /** 把对应卡片滚进视野 */
@@ -273,10 +295,6 @@ Page({
   /** 详情里的「预约车位」：付费链路在计划 2，这里先给出提示 */
   onDetailReserve() {
     wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
-  },
-
-  onDetailBack() {
-    this.setData({ detail: null })
   },
 
   onRetry() {
