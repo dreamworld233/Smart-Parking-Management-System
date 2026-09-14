@@ -14,6 +14,16 @@
 
 ---
 
+## 执行进度（2026-09-14 晚）
+
+- **Task 2 完成并提交**（commit 51b2b96）：tsc exit 0、jest 12 套件 202 测试全绿。Task 0/1/3/4/5/6 仍待云开发环境 ID（用户手动步骤）。
+- **计划里的两个坑，当场修正而非照抄**（符合「计划规格必须先验算」约定）：
+  1. 计划 Step 10 的「余位未上报」测试 `scoreLot(l, { allLots: [l], userNeedsCharging: false })` **漏了 `hasCharging` 形参**，编译不过；且断言 100 分需以 `lot()` 默认 `ratingSummary: null` 为前提，与同批「部分因子缺失」测试显式传 `ratingSummary: null` 矛盾。已定 `lot()` 默认 `ratingSummary: null` 并补 `hasCharging: false`。
+  2. 计划 `sourceNotes` 的实现对 `pricing.source === 'public'` 也出「收费来源于车场公示价」标注（三种收费来源各有标签），因此「全真实为空数组」这条**不可达**、与实现矛盾。已把该测试改为「距离估算 + 收费公示价各自独立标注」，断言非空。
+- **桥接超出了计划 Task 2 的文件清单**：`LotAvailability.source` 收窄到 `'public' | 'ops'` 后，旧 `services/lot.ts` 的 `source: 'estimated'` 过不了编译。为让 Task 2 独立提交且全绿，桥接把 `services/lot.ts` 的 `availability.source` 改 `'ops'`、`rating→ratingSummary: null`、`tags→facilities`，并同步改了 `tests/services/lot.test.ts` 的 3 处断言（计划把它俩都留给 Task 3）。Task 3 会整个重写 lot.ts。
+
+---
+
 ## 与数据模型设计稿的偏差（记录在案，答辩口径）
 
 | 设计稿原文 | 2a 实际做法 | 理由 |
