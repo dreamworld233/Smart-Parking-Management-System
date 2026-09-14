@@ -31,3 +31,43 @@ export function getCloudApi(): CloudApi | null {
     return null
   }
 }
+
+export interface CloudOk<T> { ok: true; data: T }
+export interface CloudErr { ok: false; code: string; message: string }
+export type CloudResult<T> = CloudOk<T> | CloudErr
+
+/**
+ * 云函数统一返回 `{ code, message, data }`（数据模型 §6 口径）。
+ * 网络层异常归一成 `NETWORK`，调用方只看 ok 分支，不用各写一遍 try/catch
+ */
+export async function callFunction<T>(
+  name: string,
+  data?: Record<string, unknown>,
+): Promise<CloudResult<T>> {
+  const api = getCloudApi()
+  if (!api) return { ok: false, code: 'NO_CLOUD', message: '基础库不支持云开发' }
+  try {
+    const res = await api.callFunction({ name, data: data ?? {} })
+    const body = res.result as { code?: unknown; message?: unknown; data?: unknown }
+    if (body && body.code === 0) return { ok: true, data: body.data as T }
+    return {
+      ok: false,
+      code: String(body?.code ?? 'UNKNOWN'),
+      message: String(body?.message ?? '云函数返回异常'),
+    }
+  } catch (e) {
+    return { ok: false, code: 'NETWORK', message: (e as Error)?.message || '云函数调用失败' }
+  }
+}
+
+export interface LoginResult {
+  userId: string
+  role: 'driver' | 'lot_admin' | 'ops_admin'
+  violationCount: number
+  banned: boolean
+}
+
+/** 微信身份建档（users 无则建）。2b 起的写操作云函数都以此为身份前提 */
+export function ensureLogin(): Promise<CloudResult<LoginResult>> {
+  return callFunction<LoginResult>('login')
+}
