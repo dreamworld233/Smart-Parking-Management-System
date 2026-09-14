@@ -20,6 +20,10 @@
 --   t_space（逐车位表 —— 拿不到车场内部车位级数据，做了就是编数据）
 -- =====================================================================
 
+-- 强制会话字符集：不加这句，用默认 GBK 的客户端导入会把中文注释写成乱码
+-- （MySQL 命令行 / Navicat / Workbench 导入时都要保证这点；文件本身是 UTF-8 无 BOM）
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS smart_parking
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
