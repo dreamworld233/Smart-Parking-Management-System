@@ -20,51 +20,63 @@
 
   <!-- 面板固定停在这一位：不拖拽、不收起，只有「居中」一个状态（与搜索页同一套） -->
   <view class="sheet" style="height: {{sheetHeight}}px; bottom: {{sheetBottom}}px">
-    <view class="sheet__head" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场</view>
-
-    <!-- 排序 chips 放进面板（与搜索页统一，也让出上面一整条给地图） -->
-    <view class="chips-row" wx:if="{{state === 'ready'}}">
-      <sort-chips value="{{sortKey}}" bind:change="onSortChange" />
-    </view>
-
-    <view wx:if="{{fallbackText}}" class="notice" bindtap="onRetry">
-      <text class="notice__text">{{fallbackText}}</text>
-      <text class="notice__retry">重新定位</text>
-    </view>
-
-    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在获取周边车场…" />
-
-    <state-view
-      wx:elif="{{state === 'empty'}}"
-      kind="empty"
-      text="附近 3 公里内未找到停车场"
-      hint="试试搜索指定目的地"
-      action-text="去搜索"
-      bind:action="onSearchTap"
+    <!-- 详情占满面板，面板高度一个像素都不变，内容在内部自己滚（2026-09-14 决定） -->
+    <lot-detail
+      wx:if="{{detail}}"
+      vm="{{detail}}"
+      bind:back="onDetailBack"
+      bind:navigate="onNavigate"
+      bind:reserve="onDetailReserve"
     />
 
-    <state-view
-      wx:elif="{{state === 'error'}}"
-      kind="error"
-      text="车场数据加载失败"
-      hint="请检查网络后重试"
-      action-text="重试"
-      bind:action="onRetry"
-    />
+    <!-- 列表视图。详情是面板内的另一种内容，两者互斥，不该叠在一起 -->
+    <block wx:else>
+      <view class="sheet__head" wx:if="{{state === 'ready'}}">附近 {{cards.length}} 个车场</view>
 
-    <scroll-view wx:else class="sheet__list" scroll-y scroll-into-view="{{intoView}}" scroll-with-animation>
-      <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
-      <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
-        <lot-card
-          item="{{item}}"
-          selected="{{item.lot.id === selectedId}}"
-          show-actions
-          bind:cardtap="onCardTap"
-          bind:navigate="onNavigate"
-          bind:reserve="onReserve"
-        />
+      <!-- 排序 chips 放进面板（与搜索页统一，也让出上面一整条给地图） -->
+      <view class="chips-row" wx:if="{{state === 'ready'}}">
+        <sort-chips value="{{sortKey}}" bind:change="onSortChange" />
       </view>
-      <view class="sheet__tail" />
-    </scroll-view>
+
+      <view wx:if="{{fallbackText}}" class="notice" bindtap="onRetry">
+        <text class="notice__text">{{fallbackText}}</text>
+        <text class="notice__retry">重新定位</text>
+      </view>
+
+      <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在获取周边车场…" />
+
+      <state-view
+        wx:elif="{{state === 'empty'}}"
+        kind="empty"
+        text="附近 3 公里内未找到停车场"
+        hint="试试搜索指定目的地"
+        action-text="去搜索"
+        bind:action="onSearchTap"
+      />
+
+      <state-view
+        wx:elif="{{state === 'error'}}"
+        kind="error"
+        text="车场数据加载失败"
+        hint="请检查网络后重试"
+        action-text="重试"
+        bind:action="onRetry"
+      />
+
+      <scroll-view wx:else class="sheet__list" scroll-y scroll-into-view="{{intoView}}" scroll-with-animation>
+        <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
+        <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
+          <lot-card
+            item="{{item}}"
+            selected="{{item.lot.id === selectedId}}"
+            show-actions
+            bind:cardtap="onCardTap"
+            bind:navigate="onNavigate"
+            bind:reserve="onReserve"
+          />
+        </view>
+        <view class="sheet__tail" />
+      </scroll-view>
+    </block>
   </view>
 </view>

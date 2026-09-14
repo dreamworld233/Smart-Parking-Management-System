@@ -1,4 +1,6 @@
 import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M } from '../../config'
+import { toDetailVM } from '../../domain/detail'
+import type { LotDetailVM } from '../../domain/detail'
 import { formatDistance, formatSpots, searchLocationNotice, sourceNote } from '../../domain/format'
 import { pickPins, pinOf, toMarkers } from '../../domain/pins'
 import type { MapMarker, MapPin } from '../../domain/pins'
@@ -64,6 +66,8 @@ Page({
     centerLng: FALLBACK_PLACE.point.lng,
     /** 联动用的选中项。检索完成后自动落在第一条上（不再有单独的「推荐」标记） */
     selectedId: '',
+    /** 非空 = 面板正在显示该车场的详情；面板高度不变，只有内容切换（同首页） */
+    detail: null as LotDetailVM | null,
     /** 点图钉时把对应卡片滚进视野；scroll-into-view 只在值变化时才动，用完要清 */
     intoView: '',
     pins: [] as MapPin[],
@@ -142,8 +146,14 @@ Page({
       return
     }
 
-    // 上一轮的兜底提示先清掉：重试后可能已经拿到真定位，留着就是假话
-    this.setData({ history: pushSearchHistory(keyword), state: 'loading', fallbackText: '' })
+    // 上一轮的兜底提示先清掉：重试后可能已经拿到真定位，留着就是假话。
+    // 详情同理：重新检索会换一批车场，留着上一批的详情也是在说假话
+    this.setData({
+      history: pushSearchHistory(keyword),
+      state: 'loading',
+      fallbackText: '',
+      detail: null,
+    })
     const seq = ++this.searchSeq
 
     const loc = await getCurrentPoint()
@@ -211,22 +221,32 @@ Page({
     this.applySort(e.detail.key)
   },
 
-  /** 点卡片 = 选中它 + 把地图移到它上面（与首页同一套联动；详情按新决定做进面板内） */
-  onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
-    const rec = this.recommendations.find(r => r.lot.id === e.detail.id)
+  /**
+   * 进详情 = 选中它 + 把地图移到它上面 + 面板内容切成详情（与首页同一套）。
+   * 点整张卡片与点卡片上的「预约车位」走同一条路：详情不再是独立页面，
+   * 付费层的「预约确认」屏仍留在计划 2
+   */
+  openDetail(id: string) {
+    const rec = this.recommendations.find(r => r.lot.id === id)
     if (!rec) return
     this.setData({
       selectedId: rec.lot.id,
       centerLat: rec.lot.location.lat,
       centerLng: rec.lot.location.lng,
+      detail: toDetailVM(rec),
     })
     this.applySort(this.data.sortKey)
+  },
+
+  onCardTap(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
+    this.openDetail(e.detail.id)
   },
 
   onPinTap(e: WechatMiniprogram.CustomEvent<{ markerId: number }>) {
     const pin = this.data.pins[e.detail.markerId]
     if (!pin) return
-    this.setData({ selectedId: pin.id })
+    // 详情态下点图钉 = 回列表看那张卡片：先退出详情，列表渲染出来 scroll-into-view 才有目标
+    this.setData({ selectedId: pin.id, detail: null })
     this.applySort(this.data.sortKey)
     this.scrollToCard(pin.id)
   },
@@ -247,7 +267,16 @@ Page({
   },
 
   onReserve(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
-    wx.navigateTo({ url: `/pages/lot-detail/lot-detail?id=${e.detail.id}&intent=reserve` })
+    this.openDetail(e.detail.id)
+  },
+
+  /** 详情里的「预约车位」：付费链路在计划 2，这里先给出提示 */
+  onDetailReserve() {
+    wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
+  },
+
+  onDetailBack() {
+    this.setData({ detail: null })
   },
 
   onRetry() {

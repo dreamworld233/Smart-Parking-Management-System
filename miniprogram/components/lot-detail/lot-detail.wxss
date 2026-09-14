@@ -1,0 +1,146 @@
+@import "../../styles/tags.wxss";
+
+.detail {
+  /* 宿主 lot-detail 由页面定成 flex 行容器（flex: 1; height: 0; display: flex），
+     这里靠 flex: 1 拿满宽度、靠父级默认的 stretch 拿满高度，再自己竖排 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.detail__back {
+  flex: none;
+  padding-bottom: var(--space-2);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.detail__body {
+  flex: 1;
+  /* flex 子项默认高度是内容高度，不设 0 时 scroll-view 会撑破面板（.sheet__list 同款坑） */
+  height: 0;
+}
+
+.detail__bar {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.detail__ghost,
+.detail__primary {
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sub);
+  font-weight: 600;
+}
+
+.detail__ghost {
+  flex: 1;
+  border: 2rpx solid #cbd5e1;
+  color: var(--color-text);
+}
+
+.detail__primary {
+  flex: 1.4;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.card__name {
+  flex: 1;
+  margin-right: var(--space-2);
+  font-size: var(--font-title);
+  font-weight: 700;
+}
+
+.card__rating {
+  font-size: var(--font-sub);
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.card__addr {
+  margin-top: 10rpx;
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+}
+
+.card__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-card-title);
+  font-weight: 700;
+}
+
+.card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.stat {
+  flex: 1;
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 18rpx 20rpx;
+}
+
+.stat__k { font-size: var(--font-micro); color: var(--color-text-weak); }
+.stat__v { margin-top: 6rpx; font-size: 36rpx; font-weight: 700; letter-spacing: -1rpx; }
+.stat__u { font-size: var(--font-micro); font-weight: 400; color: var(--color-text-weak); }
+
+/* 余位档位配色与 lot-card 的 .card__free 同源（都由 availabilityLevel 产出） */
+.stat__v.ok { color: var(--color-success); }
+.stat__v.warn { color: var(--color-warning); }
+.stat__v.bad { color: var(--color-danger); }
+.stat__v.primary { color: var(--color-primary); }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8rpx 0;
+  font-size: var(--font-body);
+}
+
+.row__k { color: var(--color-text-sub); }
+
+.quota { font-size: var(--font-body); color: var(--color-text-sub); }
+
+.quota__note {
+  margin-top: var(--space-2);
+  font-size: var(--font-micro);
+  line-height: 1.7;
+  color: var(--color-text-weak);
+}
+
+.primary { color: var(--color-primary); }
+.bold { font-weight: 700; }
+
+/* 面板底部已让开 tabBar，这里只留一点呼吸空间 */
+.tail { height: var(--space-4); }

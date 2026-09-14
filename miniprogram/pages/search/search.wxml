@@ -43,55 +43,67 @@
     wx:if="{{state !== 'idle'}}"
     style="height: {{sheetHeight}}px; padding-bottom: {{safeBottom}}px"
   >
-    <view class="sheet__head" wx:if="{{state === 'ready'}}">{{cards.length}} 个车场</view>
-
-    <!-- 排序 chips 放进面板（与首页统一） -->
-    <view class="chips-row" wx:if="{{state === 'ready'}}">
-      <!-- 长标签：UI 稿 §5.2 是「综合推荐 / 距离最近 / 费用最低 / 空位最多」，首页才用短的那套 -->
-      <sort-chips variant="long" value="{{sortKey}}" bind:change="onSortChange" />
-    </view>
-
-    <view class="notice" wx:if="{{fallbackText}}">
-      <text class="notice__text">{{fallbackText}}</text>
-    </view>
-
-    <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在检索…" />
-
-    <state-view
-      wx:elif="{{state === 'empty'}}"
-      kind="empty"
-      text="没有找到相关车场"
-      hint="换个关键词，或直接输入目的地"
+    <!-- 详情占满面板，面板高度一个像素都不变，内容在内部自己滚（2026-09-14 决定） -->
+    <lot-detail
+      wx:if="{{detail}}"
+      vm="{{detail}}"
+      bind:back="onDetailBack"
+      bind:navigate="onNavigate"
+      bind:reserve="onDetailReserve"
     />
 
-    <state-view
-      wx:elif="{{state === 'error'}}"
-      kind="error"
-      text="检索失败"
-      hint="请检查网络后重试"
-      action-text="重试"
-      bind:action="onRetry"
-    />
+    <!-- 结果列表视图。详情是面板内的另一种内容，两者互斥，不该叠在一起 -->
+    <block wx:else>
+      <view class="sheet__head" wx:if="{{state === 'ready'}}">{{cards.length}} 个车场</view>
 
-    <scroll-view
-      wx:elif="{{state === 'ready'}}"
-      class="sheet__list"
-      scroll-y
-      scroll-into-view="{{intoView}}"
-      scroll-with-animation
-    >
-      <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
-      <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
-        <lot-card
-          item="{{item}}"
-          selected="{{item.lot.id === selectedId}}"
-          show-actions
-          bind:cardtap="onCardTap"
-          bind:navigate="onNavigate"
-          bind:reserve="onReserve"
-        />
+      <!-- 排序 chips 放进面板（与首页统一） -->
+      <view class="chips-row" wx:if="{{state === 'ready'}}">
+        <!-- 长标签：UI 稿 §5.2 是「综合推荐 / 距离最近 / 费用最低 / 空位最多」，首页才用短的那套 -->
+        <sort-chips variant="long" value="{{sortKey}}" bind:change="onSortChange" />
       </view>
-      <view class="sheet__tail" />
-    </scroll-view>
+
+      <view class="notice" wx:if="{{fallbackText}}">
+        <text class="notice__text">{{fallbackText}}</text>
+      </view>
+
+      <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在检索…" />
+
+      <state-view
+        wx:elif="{{state === 'empty'}}"
+        kind="empty"
+        text="没有找到相关车场"
+        hint="换个关键词，或直接输入目的地"
+      />
+
+      <state-view
+        wx:elif="{{state === 'error'}}"
+        kind="error"
+        text="检索失败"
+        hint="请检查网络后重试"
+        action-text="重试"
+        bind:action="onRetry"
+      />
+
+      <scroll-view
+        wx:elif="{{state === 'ready'}}"
+        class="sheet__list"
+        scroll-y
+        scroll-into-view="{{intoView}}"
+        scroll-with-animation
+      >
+        <!-- 每张卡片套一层带 id 的 view：scroll-into-view 按 id 找目标，点图钉时要能滚到它 -->
+        <view wx:for="{{cards}}" wx:key="lot.id" id="card{{index}}">
+          <lot-card
+            item="{{item}}"
+            selected="{{item.lot.id === selectedId}}"
+            show-actions
+            bind:cardtap="onCardTap"
+            bind:navigate="onNavigate"
+            bind:reserve="onReserve"
+          />
+        </view>
+        <view class="sheet__tail" />
+      </scroll-view>
+    </block>
   </view>
 </view>

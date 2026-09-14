@@ -1,3 +1,5 @@
+@import "../../styles/tags.wxss";
+
 .card {
   background: var(--color-surface);
   border: 2rpx solid var(--color-border);
@@ -61,24 +63,6 @@
   gap: 12rpx;
   margin-top: 14rpx;
   flex-wrap: wrap;
-}
-
-.tag {
-  padding: 2rpx 12rpx;
-  border-radius: 6rpx;
-  font-size: var(--font-tag);
-}
-
-.tag.info { background: #dbeafe; color: #1d4ed8; }
-.tag.good { background: #dcfce7; color: #15803d; }
-.tag.bad { background: #fee2e2; color: #b91c1c; }
-.tag.plain { background: #f1f5f9; color: #475569; }
-
-/* 数据来源标注：虚线边框，与「推荐理由」标签区分开 */
-.tag.source {
-  background: #f8fafc;
-  border: 2rpx dashed #cbd5e1;
-  color: var(--color-text-sub);
 }
 
 .card__actions {

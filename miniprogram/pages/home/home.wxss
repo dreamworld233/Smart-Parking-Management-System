@@ -111,3 +111,12 @@
 
 /* 面板 bottom 已让开 tabBar，这里只留一点呼吸空间 */
 .sheet__tail { height: 24rpx; }
+
+/* 详情视图直接当面板的 flex 子项：撑满面板剩余高度，内部自己滚。
+   宿主设成 flex 行容器，组件根节点的 flex: 1 与父级默认的 stretch 才拿得到完整高度
+   （Skyline 不支持 position: fixed，面板里也不能再绝对定位铺一层） */
+.sheet lot-detail {
+  flex: 1;
+  height: 0;
+  display: flex;
+}
