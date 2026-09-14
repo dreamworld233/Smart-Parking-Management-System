@@ -9,13 +9,22 @@
  * 配置步骤见 `docs/setup/tencent-map-setup.md`。
  */
 let localKey = ''
+let localEnv = ''
 try {
-  localKey = require('./config.local').QQMAP_KEY || ''
+  const local = require('./config.local')
+  localKey = local.QQMAP_KEY || ''
+  localEnv = local.CLOUD_ENV || ''
 } catch {
   // config.local.ts 不存在：保持占位符
 }
 
 export const QQMAP_KEY = localKey || 'REPLACE_WITH_YOUR_KEY'
+
+/**
+ * 云开发环境 ID。未配置（新克隆）时为空串，服务层据此给出明确报错，
+ * 不做静默兜底 —— 环境配错的表现应该是「一句话说清」，而不是 undefined 行为
+ */
+export const CLOUD_ENV = localEnv
 
 /** 首页默认搜索半径（米） */
 export const DEFAULT_RADIUS_M = 3000

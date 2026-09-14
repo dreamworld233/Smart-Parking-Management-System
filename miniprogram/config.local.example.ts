@@ -8,3 +8,10 @@
 // ⚠️ 不要直接把 Key 写在本文件里。本文件是被 git 跟踪的模板，写在这里等于公开。
 // 申请步骤见 docs/setup/tencent-map-setup.md
 export const QQMAP_KEY = '在这里填你的腾讯位置服务 Key'
+
+/**
+ * 云开发环境 ID。从微信开发者工具「云开发」控制台复制，
+ * 形如 `cloud1-xxxxxxxxxxxx` 或你建环境时自定义的短名。
+ * 未配置时服务层会给出明确报错，不会静默兜底
+ */
+export const CLOUD_ENV = ''
