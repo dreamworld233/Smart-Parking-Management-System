@@ -6,7 +6,7 @@
     <view class="card">
       <view class="card__head">
         <view class="card__name">{{vm.lot.name}}</view>
-        <view class="card__rating">★ {{vm.lot.rating}}</view>
+        <view class="card__rating">{{vm.ratingText}}</view>
       </view>
       <view class="card__addr">{{vm.lot.address}} · 步行 {{vm.walkText}} · {{vm.distanceText}}</view>
 
@@ -25,9 +25,14 @@
         </view>
       </view>
 
-      <view class="card__tags" wx:if="{{vm.estimateText || vm.reasons.length}}">
-        <!-- 数据来源标注：车位数/余位/收费都是估算，课程要求逐处标注来源 -->
-        <view class="tag source" wx:if="{{vm.estimateText}}">{{vm.estimateText}}</view>
+      <view class="card__tags" wx:if="{{vm.sourceNotes.length || vm.reasons.length}}">
+        <!-- 数据来源标注：逐条来自 sourceNotes（公示价/运营声明/待上报/估算） -->
+        <view
+          wx:for="{{vm.sourceNotes}}"
+          wx:for-item="note"
+          wx:key="*this"
+          class="tag source"
+        >{{note}}</view>
 
         <!--
           循环变量必须改名：默认的 `item` 会盖住外层作用域，
@@ -56,6 +61,7 @@
       <view class="card__title">可预约额度</view>
       <view class="quota">本车场已开放 <text class="primary bold">{{vm.quotaText}}</text> 个预约车位</view>
       <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
+      <view class="quota__note">可预约额度与设施由平台运营维护</view>
     </view>
 
     <view class="tail" />

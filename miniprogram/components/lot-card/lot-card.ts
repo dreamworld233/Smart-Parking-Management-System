@@ -19,8 +19,8 @@ export interface LotCardItem {
   score: number
   reasons: string[]
   tone: ReasonTone
-  /** 数据来源标注，如「车位数与收费为估算」；空串则不渲染该标签 */
-  estimateText: string
+  /** 数据来源标注（逐条）；空数组则不渲染标签区 */
+  sourceNotes: string[]
 }
 
 function readItem(ctx: { data: { item?: unknown } }): LotCardItem | null {

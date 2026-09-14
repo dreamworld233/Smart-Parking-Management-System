@@ -10,11 +10,11 @@ function rec(id: string, score: number, distanceM: number, firstHour: number, fr
     distanceM,
     walkMinutes: 1,
     distanceSource: 'estimated',
-    pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
-    availability: { freeSpots, totalSpots: 500, source: 'estimated' },
+    pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'ops' },
+    availability: { freeSpots, totalSpots: 500, source: 'ops' },
     reservableQuota: 10,
-    rating: 4.5,
-    tags: [],
+    ratingSummary: null,
+    facilities: [],
   }
   return {
     lot,

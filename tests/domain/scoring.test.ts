@@ -21,13 +21,14 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     walkMinutes: 4,
     // fixture 是人造的，距离谈不上「实测路线」，标 estimated 更诚实
     distanceSource: 'estimated',
-    pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
+    pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'ops' },
     // 空闲率 0.4，明显高于饱和下限 0.15 —— 默认 fixture 必须是「不紧张」的，
     // 否则「空位充足为 good」与「高饱和为 bad」两条测试会落在同一区间里打架
-    availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
+    availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
     reservableQuota: 120,
-    rating: 4.8,
-    tags: [],
+    // 冷启动默认无评价：真实种子车场 ratingSummary 都是 null，这是主导路径
+    ratingSummary: null,
+    facilities: [],
     ...over,
   }
 }
@@ -71,8 +72,8 @@ describe('availabilityLevel', () => {
     expect(availabilityLevel(1)).toBe('ok')
   })
 
-  it('非有限值按 bad 兜底', () => {
-    expect(availabilityLevel(NaN)).toBe('bad')
+  it('非有限值按 unknown 兜底（未上报不显示成紧张）', () => {
+    expect(availabilityLevel(NaN)).toBe('unknown')
   })
 
   it('档位边界与评分基调的饱和线是同一条', () => {
@@ -83,7 +84,7 @@ describe('availabilityLevel', () => {
       id: 'at',
       distanceM: 100,
       pricing: { ...lot().pricing, firstHour: 6 },
-      availability: { freeSpots: FREE_FLOOR * total, totalSpots: total, source: 'estimated' },
+      availability: { freeSpots: FREE_FLOOR * total, totalSpots: total, source: 'ops' },
     })
     // aboveLine 刻意又远又贵：默认 fixture 两辆车场同价同距离，费用与距离因子都会取 1，
     // 于是「不是 bad」会经费用/距离的 good 捷径通过 —— 断言看着绿，实际与可用性无关。
@@ -92,7 +93,7 @@ describe('availabilityLevel', () => {
       id: 'above',
       distanceM: 2000,
       pricing: { ...lot().pricing, firstHour: 10 },
-      availability: { freeSpots: FREE_FLOOR * total + 1, totalSpots: total, source: 'estimated' },
+      availability: { freeSpots: FREE_FLOOR * total + 1, totalSpots: total, source: 'ops' },
     })
     const ctx = { allLots: [atLine, aboveLine], hasCharging: false, userNeedsCharging: false }
 
@@ -110,7 +111,7 @@ describe('availabilityLevel', () => {
     // 注意 tone 只可能经 saturated 变 bad（toneFor 其余分支给的是 good/plain），
     // 所以这条等价式判的就是饱和线本身
     for (const rate of [0, 0.12, FREE_FLOOR, 0.16, 0.31, 1]) {
-      const l = lot({ id: `r${rate}`, availability: { freeSpots: rate * 1000, totalSpots: 1000, source: 'estimated' } })
+      const l = lot({ id: `r${rate}`, availability: { freeSpots: rate * 1000, totalSpots: 1000, source: 'ops' } })
       const ctx = { allLots: [l], hasCharging: false, userNeedsCharging: false }
       expect(availabilityLevel(rate) === 'bad').toBe(scoreLot(l, ctx).tone === 'bad')
     }
@@ -180,24 +181,24 @@ describe('scoreLot', () => {
   })
 
   it('空位充足时可用性因子高于空位紧张时', () => {
-    const plenty = scoreLot(lot({ availability: { freeSpots: 400, totalSpots: 500, source: 'estimated' } }), {
+    const plenty = scoreLot(lot({ availability: { freeSpots: 400, totalSpots: 500, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
-    const scarce = scoreLot(lot({ availability: { freeSpots: 3, totalSpots: 800, source: 'estimated' } }), {
+    const scarce = scoreLot(lot({ availability: { freeSpots: 3, totalSpots: 800, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
-    expect(plenty.factors.availability).toBeGreaterThan(scarce.factors.availability)
+    expect(plenty.factors.availability!).toBeGreaterThan(scarce.factors.availability!)
   })
 
   it('空闲率低于警戒线时可用性因子为 0', () => {
-    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'estimated' } }), {
+    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.factors.availability).toBe(0)
   })
 
   it('评分低于饱和警戒线时产出「高峰紧张」理由', () => {
-    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'estimated' } }), {
+    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.reasons).toContain('高峰紧张')
@@ -224,8 +225,8 @@ describe('scoreLot', () => {
     const best = lot({
       id: 'best',
       distanceM: 50,
-      tags: ['充电桩'],
-      availability: { freeSpots: 450, totalSpots: 500, source: 'estimated' },
+      facilities: ['充电桩'],
+      availability: { freeSpots: 450, totalSpots: 500, source: 'ops' },
     })
     const other = lot({ id: 'other', distanceM: 900, pricing: { ...lot().pricing, firstHour: 9 } })
     const r = scoreLot(best, { allLots: [best, other], hasCharging: true, userNeedsCharging: true })
@@ -240,13 +241,13 @@ describe('scoreLot', () => {
       id: 'roomy',
       distanceM: 2000,
       pricing: { ...lot().pricing, firstHour: 10 },
-      availability: { freeSpots: 480, totalSpots: 500, source: 'estimated' },
+      availability: { freeSpots: 480, totalSpots: 500, source: 'ops' },
     })
     const tight = lot({
       id: 'tight',
       distanceM: 100,
       pricing: { ...lot().pricing, firstHour: 4 },
-      availability: { freeSpots: 400, totalSpots: 500, source: 'estimated' },
+      availability: { freeSpots: 400, totalSpots: 500, source: 'ops' },
     })
     const r = scoreLot(roomy, { allLots: [roomy, tight], hasCharging: false, userNeedsCharging: false })
 
@@ -256,14 +257,14 @@ describe('scoreLot', () => {
   })
 
   it('基调：高饱和为 bad', () => {
-    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'estimated' } }), {
+    const r = scoreLot(lot({ availability: { freeSpots: 10, totalSpots: 100, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.tone).toBe('bad')
   })
 
   it('总车位为 0 时按空闲率 0 处理，可用性因子归零且基调为 bad', () => {
-    const r = scoreLot(lot({ availability: { freeSpots: 0, totalSpots: 0, source: 'estimated' } }), {
+    const r = scoreLot(lot({ availability: { freeSpots: 0, totalSpots: 0, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.factors.availability).toBe(0)
@@ -271,7 +272,7 @@ describe('scoreLot', () => {
   })
 
   it('空闲数超过总车位时因子被夹到 1，综合分不越界', () => {
-    const r = scoreLot(lot({ availability: { freeSpots: 1000, totalSpots: 500, source: 'estimated' } }), {
+    const r = scoreLot(lot({ availability: { freeSpots: 1000, totalSpots: 500, source: 'ops' } }), {
       allLots: [lot()], hasCharging: false, userNeedsCharging: false,
     })
     expect(r.factors.availability).toBe(1)
@@ -285,8 +286,7 @@ describe('scoreLot', () => {
       id: 'orphan',
       distanceM: 0,
       pricing: { ...lot().pricing, firstHour: 0 },
-      availability: { freeSpots: 1000, totalSpots: 500, source: 'estimated' },
-      rating: 5,
+      availability: { freeSpots: 1000, totalSpots: 500, source: 'ops' },
     })
     const r = scoreLot(orphan, {
       allLots: [
@@ -303,12 +303,29 @@ describe('scoreLot', () => {
     expect(r.score).toBeLessThanOrEqual(100)
   })
 
-  it('评分缺失（NaN）时口碑因子按 0 计，综合分仍是有限数', () => {
-    const r = scoreLot(lot({ rating: NaN }), {
-      allLots: [lot()], hasCharging: false, userNeedsCharging: false,
-    })
-    expect(r.factors.reputation).toBe(0)
-    expect(Number.isFinite(r.score)).toBe(true)
+  it('余位未上报时不惩罚可用性，权重重分配', () => {
+    const l = lot({ availability: { freeSpots: null, totalSpots: 500, source: 'ops' } })
+    const r = scoreLot(l, { allLots: [l], hasCharging: false, userNeedsCharging: false })
+    expect(r.factors.availability).toBeNull()
+    // 只剩 fee/distance/infra 三因子：全部同批同值 → 各得 1 → 100 分
+    expect(r.score).toBe(100)
+  })
+
+  it('无评价时不惩罚口碑，权重重分配', () => {
+    const l = lot({ ratingSummary: null })
+    const r = scoreLot(l, { allLots: [l], hasCharging: false, userNeedsCharging: false })
+    expect(r.factors.reputation).toBeNull()
+  })
+
+  it('部分因子缺失时权重重分配保持 0–100', () => {
+    const a = lot({ id: 'A', ratingSummary: { score: 5, count: 3 } })
+    const b = lot({ id: 'B', ratingSummary: null })
+    const ra = scoreLot(a, { allLots: [a, b], hasCharging: false, userNeedsCharging: false })
+    const rb = scoreLot(b, { allLots: [a, b], hasCharging: false, userNeedsCharging: false })
+    for (const r of [ra, rb]) {
+      expect(r.score).toBeGreaterThanOrEqual(0)
+      expect(r.score).toBeLessThanOrEqual(100)
+    }
   })
 
   it('候选集合为空时综合分仍是有限数', () => {
@@ -338,7 +355,7 @@ describe('topRecommendations', () => {
   it('充电桩按各车场自身标签判定，调用方传什么都不影响', () => {
     // 签名已用类型禁掉 hasCharging，这里刻意绕过类型钉住运行时行为：
     // 万一有人从 JS 或旧签名调进来，调用方的值也不能盖过车场自身的 tags
-    const withPile = lot({ id: 'pile', tags: ['充电桩'] })
+    const withPile = lot({ id: 'pile', facilities: ['充电桩'] })
     const withoutPile = lot({ id: 'nopile' })
     const forged = {
       hasCharging: true,

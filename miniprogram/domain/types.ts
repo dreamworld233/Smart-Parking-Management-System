@@ -1,5 +1,3 @@
-export type DataSource = 'poi' | 'rule' | 'estimated'
-
 export interface GeoPoint {
   lat: number
   lng: number
@@ -16,24 +14,41 @@ export interface LotPricing {
   capPerDay: number
   /** 夜间费率（22:00–次日 08:00），单位元，可缺省 */
   nightRate?: number
-  source: DataSource
+  /**
+   * 收费数据来源。数据模型设计稿 §3：
+   * - `public`：公示价（人工核实，存证在 lot_price_changes）
+   * - `ops`：平台运营声明（不谎称实测）
+   * - `estimated`：真估算（2a 之后理论上不该再出现，保留用于降级路径）
+   */
+  source: 'public' | 'ops' | 'estimated'
 }
 
 export interface LotAvailability {
-  freeSpots: number
+  /**
+   * 实时余位。**null = 车场端尚未上报**（数据模型 §4）：
+   * 界面显示「待上报」，绝不显示 0，更不编数。
+   * 注意 `null / totalSpots` 在 JS 里是 0，任何算空闲率的地方必须先判 null
+   */
+  freeSpots: number | null
+  /** 总车位（公示或运营声明） */
   totalSpots: number
-  source: DataSource
+  source: 'public' | 'ops'
 }
 
 /**
  * 距离与步行时长的来源。
  * - `route`：路径矩阵查到的真实步行路线
  * - `estimated`：直线距离 × 绕行系数估算
- *
- * 必须逐条标注而不是整批一个标记：矩阵接口按「目的地」计费（实测约 5 点/秒），
- * 首页只查得起少数几个车场，同一次列表里两种数据是混着的
  */
 export type DistanceSource = 'route' | 'estimated'
+
+/** 平台自有评价的聚合（数据模型 §5.4）。无评价时整体为 null，不编数 */
+export interface LotRatingSummary {
+  /** 1–5，一位小数 */
+  score: number
+  /** 参与聚合的评价条数 */
+  count: number
+}
 
 export interface ParkingLot {
   id: string
@@ -46,25 +61,21 @@ export interface ParkingLot {
   distanceSource: DistanceSource
   pricing: LotPricing
   availability: LotAvailability
-  /** 车场开放的可预约车位数 */
+  /** 车场开放的可预约车位数（运营配置；实时剩余随预约扣减，云函数维护） */
   reservableQuota: number
-  /** 车场评分，0–5 */
-  rating: number
-  tags: string[]
+  /** 平台评价聚合。null = 暂无评价，界面显示「暂无评分」 */
+  ratingSummary: LotRatingSummary | null
+  /** 设施标签，签约时由运营录入（来源 ops），如 `['充电桩']` */
+  facilities: string[]
 }
 
-/** 各维度得分均为归一化后的 0–1 数值 */
+/** 各维度得分均为归一化后的 0–1 数值；null = 该因子无数据，未参与本次加权 */
 export interface ScoreFactors {
-  /** 费用维度，0–1 */
   fee: number
-  /** 距离维度，0–1 */
   distance: number
-  /** 空位维度，0–1 */
-  availability: number
-  /** 设施维度，0–1 */
+  availability: number | null
   infra: number
-  /** 口碑维度，0–1 */
-  reputation: number
+  reputation: number | null
 }
 
 /** 推荐理由的整体基调，由领域层判定，页面据此选标签配色 */
@@ -72,7 +83,7 @@ export type ReasonTone = 'good' | 'bad' | 'plain'
 
 export interface Recommendation {
   lot: ParkingLot
-  /** 综合得分，四舍五入后的 0–100 整数 */
+  /** 综合得分，四舍五入后的 0–100 整数（有效因子权重重分配后仍落在此区间） */
   score: number
   factors: ScoreFactors
   /** 可解释推荐理由的展示文案 */
@@ -83,6 +94,7 @@ export interface Recommendation {
 
 export type SortKey = 'composite' | 'distance' | 'fee' | 'availability'
 
+// 注：'violated' 从状态机移除一事推迟到 2b（见计划头部偏差表）
 export type ReservationStatus =
   | 'pending_entry'
   | 'entered'

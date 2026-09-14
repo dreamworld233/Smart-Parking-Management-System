@@ -17,9 +17,14 @@
     <text>综合 <text class="card__score tnum">{{item.score}}</text> 分</text>
   </view>
 
-  <view class="card__tags" wx:if="{{item.estimateText || item.reasons.length}}">
-    <!-- 数据来源标注：车位数/余位/收费等都是估算，课程要求逐处标注来源 -->
-    <view class="tag source" wx:if="{{item.estimateText}}">{{item.estimateText}}</view>
+  <view class="card__tags" wx:if="{{item.sourceNotes.length || item.reasons.length}}">
+    <!-- 数据来源标注：逐条来自 sourceNotes（公示价/运营声明/待上报/估算） -->
+    <view
+      wx:for="{{item.sourceNotes}}"
+      wx:for-item="note"
+      wx:key="*this"
+      class="tag source"
+    >{{note}}</view>
 
     <!--
       循环变量必须改名：默认的 `item` 会盖住外层的 item 属性，

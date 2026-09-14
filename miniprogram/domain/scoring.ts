@@ -32,27 +32,30 @@ export function isSaturated(freeRate: number): boolean {
  */
 export const AVAILABILITY_WARN_RATIO = 2
 
-export type AvailabilityLevel = 'ok' | 'warn' | 'bad'
+export type AvailabilityLevel = 'ok' | 'warn' | 'bad' | 'unknown'
 
 /**
- * 空位展示档位（详情页色条、列表标签用）。
+ * 空位展示档位。
  *
- * 阈值全部由 FREE_FLOOR 派生，页面不得自定 0.1 / 0.25 这类数字：
- * 两套阈值会让色条和评分对同一个车场给出相反结论。
- * 非有限值按 bad 兜底 —— 数据缺失时宁可显示紧张，也不要显示成「空位充足」。
+ * NaN（未上报 / totalSpots 缺失之外的无效值）归 unknown 灰档：
+ * 缺数据的失败方向是「如实说没数据」，不是「宁可显示紧张」 ——
+ * 余位从未上报时显示红色「紧张」是造谣，显示灰色「待上报」才是诚实。
+ * 阈值全部由 FREE_FLOOR 派生，页面不得自定 0.1 / 0.25 这类数字。
  */
 export function availabilityLevel(freeRate: number): AvailabilityLevel {
-  if (!Number.isFinite(freeRate)) return 'bad'
+  if (!Number.isFinite(freeRate)) return 'unknown'
   if (isSaturated(freeRate)) return 'bad'
   if (freeRate <= FREE_FLOOR * AVAILABILITY_WARN_RATIO) return 'warn'
   return 'ok'
 }
 
 /**
- * 空闲率。totalSpots 为 0（除零）或数值缺失（算出 NaN）时一律按 0 处理 ——
- * 这个失败方向是安全的：0 落在饱和区间内，宁可判紧张也不要把缺数据说成空位充足。
+ * 空闲率。*null（未上报）返回 NaN*，把「没数据」与「满员/坏了」分开 ——
+ * `null / totalSpots` 在 JS 里是 0，不先判 null 就会把「未上报」算成「满员」。
+ * totalSpots 为 0（除零）按 0 处理：0 落在饱和区间，那个失败方向是安全的。
  */
 export function freeRate(availability: LotAvailability): number {
+  if (availability.freeSpots === null) return NaN
   const raw = availability.totalSpots === 0
     ? 0
     : availability.freeSpots / availability.totalSpots
@@ -129,20 +132,24 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
   const distanceFactor = lowerIsBetter(lot.distanceM, ctx.allLots.map(l => l.distanceM))
 
   // 可用性：空闲率低于饱和下限直接归零；高于下限则从下限到满位线性映射到 0–1。
-  // 除零与缺失值口径收敛在 freeRate()，页面要展示同一个数字也调它，
-  // 免得各写一份 totalSpots === 0 的判断，改一处漏一处就对不上了
+  // 除零与缺失值口径收敛在 freeRate()。
   const rate = freeRate(lot.availability)
   // 饱和判定只有 isSaturated 一处定义；这里求一次再传给 toneFor / buildReasons。
-  // 三处各写一遍比较式，改一处漏两处就会出现
-  // 「可用性因子 > 0 却标红写「高峰紧张」」的自相矛盾产物
   const saturated = isSaturated(rate)
-  const availabilityFactor = saturated ? 0 : clamp01((rate - FREE_FLOOR) / (1 - FREE_FLOOR))
+  // 余位未上报（NaN）时可用性因子整体缺席，而不是记 0 分 ——
+  // 记 0 分是对「没数据」的系统性惩罚，与口碑同理（数据模型 §5.4）
+  const availabilityFactor = saturated || Number.isNaN(rate)
+    ? (Number.isNaN(rate) ? null : 0)
+    : clamp01((rate - FREE_FLOOR) / (1 - FREE_FLOOR))
 
   // 基础设施：仅纯电/插混车受充电桩影响
   const infraFactor = ctx.userNeedsCharging ? (ctx.hasCharging ? 1 : 0) : 1
 
-  // 口碑：4.0 分以下按 0 计；评分缺失（NaN）同样不给分，避免把整个综合分污染成 NaN
-  const reputationFactor = Number.isFinite(lot.rating) ? clamp01((lot.rating - 4.0) / 1.0) : 0
+  // 口碑冷启动：无评价为 null，不惩罚新车场（数据模型 §5.4）
+  const summary = lot.ratingSummary
+  const reputationFactor = summary && summary.count > 0 && Number.isFinite(summary.score)
+    ? clamp01((summary.score - 4.0) / 1.0)
+    : null
 
   const factors: ScoreFactors = {
     fee: feeFactor,
@@ -152,16 +159,26 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
     reputation: reputationFactor,
   }
 
-  const raw =
-    weights.fee * factors.fee +
-    weights.distance * factors.distance +
-    weights.availability * factors.availability +
-    weights.infra * factors.infra +
-    weights.reputation * factors.reputation
+  // 有效因子权重重分配：缺一个因子就把它那份权重按比例分给剩下的，
+  // 而不是当成 0 分。fee 与 distance 恒有值（权重合计至少 0.45），除零不可达
+  let weightSum = 0
+  let raw = 0
+  const pairs: Array<[number, number | null]> = [
+    [weights.fee, feeFactor],
+    [weights.distance, distanceFactor],
+    [weights.availability, availabilityFactor],
+    [weights.infra, infraFactor],
+    [weights.reputation, reputationFactor],
+  ]
+  for (const [w, f] of pairs) {
+    if (f === null) continue
+    weightSum += w
+    raw += w * f
+  }
 
   return {
     lot,
-    score: Math.round(raw * 100),
+    score: Math.round((raw / weightSum) * 100),
     factors,
     reasons: buildReasons(lot, ctx, factors, saturated, minFee, maxFee),
     tone: toneFor(saturated, factors),
@@ -174,7 +191,8 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
  */
 function toneFor(saturated: boolean, factors: ScoreFactors): ReasonTone {
   if (saturated) return 'bad'
-  return factors.availability >= 0.6 || factors.fee >= 0.8 || factors.distance >= 0.8 ? 'good' : 'plain'
+  const availabilityGood = factors.availability !== null && factors.availability >= 0.6
+  return availabilityGood || factors.fee >= 0.8 || factors.distance >= 0.8 ? 'good' : 'plain'
 }
 
 function buildReasons(
@@ -189,7 +207,7 @@ function buildReasons(
 
   if (saturated) {
     reasons.push('高峰紧张')
-  } else if (factors.availability >= 0.6) {
+  } else if (factors.availability !== null && factors.availability >= 0.6) {
     reasons.push('空位充足')
   }
 
@@ -213,7 +231,7 @@ function buildReasons(
 /**
  * 按评分降序取 Top N（PM FR-U06 要求 Top3）。
  *
- * hasCharging 是按**每个车场自己的** tags 推出来的，所以签名里刻意不收它 ——
+ * hasCharging 是按**每个车场自己的** facilities 推出来的，所以签名里刻意不收它 ——
  * 「车场有没有充电桩」本来就是车场自身的属性，让调用方统一指定既多余又容易填错，
  * 类型上直接禁掉比靠文档约定可靠。
  */
@@ -223,7 +241,7 @@ export function topRecommendations(
   n = 3,
 ): Recommendation[] {
   const scored = lots.map(l =>
-    scoreLot(l, { ...ctx, allLots: lots, hasCharging: l.tags.includes('充电桩') }),
+    scoreLot(l, { ...ctx, allLots: lots, hasCharging: l.facilities.includes('充电桩') }),
   )
   return scored.sort((a, b) => b.score - a.score).slice(0, n)
 }

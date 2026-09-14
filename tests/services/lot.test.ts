@@ -89,7 +89,7 @@ describe('fetchNearbyLots · 估算字段', () => {
     expect(lots.length).toBe(5)
     for (const lot of lots) {
       expect(lot.pricing.source).toBe('estimated')
-      expect(lot.availability.source).toBe('estimated')
+      expect(lot.availability.source).toBe('ops')
       expect(lot.distanceSource).toBe('estimated')
     }
   })
@@ -102,8 +102,7 @@ describe('fetchNearbyLots · 估算字段', () => {
     for (const lot of lots) {
       expect(lot.availability.freeSpots).toBeGreaterThanOrEqual(0)
       expect(lot.availability.freeSpots).toBeLessThanOrEqual(lot.availability.totalSpots)
-      expect(lot.rating).toBeGreaterThanOrEqual(4.0)
-      expect(lot.rating).toBeLessThan(4.9)
+      expect(lot.ratingSummary).toBeNull()
       expect(lot.reservableQuota).toBeGreaterThanOrEqual(40)
       expect(lot.reservableQuota).toBeLessThanOrEqual(160)
       expect(lot.pricing.stepMinutes).toBe(15)
@@ -120,8 +119,8 @@ describe('fetchNearbyLots · 估算字段', () => {
     installWx({ matrixFails: true })
     const second = (await fetchNearbyLots(CENTER)).lots
 
-    expect(second.map(l => [l.id, l.rating, l.reservableQuota, l.availability.freeSpots])).toEqual(
-      first.map(l => [l.id, l.rating, l.reservableQuota, l.availability.freeSpots]),
+    expect(second.map(l => [l.id, l.reservableQuota, l.availability.freeSpots])).toEqual(
+      first.map(l => [l.id, l.reservableQuota, l.availability.freeSpots]),
     )
   })
 

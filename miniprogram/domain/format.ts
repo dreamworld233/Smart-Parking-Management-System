@@ -16,19 +16,20 @@ export const SORT_LABELS: Record<SortKey, { short: string; long: string }> = {
 }
 
 /**
- * 数据来源标注（UI 稿 §6「数据为估算值 → 卡片与详情页标注数据来源」）。
+ * 数据来源标注（数据模型设计稿 §3：每个字段必须能回答「从哪来」）。
  *
- * 逐条判而不是「整批一个标记」：首页只给推荐 Top3 查得起真实步行路线，
- * 同一次列表里 route 与 estimated 是混着的，整批标「估算」会把真实数据也说成估算。
- * 没有估算项时返回空串，调用方据此不渲染标签 —— 不能返回「全部为真实数据」，
- * 那会在数据源缺失（source 为 'poi'/'rule' 但与实际不符）时给出虚假保证
+ * 返回数组而不是拼好的整句：不同来源对应不同语义（实测/公示/声明/待上报），
+ * 混成一句「部分数据为估算」会把公示价也说成估算。
+ * 空数组 = 没有要标的，调用方不渲染标签区
  */
-export function sourceNote(lot: ParkingLot): string {
-  const parts: string[] = []
-  if (lot.distanceSource === 'estimated') parts.push('距离')
-  if (lot.pricing.source === 'estimated') parts.push('收费')
-  if (lot.availability.source === 'estimated') parts.push('余位')
-  return parts.length ? `${parts.join('、')}为估算` : ''
+export function sourceNotes(lot: ParkingLot): string[] {
+  const notes: string[] = []
+  if (lot.distanceSource === 'estimated') notes.push('距离为估算')
+  if (lot.pricing.source === 'public') notes.push('收费来源于车场公示价')
+  else if (lot.pricing.source === 'ops') notes.push('收费为运营声明')
+  else if (lot.pricing.source === 'estimated') notes.push('收费为估算')
+  if (lot.availability.freeSpots === null) notes.push('余位待车场上报')
+  return notes
 }
 
 /**
@@ -79,9 +80,22 @@ function formatSpotCount(v: number | null): string {
   return typeof v === 'number' && Number.isFinite(v) ? String(Math.max(0, v)) : UNKNOWN
 }
 
-/** 余位展示，形如 `46/500` */
+/**
+ * 余位展示。有上报时形如 `46/500`；**未上报（free 为 null）显示「待上报」**，
+ * 不是 `--/500` 也不是 0 —— 「没数据」和「满了」是两句话（用户 2026-09-14 拍板）
+ */
 export function formatSpots(free: number | null, total: number | null): string {
+  if (free === null) return '待上报'
   return `${formatSpotCount(free)}/${formatSpotCount(total)}`
+}
+
+/**
+ * 评分聚合展示。无评价（null / 条数为 0 / 分数无效）显示「暂无评分」，
+ * **不显示 0 分** —— 冷启动没有评价与「被评了 0 分」对车场是两种命运
+ */
+export function formatRatingSummary(summary: { score: number; count: number } | null): string {
+  if (!summary || !(summary.count > 0) || !Number.isFinite(summary.score)) return '暂无评分'
+  return `★ ${summary.score.toFixed(1)}（${summary.count} 条）`
 }
 
 /**

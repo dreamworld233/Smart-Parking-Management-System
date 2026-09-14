@@ -52,6 +52,8 @@
 .card__free.ok { color: var(--color-success); }
 .card__free.warn { color: var(--color-warning); }
 .card__free.bad { color: var(--color-danger); }
+/* 余位未上报：灰档。缺数据不是紧张，不能落到 red/bad 色 */
+.card__free.unknown { color: #94a3b8; }
 
 .card__score {
   font-weight: 700;

@@ -7,7 +7,8 @@ import {
   formatPlate,
   formatSpots,
   formatTimeRangeLabel,
-  sourceNote,
+  formatRatingSummary,
+  sourceNotes,
 } from '../../miniprogram/domain/format'
 import type { ParkingLot } from '../../miniprogram/domain/types'
 
@@ -42,8 +43,8 @@ describe('formatSpots', () => {
     expect(formatSpots(46, 500)).toBe('46/500')
   })
 
-  it('余位缺失显示 --，不显示 0', () => {
-    expect(formatSpots(null, 500)).toBe('--/500')
+  it('余位未上报显示「待上报」，不显示 --/500 也不显示 0', () => {
+    expect(formatSpots(null, 500)).toBe('待上报')
   })
 
   it('总数缺失显示 --', () => {
@@ -59,6 +60,21 @@ describe('formatSpots', () => {
     // 注意这与「缺失显示 --」不冲突 —— 一个是数据脏，一个是数据没有
     expect(formatSpots(-1, 500)).toBe('0/500')
     expect(formatSpots(46, -500)).toBe('46/0')
+  })
+})
+
+describe('formatRatingSummary', () => {
+  it('有评价时显示星级与条数', () => {
+    expect(formatRatingSummary({ score: 4.75, count: 4 })).toBe('★ 4.8（4 条）')
+  })
+
+  it('无评价（null）显示「暂无评分」，不显示 0 分', () => {
+    expect(formatRatingSummary(null)).toBe('暂无评分')
+  })
+
+  it('条数为 0 或分数无效同样按无评价处理', () => {
+    expect(formatRatingSummary({ score: 4.8, count: 0 })).toBe('暂无评分')
+    expect(formatRatingSummary({ score: NaN, count: 4 })).toBe('暂无评分')
   })
 })
 
@@ -146,7 +162,7 @@ describe('formatPlate', () => {
   })
 })
 
-describe('sourceNote', () => {
+describe('sourceNotes', () => {
   function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     return {
       id: 'L1',
@@ -156,37 +172,40 @@ describe('sourceNote', () => {
       distanceM: 320,
       walkMinutes: 4,
       distanceSource: 'estimated',
-      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
-      availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
+      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'ops' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
       reservableQuota: 120,
-      rating: 4.8,
-      tags: [],
+      ratingSummary: { score: 4.8, count: 12 },
+      facilities: [],
       ...over,
     }
   }
 
-  it('全为估算时逐项列出', () => {
-    expect(sourceNote(lot())).toBe('距离、收费、余位为估算')
+  it('距离估算、收费运营声明、余位未上报时逐条标注', () => {
+    const l = lot({ availability: { freeSpots: null, totalSpots: 500, source: 'ops' } })
+    expect(sourceNotes(l)).toEqual(['距离为估算', '收费为运营声明', '余位待车场上报'])
   })
 
-  it('只有距离是估算时不牵连收费与余位', () => {
-    // 首页只给 Top3 查真实步行路线，所以这条是常态：
-    // 整批标「估算」会把真实的收费规则也一起说成估算
-    const mixed = lot({
-      distanceSource: 'estimated',
-      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'rule' },
-      availability: { freeSpots: 200, totalSpots: 500, source: 'poi' },
-    })
-    expect(sourceNote(mixed)).toBe('距离为估算')
+  it('收费为公示价时标注公示价，不牵连其它', () => {
+    const l = lot({ distanceSource: 'route', pricing: { ...lot().pricing, source: 'public' } })
+    expect(sourceNotes(l)).toEqual(['收费来源于车场公示价'])
   })
 
-  it('全部来自真实来源时返回空串，调用方不渲染标签', () => {
-    const real = lot({
+  it('收费为估算时单独标注，不把公示价说成估算', () => {
+    const l = lot({
       distanceSource: 'route',
-      pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'rule' },
-      availability: { freeSpots: 200, totalSpots: 500, source: 'poi' },
+      pricing: { ...lot().pricing, source: 'estimated' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
     })
-    expect(sourceNote(real)).toBe('')
+    expect(sourceNotes(l)).toEqual(['收费为估算'])
+  })
+
+  it('距离估算与收费公示价各自独立标注，不把公示价说成估算', () => {
+    const l = lot({
+      pricing: { ...lot().pricing, source: 'public' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'public' },
+    })
+    expect(sourceNotes(l)).toEqual(['距离为估算', '收费来源于车场公示价'])
   })
 })
 

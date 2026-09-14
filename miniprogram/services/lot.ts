@@ -82,11 +82,13 @@ function toParkingLot(poi: PoiItem): ParkingLot {
     availability: {
       freeSpots,
       totalSpots: hint.totalSpots,
-      source: 'estimated',
+      // 哈希派生字段在 Task 3 整体退役；这里只用 'ops' 占位让旧代码过编译，
+      // 真实来源由 cloud 库的 availability.source 决定
+      source: 'ops',
     },
     reservableQuota: pick(seed, 40, 160),
-    rating: 4.0 + (seed % 9) / 10,
-    tags: seed % 3 === 0 ? ['充电桩'] : [],
+    ratingSummary: null,
+    facilities: seed % 3 === 0 ? ['充电桩'] : [],
   }
 }
 

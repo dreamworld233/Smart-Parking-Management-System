@@ -10,12 +10,12 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     distanceM: 320,
     walkMinutes: 4,
     distanceSource: 'estimated',
-    pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'estimated' },
+    pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'ops' },
     // 空闲率 0.4：高于饱和下限 0.15，也高于 warn 的上界 0.3，落 ok 档
-    availability: { freeSpots: 200, totalSpots: 500, source: 'estimated' },
+    availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
     reservableQuota: 120,
-    rating: 4.8,
-    tags: [],
+    ratingSummary: { score: 4.8, count: 12 },
+    facilities: [],
     ...over,
   }
 }
@@ -47,7 +47,7 @@ describe('toDetailVM', () => {
 
   it('空闲率落进饱和区间时降档到 bad，与 availabilityLevel 同一判定', () => {
     // 50/500 = 0.1，低于饱和下限 0.15
-    const vm = toDetailVM(rec({ availability: { freeSpots: 50, totalSpots: 500, source: 'estimated' } }))
+    const vm = toDetailVM(rec({ availability: { freeSpots: 50, totalSpots: 500, source: 'ops' } }))
     expect(vm.freeClass).toBe('bad')
   })
 
@@ -64,13 +64,18 @@ describe('toDetailVM', () => {
     expect(toDetailVM(rec({ reservableQuota: -5 })).quotaText).toBe('0')
   })
 
-  it('逐条标注数据来源，字段都真实时为空串', () => {
-    // fixture 三个来源都是 estimated，所以三个都进标注 —— sourceNote 是逐条判的
-    expect(toDetailVM(rec()).estimateText).toBe('距离、收费、余位为估算')
-    const real = rec()
-    real.lot.distanceSource = 'route'
-    real.lot.pricing.source = 'rule'
-    real.lot.availability.source = 'poi'
-    expect(toDetailVM(real).estimateText).toBe('')
+  it('逐条标注数据来源，公示价与估算距离各按自己的来源标', () => {
+    // 默认 fixture：距离 estimated、收费 ops、余位已上报 → 距离 + 收费两条
+    expect(toDetailVM(rec()).sourceNotes).toEqual(['距离为估算', '收费为运营声明'])
+    const publicPriced = rec()
+    publicPriced.lot.distanceSource = 'route'
+    publicPriced.lot.pricing.source = 'public'
+    // 距离真实（route）不标，收费公示价照标 —— 公示价是「从哪来」的诚实答案
+    expect(toDetailVM(publicPriced).sourceNotes).toEqual(['收费来源于车场公示价'])
+  })
+
+  it('评分聚合展示走 formatRatingSummary，无评价显示暂无评分', () => {
+    expect(toDetailVM(rec()).ratingText).toBe('★ 4.8（12 条）')
+    expect(toDetailVM(rec({ ratingSummary: null })).ratingText).toBe('暂无评分')
   })
 })

@@ -1,7 +1,7 @@
 import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M } from '../../config'
 import { toDetailVM } from '../../domain/detail'
 import type { LotDetailVM } from '../../domain/detail'
-import { formatDistance, formatSpots, searchLocationNotice, sourceNote } from '../../domain/format'
+import { formatDistance, formatSpots, searchLocationNotice, sourceNotes } from '../../domain/format'
 import { pickPins, pinOf, toMarkers } from '../../domain/pins'
 import type { MapMarker, MapPin } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
@@ -31,7 +31,7 @@ interface CardVM {
   walkText: string
   spotsText: string
   freeClass: AvailabilityLevel
-  estimateText: string
+  sourceNotes: string[]
 }
 
 function toVM(rec: Recommendation): CardVM {
@@ -48,7 +48,7 @@ function toVM(rec: Recommendation): CardVM {
     walkText: `${rec.lot.walkMinutes} 分钟`,
     spotsText: formatSpots(free, total),
     freeClass: availabilityLevel(rate),
-    estimateText: sourceNote(rec.lot),
+    sourceNotes: sourceNotes(rec.lot),
   }
 }
 

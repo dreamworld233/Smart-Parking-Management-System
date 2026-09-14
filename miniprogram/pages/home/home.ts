@@ -1,7 +1,7 @@
 import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS } from '../../config'
 import { toDetailVM } from '../../domain/detail'
 import type { LotDetailVM } from '../../domain/detail'
-import { fallbackNotice, formatDistance, formatSpots, sourceNote } from '../../domain/format'
+import { fallbackNotice, formatDistance, formatSpots, sourceNotes } from '../../domain/format'
 import { pickPins, pinOf, toMarkers } from '../../domain/pins'
 import type { MapMarker, MapPin } from '../../domain/pins'
 import { availabilityLevel, freeRate, topRecommendations } from '../../domain/scoring'
@@ -37,7 +37,7 @@ interface CardVM {
   spotsText: string
   // 用领域类型而非 string：下次有人想在这里再写死一个阈值时，是类型错误而不是静默分叉
   freeClass: AvailabilityLevel
-  estimateText: string
+  sourceNotes: string[]
 }
 
 function toVM(rec: Recommendation): CardVM {
@@ -54,7 +54,7 @@ function toVM(rec: Recommendation): CardVM {
     walkText: `${rec.lot.walkMinutes} 分钟`,
     spotsText: formatSpots(free, total),
     freeClass: availabilityLevel(rate),
-    estimateText: sourceNote(rec.lot),
+    sourceNotes: sourceNotes(rec.lot),
   }
 }
 

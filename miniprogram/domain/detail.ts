@@ -1,4 +1,4 @@
-import { formatAmount, formatDistance, formatSpots, sourceNote } from './format'
+import { formatAmount, formatDistance, formatRatingSummary, formatSpots, sourceNotes } from './format'
 import { availabilityLevel, freeRate } from './scoring'
 import type { AvailabilityLevel } from './scoring'
 import type { ParkingLot, ReasonTone, Recommendation } from './types'
@@ -25,8 +25,10 @@ export interface LotDetailVM {
   /** 整串自带单位，如 `¥3.00/时`；缺夜间价时为 `--` */
   nightText: string
   quotaText: string
-  /** 数据来源标注；空串则调用方不渲染该标签 */
-  estimateText: string
+  /** 评分聚合展示，如 `★ 4.8（12 条）`；无评价时为「暂无评分」 */
+  ratingText: string
+  /** 数据来源标注；空数组则调用方不渲染标签区 */
+  sourceNotes: string[]
 }
 
 /** 数据缺失时的统一占位，与 format.ts 的 UNKNOWN 同口径（0 与「未知」语义不同） */
@@ -54,6 +56,7 @@ export function toDetailVM(rec: Recommendation): LotDetailVM {
     nightText: typeof nightRate === 'number' ? `¥${formatAmount(nightRate)}/时` : UNKNOWN,
     // Math.max(0, NaN) 还是 NaN，不挡会在详情里渲染成「已开放 NaN 个预约车位」
     quotaText: Number.isFinite(lot.reservableQuota) ? String(Math.max(0, lot.reservableQuota)) : UNKNOWN,
-    estimateText: sourceNote(lot),
+    ratingText: formatRatingSummary(lot.ratingSummary),
+    sourceNotes: sourceNotes(lot),
   }
 }

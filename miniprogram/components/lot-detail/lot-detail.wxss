@@ -119,6 +119,8 @@
 .stat__v.ok { color: var(--color-success); }
 .stat__v.warn { color: var(--color-warning); }
 .stat__v.bad { color: var(--color-danger); }
+/* 余位未上报：灰档。缺数据不是紧张，不能落到 red/bad 色 */
+.stat__v.unknown { color: #94a3b8; }
 .stat__v.primary { color: var(--color-primary); }
 
 .row {
