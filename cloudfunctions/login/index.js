@@ -7,34 +7,47 @@ exports.main = async () => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
   const db = cloud.database()
-  const got = await db.collection('users').where({ _openid: OPENID }).limit(1).get()
-  if (got.data.length > 0) {
-    const u = got.data[0]
-    const credit = u.credit || { violationCount: 0, bannedUntil: null }
-    const banned = typeof credit.bannedUntil === 'number' && credit.bannedUntil > Date.now()
-    return {
-      code: 0,
-      data: {
-        userId: u._id,
-        role: u.role || 'driver',
-        violationCount: credit.violationCount || 0,
-        banned,
-      },
+  const users = db.collection('users')
+
+  let u = (await users.where({ _openid: OPENID }).limit(1).get()).data[0]
+  if (!u) {
+    try {
+      // `_id` 直接钉成 OPENID：`_openid` 上没建唯一索引，「先查后插」在并发下会建出两条、
+      // 同一人拿到两个身份（onLaunch 的建档还没返回时，角色页再调一次就会撞上）。
+      // 用主键唯一性把这条路堵死 —— 冲突即「已存在」，回查即可
+      await users.add({
+        data: {
+          _id: OPENID,
+          _openid: OPENID,
+          role: 'driver',
+          nickname: '',
+          avatar: '',
+          phone: '',
+          credit: { violationCount: 0, bannedUntil: null },
+          createdAt: Date.now(),
+        },
+      })
+      u = { role: 'driver', credit: { violationCount: 0, bannedUntil: null } }
+    } catch (e) {
+      // 并发的那一次刚插进去：回查已存在的那条。查不到说明 add 是真失败（例如服务端不接受
+      // 自定义 _id），此时**原样重抛**，别把真错误吞成「已存在」
+      const again = await users.where({ _openid: OPENID }).limit(1).get()
+      if (!again.data.length) throw e
+      u = again.data[0]
     }
   }
-  const added = await db.collection('users').add({
-    data: {
-      _openid: OPENID,
-      role: 'driver',
-      nickname: '',
-      avatar: '',
-      phone: '',
-      credit: { violationCount: 0, bannedUntil: null },
-      createdAt: Date.now(),
-    },
-  })
+
+  const credit = u.credit || { violationCount: 0, bannedUntil: null }
+  const banned = typeof credit.bannedUntil === 'number' && credit.bannedUntil > Date.now()
   return {
     code: 0,
-    data: { userId: added._id, role: 'driver', violationCount: 0, banned: false },
+    data: {
+      // userId 存 openid（设计稿 §4）：cars / reservations / orders / reviews 的安全规则是
+      // `doc.userId == auth.openid`，返回文档 _id 会让 2b 写进去的值永远比不中
+      userId: OPENID,
+      role: u.role || 'driver',
+      violationCount: credit.violationCount || 0,
+      banned,
+    },
   }
 }
