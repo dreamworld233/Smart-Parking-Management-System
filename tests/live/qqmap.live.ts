@@ -1,5 +1,13 @@
 import { QQMAP_KEY } from '../../miniprogram/config'
-import { QQMapError, searchByKeyword, searchDestination, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
+import {
+  QQMapError,
+  searchByKeyword,
+  searchDestination,
+  searchNearby,
+  suggestPlaces,
+  walkingDistance,
+  walkingDistances,
+} from '../../miniprogram/services/qqmap'
 import { installWxRequestShim, throttleMatrix } from './wx-node-shim'
 
 // 假 Key 时整组跳过并说明原因：公开仓库新克隆的机器上跑 test:live 不该给个
@@ -52,17 +60,34 @@ maybeDescribe('qqmap 真接口', () => {
   )
 
   it(
-    '目的地检索跨城也能命中正确的地点',
+    'nearby 目的地检索对部分关键词能跨城返回远处结果',
     async () => {
-      // 以**济南**为心搜「合肥大学」，这是搜索页取首个匹配当下车点的那一步。
-      // 两个已排除的写法在这条上都会露馅：region(济南) 给的是山东大学/济南大学，
-      // orderby=_distance 给的是一堆「XX大学」小 POI。相关度排序必须把合肥大学排第一。
-      // 顺带固定住「半径是摆设」这个前提：545 公里外的结果照收
-      const pois = await searchDestination('合肥大学', CENTER, 50000)
+      // 2026-09-15 实测：以合肥为心，「南京理工大学」返回 155 公里外、「郑州东站」465 公里外、
+      // 「合肥大学」（以济南为心）545 公里外的结果 —— 跨城可行。
+      // 但同批实测「南京大学」「北京大学」「德基广场」一律 0 条，与距离、城市、类别都无关
+      // （南京理工 vs 南京大学：同城、同距、同类，一个出 20 一个出 0）。
+      // 决定因素在腾讯侧的关键词索引，页面无法预测 —— 这正是搜索页改用 suggestion
+      // 做目的地检索的原因，searchDestination 只剩历史回点兜底在用
+      const pois = await searchDestination('南京理工大学', CENTER, 50000)
 
       expect(pois.length).toBeGreaterThan(0)
-      expect(pois[0].title).toContain('合肥大学')
-      expect(pois[0].distanceM).toBeGreaterThan(400000)
+      // 结果确确实实来自南京，不是被纠偏成本地同名地点
+      expect(pois[0].distanceM).toBeGreaterThan(100000)
+    },
+    20000,
+  )
+
+  it(
+    'suggestion 限定合肥：本地地点能出，跨城的进不来',
+    async () => {
+      const local = await suggestPlaces('合肥大学', '合肥')
+
+      expect(local.length).toBeGreaterThan(0)
+      expect(local[0].title).toContain('合肥大学')
+
+      const cross = await suggestPlaces('南京大学', '合肥')
+
+      expect(cross.every(p => p.title.indexOf('南京大学') < 0)).toBe(true)
     },
     20000,
   )

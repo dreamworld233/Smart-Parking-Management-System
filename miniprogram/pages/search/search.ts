@@ -1,4 +1,4 @@
-import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M } from '../../config'
+import { DEFAULT_RADIUS_M, FALLBACK_PLACE, MAX_PINS, SEARCH_BIAS_RADIUS_M, SEARCH_REGION } from '../../config'
 import { toDetailVM } from '../../domain/detail'
 import type { LotDetailVM } from '../../domain/detail'
 import { formatDistance, formatSpots, searchLocationNotice, sourceNotes } from '../../domain/format'
@@ -10,7 +10,8 @@ import { sortLots } from '../../domain/sort'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
 import { fetchSignedLots } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
-import { searchDestination } from '../../services/qqmap'
+import { searchDestination, suggestPlaces } from '../../services/qqmap'
+import type { PoiItem } from '../../services/qqmap'
 import { getSearchHistory, pushSearchHistory } from '../../services/storage'
 
 type ViewState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
@@ -55,6 +56,8 @@ function toVM(rec: Recommendation): CardVM {
 Page({
   data: {
     keyword: '',
+    /** 输入时的联想候选（suggestion）。空数组 = 候选区隐藏，展示历史或地图 */
+    candidates: [] as PoiItem[],
     history: [] as string[],
     state: 'idle' as ViewState,
     sortKey: 'composite' as SortKey,
@@ -92,6 +95,8 @@ Page({
    * 每次检索领一个号，回来时号对不上就整批丢弃
    */
   searchSeq: 0,
+  /** 联想防抖的计时器句柄（number 是 wx 环境里 setTimeout 的返回类型） */
+  suggestTimer: 0,
 
   onLoad() {
     const info = wx.getWindowInfo()
@@ -126,20 +131,64 @@ Page({
   },
 
   onInput(e: WechatMiniprogram.Input) {
-    this.setData({ keyword: e.detail.value })
+    const keyword = e.detail.value
+    this.setData({ keyword })
+    this.scheduleSuggest(keyword)
+  },
+
+  /**
+   * 联想防抖：每敲一组字打一次 suggestion。联想接口配额与 place search 分开计
+   * （用户确认），但键盘连打也不该每次都打 —— 300ms 内取最后一次
+   */
+  scheduleSuggest(keyword: string) {
+    if (this.suggestTimer) clearTimeout(this.suggestTimer)
+    this.suggestTimer = 0
+    const kw = keyword.trim()
+    if (kw.length < 2) {
+      this.setData({ candidates: [] })
+      return
+    }
+    this.suggestTimer = setTimeout(async () => {
+      this.suggestTimer = 0
+      try {
+        const pois = await suggestPlaces(kw, SEARCH_REGION)
+        // 联想是异步的，结果回来时输入可能已经变了：按当前输入对不上就整批丢弃
+        if (this.data.keyword.trim() !== kw) return
+        this.setData({ candidates: pois })
+      } catch {
+        // 联想失败静默：用户还能直接搜索，别把打字体验打断成错误态
+      }
+    }, 300)
   },
 
   onHistoryTap(e: WechatMiniprogram.TouchEvent) {
     const kw = e.currentTarget.dataset.kw as string
-    this.setData({ keyword: kw })
+    this.setData({ keyword: kw, candidates: [] })
     this.search()
   },
 
   onSearch() {
-    this.search()
+    // 键盘确认键：候选开着就取第一条（最相关的那条，用户看得见），而不是静默拿接口首条。
+    // 候选没开（没触发联想）才走兜底检索
+    const first = this.data.candidates[0]
+    if (first) this.search(first)
+    else this.search()
   },
 
-  async search() {
+  onCandidateTap(e: WechatMiniprogram.TouchEvent) {
+    const cand = this.data.candidates[e.currentTarget.dataset.idx as number]
+    if (!cand) return
+    // 把关键词补成用户选中的那家，历史记录里存的也是它，回点能还原这次选择
+    this.setData({ keyword: cand.title })
+    this.search(cand)
+  },
+
+  /**
+   * 目的地检索 + 拉周边车场。
+   * `candidate` 由候选点选/确认键给出 —— 用户**显式选过**，坐标就是它；
+   * 没候选（历史回点、或没触发联想直接搜索）才走 searchDestination 兜底。
+   */
+  async search(candidate?: PoiItem) {
     const keyword = this.data.keyword.trim()
     if (!keyword) {
       wx.showToast({ title: '请输入目的地或车场名', icon: 'none' })
@@ -150,6 +199,7 @@ Page({
     // 详情同理：重新检索会换一批车场，留着上一批的详情也是在说假话
     this.setData({
       history: pushSearchHistory(keyword),
+      candidates: [],
       state: 'loading',
       fallbackText: '',
       detail: null,
@@ -164,15 +214,21 @@ Page({
     const fallbackText = loc.ok ? '' : searchLocationNotice(loc.reason)
 
     try {
-      // 两次检索，各吃一次搜索配额：先按相关度找目的地，再拉它周边 3 公里的车场
-      //（后者有 10 分钟缓存，同关键词反复搜不会再打接口）
-      const pois = await searchDestination(keyword, center, SEARCH_BIAS_RADIUS_M)
-      if (seq !== this.searchSeq) return
-      if (pois.length === 0) {
-        this.setData({ state: 'empty', fallbackText })
-        return
+      let target: { lat: number; lng: number }
+      if (candidate) {
+        target = candidate.location
+      } else {
+        // 兜底检索：suggestion 没触发（历史回点等）时才走。nearby 对目的地是否出结果
+        // 取决于腾讯侧关键词索引、页面无法预测（南京理工出、南京大学出 0），所以它
+        // 只是兜底，主路径是 suggestion 候选点选
+        const pois = await searchDestination(keyword, center, SEARCH_BIAS_RADIUS_M)
+        if (seq !== this.searchSeq) return
+        if (pois.length === 0) {
+          this.setData({ state: 'empty', fallbackText })
+          return
+        }
+        target = pois[0].location
       }
-      const target = pois[0].location
 
       const lots = await fetchSignedLots(target, DEFAULT_RADIUS_M)
       if (seq !== this.searchSeq) return

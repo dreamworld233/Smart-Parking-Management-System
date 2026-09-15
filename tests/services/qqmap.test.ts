@@ -1,4 +1,12 @@
-import { QQMapError, searchByKeyword, searchDestination, searchNearby, walkingDistance, walkingDistances } from '../../miniprogram/services/qqmap'
+import {
+  QQMapError,
+  searchByKeyword,
+  searchDestination,
+  searchNearby,
+  suggestPlaces,
+  walkingDistance,
+  walkingDistances,
+} from '../../miniprogram/services/qqmap'
 import { QQMAP_KEY } from '../../miniprogram/config'
 
 interface ReqOption {
@@ -165,6 +173,70 @@ describe('searchDestination', () => {
     const pois = await searchDestination('万象城', { lat: 31.75, lng: 117.25 }, 50000)
 
     expect(pois[0].distanceM).toBe(0)
+  })
+})
+
+describe('suggestPlaces', () => {
+  it('走 suggestion 接口，带 region 硬限定与 page_size', async () => {
+    stubRequest(opt => opt.success({ data: { status: 0, message: 'ok', count: 1, data: [RAW_POI] } }))
+
+    await suggestPlaces('南大', '合肥')
+
+    const url = decodeURIComponent(sent[0].url)
+    expect(url).toContain('https://apis.map.qq.com/ws/place/v1/suggestion?')
+    expect(url).toContain('keyword=南大')
+    expect(url).toContain('region=合肥')
+    // region_fix=1 是硬限定：不传它会全国联想，把南京大学带进来（2026-09-15 实测）
+    expect(url).toContain('region_fix=1')
+    expect(url).toContain('page_size=10')
+  })
+
+  it('把候选映射成 PoiItem；缺 id 时记空串而不是 undefined', async () => {
+    const { id, ...noId } = RAW_POI
+    stubRequest(opt => opt.success({ data: { status: 0, message: 'ok', count: 1, data: [noId] } }))
+
+    const pois = await suggestPlaces('万象城', '合肥')
+
+    expect(pois).toEqual([
+      {
+        id: '',
+        title: '万象城地下停车场',
+        address: '历下区经十路 1234 号',
+        location: { lat: 36.66, lng: 117.13 },
+        distanceM: 320,
+      },
+    ])
+  })
+})
+
+describe('searchNearby 缓存', () => {
+  it('同关键词同中心 10 分钟内命中缓存，不再打接口', async () => {
+    const memory: Record<string, unknown> = {}
+    sent = []
+    const g = globalThis as unknown as {
+      wx: {
+        request: (o: ReqOption) => void
+        getStorageSync: (k: string) => unknown
+        setStorageSync: (k: string, v: unknown) => void
+      }
+    }
+    g.wx = {
+      getStorageSync: k => memory[k],
+      setStorageSync: (k, v) => {
+        memory[k] = v
+      },
+      request: o => {
+        sent.push(o)
+        o.success({ data: searchBody([RAW_POI]) })
+      },
+    }
+
+    const center = { lat: 36.65, lng: 117.12 }
+    const first = await searchNearby('停车场', center, 3000)
+    const second = await searchNearby('停车场', center, 3000)
+
+    expect(first).toEqual(second)
+    expect(sent).toHaveLength(1)
   })
 })
 

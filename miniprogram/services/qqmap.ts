@@ -1,8 +1,9 @@
-import { QQMAP_KEY, REQUEST_TIMEOUT_MS, WALK_METERS_PER_MINUTE } from '../config'
+import { QQMAP_KEY, REQUEST_TIMEOUT_MS, SEARCH_CACHE_TTL_MS, WALK_METERS_PER_MINUTE } from '../config'
 import type { GeoPoint } from '../domain/types'
 
 const BASE = 'https://apis.map.qq.com'
 const SEARCH_PATH = '/ws/place/v1/search'
+const SUGGEST_PATH = '/ws/place/v1/suggestion'
 const MATRIX_PATH = '/ws/distance/v1/matrix'
 
 /**
@@ -104,6 +105,55 @@ function toPoi(item: RawPoi): PoiItem {
 }
 
 /**
+ * suggestion 联想接口的返回条目。与 search 的 POI 形状基本一致，但 `id` 不保证下发
+ * （探针见过只有 title/address/location 的条目），单独映射而不复用 `toPoi`，
+ * 免得把 undefined id 写进类型契约
+ */
+interface RawSuggestion {
+  id?: string
+  title: string
+  address: string
+  location: { lat: number; lng: number }
+  _distance?: number
+}
+
+function toSuggestion(item: RawSuggestion): PoiItem {
+  return {
+    id: item.id ?? '',
+    title: item.title,
+    address: item.address,
+    location: { lat: item.location.lat, lng: item.location.lng },
+    distanceM: item._distance ?? 0,
+  }
+}
+
+/**
+ * 关键词语料联想（`/ws/place/v1/suggestion`）。
+ *
+ * 页面用它做目的地检索（用户 2026-09-15 拍板）：
+ * - **`region` 是硬限定，不是偏好**（2026-09-15 实测）：`南大&region=合肥&region_fix=1`
+ *   只出合肥内的南大街/南大郢；不传 region 则全国联想、直接出南京大学。项目以合肥为
+ *   中心，跨城检索有意关掉，所以固定 `region_fix=1`
+ * - **返回值不带距离**：候选只有 title/address/location，页面不排序、按接口顺序展示，
+ *   用户点选哪条就用哪条的坐标
+ * - 联想接口的配额与 place search **分开计**（用户确认），所以输入时每敲一组字打一次
+ *   也打得起 —— 页面仍要防抖，别把键盘当机关枪
+ *
+ * 为什么换掉 `searchDestination`：nearby 检索对目的地是否返回结果**取决于腾讯侧的关键词
+ * 索引，页面无法预测**（同城同距同类的南京理工出 20 条、南京大学出 0 条，2026-09-15 实测）。
+ * 联想接口让用户显式点选，把「接口猜不中」变成「用户自己选」，模糊输入也不再丢
+ */
+export async function suggestPlaces(keyword: string, region: string): Promise<PoiItem[]> {
+  const raw = await get<RawSuggestion[]>(SUGGEST_PATH, {
+    keyword,
+    region,
+    region_fix: 1,
+    page_size: 10,
+  })
+  return (raw ?? []).map(toSuggestion)
+}
+
+/**
  * 关键词周边检索，返回半径内按距离升序的 POI。
  *
  * 半径是**本地过滤**的：实测接口的 `nearby(...,r)` 半径不生效 ——
@@ -112,6 +162,16 @@ function toPoi(item: RawPoi): PoiItem {
  * 按 `_distance` 排一次不贵，且不依赖服务端的排序口径
  */
 export async function searchNearby(keyword: string, center: GeoPoint, radiusM: number): Promise<PoiItem[]> {
+  const cacheKey = `qqmap.nearby.${keyword}.${center.lat.toFixed(3)}.${center.lng.toFixed(3)}.${radiusM}`
+  // 缓存是纯优化，不许它影响正确性：存储不可用（测试环境、隐私模式）时跳过即可
+  try {
+    const cached = wx.getStorageSync(cacheKey) as { t?: number; data?: PoiItem[] } | ''
+    if (cached && typeof cached.t === 'number' && Date.now() - cached.t < SEARCH_CACHE_TTL_MS) {
+      return cached.data ?? []
+    }
+  } catch {
+    // 忽略：拿不到缓存就直查
+  }
   const raw = await get<RawPoi[]>(SEARCH_PATH, {
     keyword,
     boundary: `nearby(${center.lat},${center.lng},${radiusM})`,
@@ -121,10 +181,16 @@ export async function searchNearby(keyword: string, center: GeoPoint, radiusM: n
     page_size: 20,
     page_index: 1,
   })
-  return (raw ?? [])
+  const result = (raw ?? [])
     .map(toPoi)
     .filter(poi => poi.distanceM <= radiusM)
     .sort((a, b) => a.distanceM - b.distanceM)
+  try {
+    wx.setStorageSync(cacheKey, { t: Date.now(), data: result })
+  } catch {
+    // 同上：缓存写不进就不写
+  }
+  return result
 }
 
 /**

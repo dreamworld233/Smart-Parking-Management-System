@@ -12,8 +12,23 @@
     <view class="bar__cancel" bindtap="onBack">取消</view>
   </view>
 
-  <!-- 还没搜过：只出历史，不出地图（少一次原生组件创建） -->
-  <view class="hist" wx:if="{{state === 'idle'}}" style="padding-top: {{mapTop}}px">
+  <!-- 输入联想候选：在搜索栏正下方，替代历史。用户点选哪条就用哪条的坐标，
+       不再静默拿接口首条（2026-09-15 改：suggestion + 显式选择） -->
+  <scroll-view class="suggest" scroll-y wx:if="{{candidates.length}}" style="top: {{mapTop}}px">
+    <view
+      class="suggest__item"
+      wx:for="{{candidates}}"
+      wx:key="index"
+      data-idx="{{index}}"
+      bindtap="onCandidateTap"
+    >
+      <view class="suggest__title">{{item.title}}</view>
+      <view class="suggest__addr">{{item.address}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 还没搜过：只出历史，不出地图（少一次原生组件创建）。候选开着时历史让位 -->
+  <view class="hist" wx:if="{{state === 'idle' && !candidates.length}}" style="padding-top: {{mapTop}}px">
     <view class="hist__title" wx:if="{{history.length}}">历史搜索</view>
     <view class="hist__list" wx:if="{{history.length}}">
       <view

@@ -44,6 +44,50 @@
   color: var(--color-text-weak);
 }
 
+/* 联想候选：top 由 search.ts 算成 px 内联传入（搜索栏正下方）。
+   z-index 显式给 1：Skyline 没有 Web 层叠上下文，同是绝对定位的兄弟节点按 DOM 顺序绘制，
+   候选排在 map 之前，不给 z-index 会被地图压住点不动（与顶栏同一条坑） */
+.suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  max-height: 560rpx;
+  padding: 0 24rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.suggest__item {
+  padding: 22rpx 24rpx;
+  background: var(--color-surface);
+  border-bottom: 2rpx solid var(--color-border);
+  overflow: hidden;
+}
+
+.suggest__item:first-child {
+  border-radius: 16rpx 16rpx 0 0;
+}
+
+.suggest__item:last-child {
+  border-radius: 0 0 16rpx 16rpx;
+  border-bottom: none;
+}
+
+.suggest__title {
+  font-size: 28rpx;
+  color: #0f172a;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.suggest__addr {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--color-text-weak);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* 顶部留白由 search.ts 算成 px 内联传入（要刚好让开绝对定位的顶栏） */
 .hist {
   padding: 0 28rpx;
