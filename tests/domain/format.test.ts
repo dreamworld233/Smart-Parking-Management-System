@@ -200,13 +200,31 @@ describe('sourceNotes', () => {
     expect(sourceNotes(l)).toEqual(['收费为估算'])
   })
 
-  it('收费与总车位为演示暂定值时，各自标成示例数据而不是运营声明', () => {
+  it('价格与总车位同为演示暂定值时，合成一条，不标成运营声明', () => {
     const l = lot({
       distanceSource: 'route',
       pricing: { ...lot().pricing, source: 'placeholder' },
       availability: { freeSpots: 200, totalSpots: 500, source: 'placeholder' },
     })
-    expect(sourceNotes(l)).toEqual(['收费为示例数据，待核实', '车位数为示例数据，待核实'])
+    expect(sourceNotes(l)).toEqual(['价格与车位为示例数据，待核实'])
+  })
+
+  it('只有价格是暂定值时，不把车位一起说成示例数据', () => {
+    const l = lot({
+      distanceSource: 'route',
+      pricing: { ...lot().pricing, source: 'placeholder' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'public' },
+    })
+    expect(sourceNotes(l)).toEqual(['价格为示例数据，待核实'])
+  })
+
+  it('只有车位是暂定值时，不把价格一起说成示例数据', () => {
+    const l = lot({
+      distanceSource: 'route',
+      pricing: { ...lot().pricing, source: 'public' },
+      availability: { freeSpots: 200, totalSpots: 500, source: 'placeholder' },
+    })
+    expect(sourceNotes(l)).toEqual(['收费来源于车场公示价', '车位数为示例数据，待核实'])
   })
 
   it('总车位是真实来源时不标注车位数', () => {
