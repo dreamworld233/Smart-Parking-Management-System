@@ -8,13 +8,10 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-const { isBookableArrival, quoteTotal } = require('./pricing')
+const { isBookableArrival, quoteTotal, ENTRY_GRACE_MS } = require('./pricing')
 
 // 车牌：省份汉字 + 大写字母 + 5-6 位大写字母/数字，覆盖蓝牌（6 位）与新能源（7 位）
 const PLATE_RE = /^[\u4e00-\u9fa5][A-Z][A-Z0-9]{5,6}$/
-
-// 入场缓冲 15 分钟（与 pricing 的 ENTRY_GRACE_MS 同口径；此处是写库字段，不参与计价）
-const ENTRY_GRACE_MS = 15 * 60 * 1000
 
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
@@ -29,11 +26,14 @@ exports.main = async (event) => {
 
   const { lotId, arriveAt, plateNo } = event || {}
 
+  // 只取一次「现在」：校验与计价共用，避免两个 now 在边缘时刻漂移
+  const now = Date.now()
+
   // 1. 入参校验
   if (typeof lotId !== 'string' || lotId === '') {
     return { code: 'BAD_REQUEST', message: '缺少车场' }
   }
-  if (typeof arriveAt !== 'number' || !isBookableArrival(new Date(), new Date(arriveAt))) {
+  if (typeof arriveAt !== 'number' || !isBookableArrival(new Date(now), new Date(arriveAt))) {
     return { code: 'BAD_REQUEST', message: '到达时刻超出可预约范围' }
   }
   if (typeof plateNo !== 'string' || !PLATE_RE.test(plateNo)) {
@@ -65,11 +65,13 @@ exports.main = async (event) => {
   // 3. 读后等值 CAS 抢额度（并发安全，最多重试 3 次）
   //
   // 老文档可能没有 reservedCount 字段：CAS 的 where 里 `reservedCount: 0` 匹配不上
-  // undefined（Mongo 语义里缺失字段 ≠ 0），先补 0 建字段。补 0 是幂等的，并发下
-  // 多请求各写一次 0 无害 —— 真正抢额度在下面的等值 CAS
+  // undefined（Mongo 语义里缺失字段 ≠ 0），先建字段再抢。**必须用 _.inc(0)** 而不是
+  // 硬写 0 —— $inc 对缺失字段「建字段 = 0」，对已有字段保持不变，且整条 doc update 原子；
+  // 硬写 0 会踩掉并发写者刚 inc 上去的值（A 补 0 → A inc→1 → B 补 0 把 1 冲回 0 →
+  // B 也抢成功 → 两条 reservation 但 reservedCount=1，超卖）
   if (typeof data.reservedCount !== 'number') {
     try {
-      await lots.doc(lotId).update({ data: { reservedCount: 0 } })
+      await lots.doc(lotId).update({ data: { reservedCount: _.inc(0) } })
     } catch (e) {
       return { code: 'INTERNAL', message: '车场数据初始化失败' }
     }
@@ -91,7 +93,6 @@ exports.main = async (event) => {
   if (!acquired) return { code: 'LOT_FULL', message: '可预约车位已满' }
 
   // 4. 计价与生成单号
-  const now = Date.now()
   const arrive = new Date(arriveAt)
   const quote = quoteTotal(new Date(now), arrive, firstHourRate)
   const orderNo = 'PK' + now + String(Math.floor(Math.random() * 1000)).padStart(3, '0')

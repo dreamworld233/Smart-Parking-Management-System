@@ -26,6 +26,8 @@ let mockFailOrderAdd: boolean
 let mockFailPaymentAdd: boolean
 let mockCasConflictOnce: boolean
 let mockCasConflictUsed: boolean
+let mockCasConflictAlways: boolean
+let mockInjectReservedCount: number | null
 
 jest.mock(
   'wx-server-sdk',
@@ -51,6 +53,11 @@ jest.mock(
       update: async ({ data }: { data: Record<string, unknown> }) => {
         const doc = mockStore[collName].get(id)
         if (!doc) return { stats: { updated: 0 } }
+        if (collName === 'lots' && mockInjectReservedCount !== null) {
+          // 模拟「并发写者刚把 reservedCount 改成别的值」，插在补字段的 doc().update 之前，
+          // 验证补字段用 _.inc(0) 不会把并发写者的值冲回 0
+          doc.reservedCount = mockInjectReservedCount
+        }
         applyData(doc, data)
         return { stats: { updated: 1 } }
       },
@@ -72,6 +79,10 @@ jest.mock(
       },
       where: (query: Record<string, unknown>) => ({
         update: async ({ data }: { data: Record<string, unknown> }) => {
+          if (collName === 'lots' && mockCasConflictAlways) {
+            // 模拟并发写者每次都抢先：CAS 永远失配，云函数 3 次重试耗尽 → LOT_FULL
+            return { stats: { updated: 0 } }
+          }
           if (collName === 'lots' && mockCasConflictOnce && !mockCasConflictUsed) {
             // 模拟并发写者抢走了额度：值已变，本次 CAS 必然失配（updated 0），
             // 触发云函数的「重读 + 重试」路径
@@ -156,6 +167,8 @@ beforeEach(() => {
   mockFailPaymentAdd = false
   mockCasConflictOnce = false
   mockCasConflictUsed = false
+  mockCasConflictAlways = false
+  mockInjectReservedCount = null
 })
 
 describe('createReservation 正常下单', () => {
@@ -241,6 +254,27 @@ describe('createReservation 额度 CAS', () => {
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res.code).toBe(0)
     // 冲突写者 +1，本请求重试成功再 +1
+    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(2)
+    expect(mockStore.reservations.size).toBe(1)
+  })
+
+  it('CAS 重试 3 次耗尽仍失配 → LOT_FULL，不建单、额度不动', async () => {
+    seedLot({ reservableQuota: 10, reservedCount: 0 })
+    mockCasConflictAlways = true
+    const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
+    expect(res).toEqual({ code: 'LOT_FULL', message: '可预约车位已满' })
+    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect(mockStore.reservations.size).toBe(0)
+  })
+
+  it('老文档补字段用 _.inc(0)：并发写者的值不被冲回 0，不超卖', async () => {
+    const doc = seedLot({ reservableQuota: 10 })
+    delete doc.reservedCount
+    // 模拟并发写者抢到 1 后才轮到本请求补字段
+    mockInjectReservedCount = 1
+    const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
+    expect(res.code).toBe(0)
+    // 补字段 inc(0) 保持 1 不变，随后 CAS inc → 2；若补字段硬写 0 则会被冲回后 CAS → 1
     expect(mockStore.lots.get('lot1')!.reservedCount).toBe(2)
     expect(mockStore.reservations.size).toBe(1)
   })

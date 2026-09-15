@@ -114,4 +114,4 @@ function cancelRefund(orderAt, arrive, cancelAt, firstHourRate) {
   }
 }
 
-module.exports = { HOUR_MS, leadHours, isBookableArrival, prepaidParkingFee, quoteTotal, cancelRefund }
+module.exports = { HOUR_MS, ENTRY_GRACE_MS, leadHours, isBookableArrival, prepaidParkingFee, quoteTotal, cancelRefund }
