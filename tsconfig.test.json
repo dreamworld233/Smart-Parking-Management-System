@@ -3,6 +3,8 @@
   "compilerOptions": {
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    // 云函数 CommonJS .js 文件也要被 ts-jest 转译（jest.config.js 对 .js 走 ts-jest）
+    "allowJs": true,
     "typeRoots": ["./node_modules/@types", "./typings"],
     // node 只给测试用（live 套件把 wx.request 接到 Node 的 https 上）；
     // 主 tsconfig 不引 node 类型，免得小程序代码里误用 Node API 也能过编译

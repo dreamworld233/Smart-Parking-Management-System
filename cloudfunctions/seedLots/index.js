@@ -71,6 +71,9 @@ exports.main = async () => {
       // 余位恒写 null 入库：只由车场端上报（Plan 3），种子不给初始值
       availability: { freeSpots: null, totalSpots: lot.availability.totalSpots, source: lot.availability.source },
       reservableQuota: lot.reservableQuota,
+      // 已预约数从 0 起：预约下单云函数用等值 CAS 抢额度（reservedCount 随预约 +1，
+      // 与 reservableQuota 比较判满）
+      reservedCount: 0,
       facilities: lot.facilities,
       ratingSummary: null,
       note: lot.note || '',
