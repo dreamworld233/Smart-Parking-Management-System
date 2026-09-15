@@ -1,4 +1,4 @@
-import type { ParkingLot, SortKey } from './types'
+import type { ParkingLot, ReservationStatus, SortKey } from './types'
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
@@ -160,6 +160,22 @@ export function formatTimeRangeLabel(now: Date, time: Date): string {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   if (isSameDay(time, tomorrow)) return `明天 ${hhmm}`
   return `${time.getMonth() + 1}月${time.getDate()}日 ${hhmm}`
+}
+
+/**
+ * 预约状态标签文案。状态机见数据模型 §5.2：
+ * pending_entry 待入场 / entered 已入场 / completed 已完成 /
+ * cancelled 已取消 / released 已释放（超时未入场）。
+ * 'violated' 已从状态机移除（2b），这里不再提供标签
+ */
+export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
+  pending_entry: '待入场',
+  entered: '已入场',
+  completed: '已完成',
+  cancelled: '已取消',
+  released: '已释放',
+  // 'violated' 待 Task 5 从状态机移除，移除前先保留标签避免类型缺项
+  violated: '已违约',
 }
 
 /**

@@ -1,6 +1,225 @@
-.page {
-  padding: var(--space-4);
-  /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* 顶栏：tab 页标题栏，z-index 必须写（Skyline 同级按 DOM 顺序绘制） */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* 内容滚动区：让出顶栏 + tabBar 高度 */
+.body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding: 120rpx 24rpx 0;
+  box-sizing: border-box;
+}
+
+.list-body {
+  /* tabBar 是 absolute 覆盖层，列表要让它自己的高度，否则底部卡片被 tabBar 压住点不动 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+/* 详情视图：取消按钮吸底，内容区让出按钮高度 */
+.detail-body {
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.card__sub {
+  font-size: var(--font-micro);
   color: var(--color-text-weak);
+  margin-top: 8rpx;
+}
+
+.card__title {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-body);
+  color: var(--color-text-sub);
+  padding: 12rpx 0;
+}
+
+.row__k {
+  color: var(--color-text-sub);
+}
+
+.strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.refund {
+  color: var(--color-success);
+  border-top: 2rpx solid var(--color-border);
+  margin-top: 8rpx;
+}
+
+.code {
+  font-size: 72rpx;
+  font-weight: 700;
+  letter-spacing: 16rpx;
+  text-align: center;
+  color: var(--color-text);
+  padding: 24rpx 0;
+}
+
+.hint {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.rule {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  line-height: 1.6;
+  margin-top: 8rpx;
+}
+
+.tail {
+  height: 40rpx;
+}
+
+/* 详情页吸底取消按钮：Skyline 不支持 fixed，absolute 贴页面根节点 */
+.btnbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 16rpx 24rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  background: var(--color-surface);
+  border-top: 2rpx solid var(--color-border);
+}
+
+.btn-danger {
+  padding: 20rpx 0;
+  text-align: center;
+  background: var(--color-danger);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-body);
+  font-weight: 600;
+}
+
+/* 列表卡片 */
+.oc {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.oc__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.oc__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.oc__sub {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: 8rpx;
+}
+
+.oc__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12rpx;
+  padding-top: 12rpx;
+  border-top: 2rpx solid var(--color-border);
+}
+
+.oc__no {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+}
+
+.oc__amount {
+  font-size: var(--font-body);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* 状态标签配色 */
+.tag {
+  font-size: var(--font-tag);
+  padding: 4rpx 16rpx;
+  border-radius: var(--radius-pill);
+}
+
+.tag--primary {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.tag--success {
+  color: var(--color-success);
+  background: #f0fdf4;
+}
+
+.tag--warning {
+  color: var(--color-warning);
+  background: #fffbeb;
+}
+
+.tag--muted {
+  color: var(--color-text-weak);
+  background: var(--color-bg);
 }

@@ -1,1 +1,90 @@
-<view class="page">订单（待实现）</view>
+<view class="wrap">
+  <!-- 顶栏：tab 页，无返回键，只有标题 -->
+  <view class="bar" style="top: {{navTop}}px">
+    <view class="bar__title">我的订单</view>
+  </view>
+
+  <!-- 详情视图（覆盖列表） -->
+  <scroll-view class="body detail-body" wx:if="{{detail}}" scroll-y>
+    <view class="card">
+      <view class="card__head">
+        <view class="card__name">{{detail.lotName}}</view>
+        <view class="tag {{detail.statusClass}}">{{detail.statusLabel}}</view>
+      </view>
+      <view class="card__sub">单号 {{detail.orderNo}}</view>
+
+      <view class="row">
+        <text class="row__k">车牌</text>
+        <text>{{detail.plateText}}</text>
+      </view>
+      <view class="row">
+        <text class="row__k">到达时刻</text>
+        <text>{{detail.arriveText}}</text>
+      </view>
+      <view class="row">
+        <text class="row__k">入场截止</text>
+        <text>{{detail.deadlineText}}</text>
+      </view>
+    </view>
+
+    <!-- 核销码：pending_entry 待入场才需要，放大展示 -->
+    <view class="card" wx:if="{{detail.status === 'pending_entry'}}">
+      <view class="card__title">入场核销码</view>
+      <view class="code">{{detail.verifyCode}}</view>
+      <view class="hint">到达后向车场出示此码或报车牌核销入场</view>
+    </view>
+
+    <view class="card">
+      <view class="card__title">费用明细</view>
+      <view class="row"><text class="row__k">预支停车费</text><text class="tnum">¥{{detail.parkingText}}</text></view>
+      <view class="row"><text class="row__k">平台服务费</text><text class="tnum">¥{{detail.serviceText}}</text></view>
+      <view class="row"><text class="row__k">合计</text><text class="tnum strong">¥{{detail.totalText}}</text></view>
+      <view class="row refund" wx:if="{{detail.refundText}}"><text class="row__k">{{detail.refundText}}</text></view>
+    </view>
+
+    <view class="card">
+      <view class="card__title">预约规则</view>
+      <view class="rule">入场截止为到达时刻后 15 分钟，超时车位自动释放并记违约</view>
+      <view class="rule">下单后 10 分钟内取消全额退还；之后按已占用时长退预支停车费，服务费不退</view>
+      <view class="rule">实际停放费由车场闸机计收，平台不参与</view>
+    </view>
+
+    <view class="tail" />
+    <view class="btnbar" wx:if="{{detail.cancellable}}">
+      <view class="btn-danger" data-id="{{detail.id}}" bindtap="onCancel">取消预约</view>
+    </view>
+  </scroll-view>
+
+  <!-- 列表视图 -->
+  <block wx:else>
+    <state-view
+      wx:if="{{state !== 'ready'}}"
+      kind="{{state}}"
+      text="{{state === 'empty' ? '还没有预约' : state === 'error' ? '加载失败' : '加载中'}}"
+      hint="{{state === 'empty' ? '从车场详情「预约车位」下单' : state === 'error' ? '请检查网络后重试' : ''}}"
+      actionText="{{state === 'error' ? '重试' : ''}}"
+      bind:action="onRetry"
+    />
+
+    <scroll-view class="body list-body" wx:if="{{state === 'ready'}}" scroll-y>
+      <view
+        class="oc"
+        wx:for="{{cards}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onCardTap"
+      >
+        <view class="oc__head">
+          <view class="oc__name">{{item.lotName}}</view>
+          <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+        </view>
+        <view class="oc__sub">{{item.plateText}} · {{item.arriveText}}</view>
+        <view class="oc__foot">
+          <view class="oc__no">{{item.orderNo}}</view>
+          <view class="oc__amount tnum">¥{{item.totalText}}</view>
+        </view>
+      </view>
+      <view class="tail" />
+    </scroll-view>
+  </block>
+</view>

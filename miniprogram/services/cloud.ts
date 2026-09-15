@@ -6,6 +6,11 @@
 export interface CloudDb {
   collection(name: string): {
     where(cond: Record<string, unknown>): {
+      orderBy(field: string, dir: 'asc' | 'desc'): {
+        limit(n: number): {
+          get(): Promise<{ data: Record<string, unknown>[] }>
+        }
+      }
       limit(n: number): {
         get(): Promise<{ data: Record<string, unknown>[] }>
       }
@@ -103,4 +108,24 @@ export function createReservation(
   // 展开成对象字面量再传：接口类型没有 index signature，直接传会与
   // callFunction 的 `Record<string, unknown>` 参数失配（TS2345）
   return callFunction<CreateReservationData>('createReservation', { ...input })
+}
+
+export interface CancelReservationData {
+  reservationId: string
+  status: string
+  usedHours: number
+  refundParking: number
+  refundService: number
+  refundTotal: number
+  isBreach: boolean
+}
+
+/**
+ * 取消预约（云函数 cancelReservation）。
+ * 退款公式在云端，这里只透传 reservationId 与退款明细
+ */
+export function cancelReservation(
+  reservationId: string,
+): Promise<CloudResult<CancelReservationData>> {
+  return callFunction<CancelReservationData>('cancelReservation', { reservationId })
 }

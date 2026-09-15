@@ -130,13 +130,23 @@ export interface Reservation {
   lotId: string
   lotName: string
   plateNo: string
-  /** ISO 字符串 */
-  arriveTime: string
-  /** 到达时间 + ENTRY_GRACE_MINUTES，ISO 字符串 */
-  enterDeadline: string
+  /** 到达时刻，毫秒时间戳（云函数写入的就是 epoch 毫秒，不是 ISO 串） */
+  arriveTime: number
+  /** 到达时间 + ENTRY_GRACE_MS，毫秒时间戳 */
+  enterDeadline: number
   prepaidParkingFee: number
   serviceFee: number
   totalAmount: number
   status: ReservationStatus
+  /** 6 位核销码（设计稿 §5.5 凭证页放大展示） */
+  verifyCode?: string
+  /** 下单时刻，毫秒时间戳 */
+  createdAt?: number
+  /** 取消时刻，毫秒时间戳 */
+  cancelledAt?: number
+  /** 取消退款明细（cancelled 时存在） */
+  refundParking?: number
+  refundService?: number
+  refundTotal?: number
   qrPayload: string
 }

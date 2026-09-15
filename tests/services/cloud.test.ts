@@ -1,5 +1,6 @@
 import {
   callFunction,
+  cancelReservation,
   createReservation,
   ensureLogin,
   type CloudApi,
@@ -111,5 +112,40 @@ describe('createReservation', () => {
     respond = () => ({ result: { code: 'LOT_FULL', message: '可预约车位已满' } })
     const r = await createReservation({ lotId: 'lot1', arriveAt: 1, plateNo: '京A8F2K9' })
     expect(r).toEqual({ ok: false, code: 'LOT_FULL', message: '可预约车位已满' })
+  })
+})
+
+describe('cancelReservation', () => {
+  beforeEach(() => {
+    stubCloud()
+    lastCall = null
+  })
+
+  it('透传 reservationId 并调用 cancelReservation 云函数', async () => {
+    respond = () => ({
+      result: {
+        code: 0,
+        data: {
+          reservationId: 'r1',
+          status: 'cancelled',
+          usedHours: 1,
+          refundParking: 6,
+          refundService: 0,
+          refundTotal: 6,
+          isBreach: false,
+        },
+      },
+    })
+    const r = await cancelReservation('r1')
+    expect(r.ok).toBe(true)
+    expect(lastCall?.name).toBe('cancelReservation')
+    expect(lastCall?.data).toEqual({ reservationId: 'r1' })
+    if (r.ok) expect(r.data.refundTotal).toBe(6)
+  })
+
+  it('非 0 code 原样透出（如 ALREADY_CANCELLED）', async () => {
+    respond = () => ({ result: { code: 'ALREADY_CANCELLED', message: '该预约已被处理' } })
+    const r = await cancelReservation('r1')
+    expect(r).toEqual({ ok: false, code: 'ALREADY_CANCELLED', message: '该预约已被处理' })
   })
 })

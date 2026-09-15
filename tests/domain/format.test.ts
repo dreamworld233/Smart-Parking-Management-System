@@ -9,6 +9,7 @@ import {
   formatTimeRangeLabel,
   formatRatingSummary,
   isValidPlate,
+  RESERVATION_STATUS_LABELS,
   sourceNotes,
 } from '../../miniprogram/domain/format'
 import type { LotPricing, ParkingLot } from '../../miniprogram/domain/types'
@@ -186,6 +187,20 @@ describe('isValidPlate', () => {
 
   it('空串拒绝', () => {
     expect(isValidPlate('')).toBe(false)
+  })
+})
+
+describe('RESERVATION_STATUS_LABELS', () => {
+  it('待入场 / 已入场 / 已完成 / 已取消 / 已释放 各有标签', () => {
+    expect(RESERVATION_STATUS_LABELS.pending_entry).toBe('待入场')
+    expect(RESERVATION_STATUS_LABELS.entered).toBe('已入场')
+    expect(RESERVATION_STATUS_LABELS.completed).toBe('已完成')
+    expect(RESERVATION_STATUS_LABELS.cancelled).toBe('已取消')
+    expect(RESERVATION_STATUS_LABELS.released).toBe('已释放')
+  })
+
+  it('violated 标签保留（Task 5 从状态机移除前不炸类型）', () => {
+    expect(RESERVATION_STATUS_LABELS.violated).toBe('已违约')
   })
 })
 
