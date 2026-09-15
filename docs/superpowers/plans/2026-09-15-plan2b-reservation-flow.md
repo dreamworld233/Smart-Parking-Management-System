@@ -59,7 +59,7 @@
 | `miniprogram/domain/types.ts` | 改 | 去掉 `'violated'`；Reservation 补 verifyCode/退款字段/时间戳 |
 | `miniprogram/domain/pricing.ts` | 不动 | 试算与退款的真值，已有单测 |
 | `miniprogram/services/cloud.ts` | 改 | 加 `createReservation` / `cancelReservation` 封装（或页面直调 callFunction） |
-| `miniprogram/services/storage.ts` | 改 | `getLastPlate` / `saveLastPlate` |
+| `miniprogram/services/storage.ts` | 复用 | `getDefaultPlate` / `setDefaultPlate`（已存在，不新建） |
 | `miniprogram/config.ts` | 改 | 到达窗口 / 入场缓冲 / 时刻步长常量 |
 | `miniprogram/pages/confirm/*` | 建 | 预约确认页（到达时刻 + 车牌 + 试算 + 模拟支付） |
 | `miniprogram/pages/orders/*` | 改 | 占位 → 我的订单（列表 / 详情 / 核销码 / 取消） |
@@ -68,13 +68,15 @@
 
 ---
 
-### Task 0: 前置核对（动手前）
+### Task 0: 前置核对（2026-09-15 已完成）
 
-- [ ] 核对 `services/cloud.ts` 的 `callFunction` 签名与 `getCloudApi`（确认 createReservation/cancelReservation 封装怎么挂）
-- [ ] 核对 `config.ts` 是否已有到达窗口/缓冲常量；没有则加
-- [ ] 核对 `domain/types.ts` 当前 `ReservationStatus` 与 `Reservation` 字段，列出本轮要加/删的
-- [ ] 核对安全规则口径：`reservations` / `orders` 前端 `doc.userId == auth.openid` 只读（控制台已配？Task 1 只配了 11 条，确认含 reservations/orders）
-- [ ] `npm test` 基线全绿（当前 225）
+- ✅ `services/cloud.ts`：`callFunction<T>` + `CloudResult<T>` + `ensureLogin()` 就绪，create/cancel 封装直接薄套 `callFunction`
+- ✅ `services/storage.ts`：**已有 `getDefaultPlate` / `setDefaultPlate`**（车牌记住功能早存在，直接复用，不新建 API）—— 文件结构总览里的 storage 行改为「复用」
+- ✅ `app.ts`：`onLaunch` 已调 `ensureLogin` 建档（身份地基在）
+- ✅ `app.json`：`pages/orders/orders` 已注册（占位页在）；`pages/confirm` 需新增注册
+- ⚠️ `config.ts`：**没有**到达窗口/入场缓冲/时刻步长常量 —— Task 2 加 `ARRIVE_WINDOW_MIN`(120)、`ENTRY_GRACE_MINUTES`(15)、`ARRIVE_STEP_MIN`(15)
+- ⚠️ **安全规则待用户控制台核对**：`reservations` / `orders` 是否已有 `doc.userId == auth.openid` 只读（Task 1 配的 11 条，需确认含这两张）
+- ✅ `npm test` 基线 225 全绿
 
 ### Task 1: createReservation 云函数
 
