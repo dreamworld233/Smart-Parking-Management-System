@@ -26,7 +26,7 @@
 | Task 3 geo.ts + lot.ts 重写 | ✅ | `4fed08a`、`5ca38eb`（复核后修复） |
 | Task 4 login + ensureLogin | ✅ | `7674d36`、`78e00a8`、`3d120f4` |
 | Task 5 seedLots 种子 | ✅ —— 4 家车场写入云端（较候选少 1 家，见下），暂定值标 `placeholder`，界面照实显示「示例数据，待核实」；云端测试实跑 `{written: [4 家], skipped: []}` | `e84bf32`、`b86b7b1` |
-| Task 6 页面接入 + 真机验收 | 未开始（需用户在场；接入代码 Task 3 已顺带改完，独立剩两条空态文案） | — |
+| Task 6 页面接入 + 真机验收 | **代码部分完成，待真机** —— 接入代码 Task 3 已顺带改完；本轮补两条空态文案、并把「价格与车位同为暂定值」合成一条标注；真机 checklist 待用户逐项过 | `eab75a1` |
 
 **云上现状**（这些只存在于云开发控制台，不在 git 里，换环境要重建）：环境 `cloud1-d8gzxlbnq9a5cbf75`；11 个集合已建；**安全规则 11 条已按 Task 1 Step 4 口径配好**；`login` 已部署并端到端验收（`users` 出现一条文档，`_id` 与 `_openid` **都等于用户 openid**、`role: 'driver'`，重编译两次仍只有一条）；`seedLots` 已部署并实跑（2026-09-15 早，返回 `{written: [4 家车场名], skipped: []}`，`lots` 集合应有 4 条 `contract.status: 'signed'` 的文档）。
 
