@@ -135,6 +135,21 @@ describe('fetchSignedLots', () => {
     expect(lots.map(l => l.id)).toEqual(['near', 'mid'])
   })
 
+  it('演示暂定值（placeholder）照常入库，来源原样带到领域层', async () => {
+    // 暂定值要被界面标注成「示例数据，待核实」，所以它必须能过校验、且 source 不被改写；
+    // 若哪天有人把它规整成 'ops'，这条会红
+    docs = [
+      doc({
+        pricing: { firstHour: 3, perHourAfter: 2, stepMinutes: 60, capPerDay: 15, source: 'placeholder' },
+        availability: { freeSpots: null, totalSpots: 200, source: 'placeholder' },
+      }),
+    ]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots).toHaveLength(1)
+    expect(lots[0].pricing.source).toBe('placeholder')
+    expect(lots[0].availability.source).toBe('placeholder')
+  })
+
   it('perHourAfter 缺省回落到 firstHour', async () => {
     docs = [doc({ pricing: { firstHour: 5, stepMinutes: 60, capPerDay: 40, source: 'ops' } })]
     const lots = await fetchSignedLots(CENTER)

@@ -12,9 +12,15 @@ function isFiniteNum(v) {
   return typeof v === 'number' && Number.isFinite(v)
 }
 
-/** 收费与余位的来源只认这两种（数据模型 §4 的 `public` / `ops`），别的一律当没核实 */
+/**
+ * 收费与车位数的来源白名单（数据模型 §4 的 `public` / `ops`，加一档 `placeholder`），
+ * 别的一律当没核实。
+ *
+ * `placeholder` 是**演示用暂定值**：界面会照实标注「示例数据，待核实」，
+ * 所以放进来的数据是诚实的；但它绝不能长成 `public` 的样子 —— 那才是编数据。
+ */
 function isSource(v) {
-  return v === 'public' || v === 'ops'
+  return v === 'public' || v === 'ops' || v === 'placeholder'
 }
 
 /**

@@ -29,9 +29,16 @@ function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | nu
   if (freeSpots !== null && typeof freeSpots !== 'number') return null
   if (typeof doc.reservableQuota !== 'number') return null
   const pricingSource = pricing.source
-  if (pricingSource !== 'public' && pricingSource !== 'ops' && pricingSource !== 'estimated') return null
+  if (
+    pricingSource !== 'public' &&
+    pricingSource !== 'ops' &&
+    pricingSource !== 'estimated' &&
+    pricingSource !== 'placeholder'
+  ) {
+    return null
+  }
   const spotsSource = availability.source
-  if (spotsSource !== 'public' && spotsSource !== 'ops') return null
+  if (spotsSource !== 'public' && spotsSource !== 'ops' && spotsSource !== 'placeholder') return null
 
   return {
     id,

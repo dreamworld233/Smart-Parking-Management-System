@@ -19,8 +19,11 @@ export interface LotPricing {
    * - `public`：公示价（人工核实，存证在 lot_price_changes）
    * - `ops`：平台运营声明（不谎称实测）
    * - `estimated`：真估算（2a 之后理论上不该再出现，保留用于降级路径）
+   * - `placeholder`：**演示用暂定值，尚未核实**。单列一档而不是塞进 `ops`，
+   *   是为了让界面能直说「这是编的」—— 库里一旦混进没有标记的假数据，
+   *   等真实公示价进来时就再也分不出哪条是编的了
    */
-  source: 'public' | 'ops' | 'estimated'
+  source: 'public' | 'ops' | 'estimated' | 'placeholder'
 }
 
 export interface LotAvailability {
@@ -30,9 +33,13 @@ export interface LotAvailability {
    * 注意 `null / totalSpots` 在 JS 里是 0，任何算空闲率的地方必须先判 null
    */
   freeSpots: number | null
-  /** 总车位（公示或运营声明） */
+  /**
+   * 总车位（公示或运营声明）。`placeholder` 同 `LotPricing.source`，
+   * 表示演示用暂定值 —— 总车位与余位一起决定空闲率，编的总车位会让
+   * 空闲率整体偏移，且这个偏移在界面上看不出来
+   */
   totalSpots: number
-  source: 'public' | 'ops'
+  source: 'public' | 'ops' | 'placeholder'
 }
 
 /**

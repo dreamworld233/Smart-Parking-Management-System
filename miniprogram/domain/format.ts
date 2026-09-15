@@ -28,6 +28,9 @@ export function sourceNotes(lot: ParkingLot): string[] {
   if (lot.pricing.source === 'public') notes.push('收费来源于车场公示价')
   else if (lot.pricing.source === 'ops') notes.push('收费为运营声明')
   else if (lot.pricing.source === 'estimated') notes.push('收费为估算')
+  else if (lot.pricing.source === 'placeholder') notes.push('收费为示例数据，待核实')
+  // 总车位数只在是示例值时才标注：真实值标出来只是噪音，编的值不标就是骗人
+  if (lot.availability.source === 'placeholder') notes.push('车位数为示例数据，待核实')
   if (lot.availability.freeSpots === null) notes.push('余位待车场上报')
   return notes
 }
