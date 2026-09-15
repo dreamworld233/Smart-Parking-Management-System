@@ -8,6 +8,7 @@ import {
   formatSpots,
   formatTimeRangeLabel,
   formatRatingSummary,
+  isValidPlate,
   sourceNotes,
 } from '../../miniprogram/domain/format'
 import type { LotPricing, ParkingLot } from '../../miniprogram/domain/types'
@@ -159,6 +160,32 @@ describe('formatPlate', () => {
     // 用户手输或上游存了「京·A8·K9」时，只删首个分隔符会重排成「京A·8·K9」——
     // 看着像车牌，其实是错的
     expect(formatPlate('京·A8·K9')).toBe('京A·8K9')
+  })
+})
+
+describe('isValidPlate', () => {
+  it('蓝牌 6 位：省份汉字 + 字母 + 5 位', () => {
+    expect(isValidPlate('京A8F2K9')).toBe(true)
+  })
+
+  it('新能源 7 位：省份汉字 + 字母 + 6 位', () => {
+    expect(isValidPlate('京AD12345')).toBe(true)
+  })
+
+  it('小写字母拒绝（云端 PLATE_RE 只认大写）', () => {
+    expect(isValidPlate('京a8F2K9')).toBe(false)
+  })
+
+  it('长度不足拒绝', () => {
+    expect(isValidPlate('京A8F2')).toBe(false)
+  })
+
+  it('省份汉字缺失拒绝', () => {
+    expect(isValidPlate('A8F2K9')).toBe(false)
+  })
+
+  it('空串拒绝', () => {
+    expect(isValidPlate('')).toBe(false)
   })
 })
 

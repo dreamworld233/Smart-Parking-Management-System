@@ -163,6 +163,20 @@ export function formatTimeRangeLabel(now: Date, time: Date): string {
 }
 
 /**
+ * 车牌号格式校验。
+ *
+ * 与云函数 createReservation 的 `PLATE_RE` 同源（两端各写一份，注释互相引用）：
+ * 省份汉字 + 大写字母 + 5-6 位大写字母/数字，覆盖蓝牌（6 位）与新能源（7 位）。
+ * 前端在输入时拦截非法车牌，云端在下单时再校验一次 —— 前端只挡输入体验，
+ * 云端才是真防线，两边都要有
+ */
+const PLATE_RE = /^[一-龥][A-Z][A-Z0-9]{5,6}$/
+
+export function isValidPlate(plate: string): boolean {
+  return PLATE_RE.test(plate)
+}
+
+/**
  * 车牌展示：省市简称 + 字母后插入分隔点。
  * 不足 4 位的不可能是车牌，原样返回 —— 门槛写成 3 会把「京A8」这种脏数据
  * 变成「京A·8」，看着像正常车牌，反而更难排查。

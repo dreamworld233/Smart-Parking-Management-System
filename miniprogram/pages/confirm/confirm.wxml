@@ -1,0 +1,86 @@
+<view class="wrap">
+  <!-- 顶栏：与搜索页同套路，top 用 px 由胶囊下沿算好内联传入 -->
+  <view class="bar" style="top: {{navTop}}px">
+    <view class="bar__back" bindtap="onBack">‹</view>
+    <view class="bar__title">预约确认</view>
+    <view class="bar__spacer" />
+  </view>
+
+  <state-view
+    wx:if="{{state !== 'ready'}}"
+    kind="{{state}}"
+    text="{{state === 'error' ? '车场信息加载失败' : '加载中'}}"
+    hint="{{state === 'error' ? '可能已下线或数据异常' : ''}}"
+    actionText="{{state === 'error' ? '重试' : ''}}"
+    bind:action="onRetry"
+  />
+
+  <scroll-view class="body" wx:else scroll-y>
+    <!-- 车场信息卡 -->
+    <view class="card">
+      <view class="card__name">{{lot.name}}</view>
+      <view class="card__addr">{{lot.address}}</view>
+      <view class="card__quota">可预约额度 {{lot.quota}} 个 · 首小时 ¥{{firstHourText}}</view>
+    </view>
+
+    <!-- 到达时刻 chips -->
+    <view class="card">
+      <view class="card__title">到达时刻</view>
+      <view class="chips">
+        <view
+          wx:for="{{options}}"
+          wx:key="offsetMinutes"
+          class="chip {{selectedIdx === index ? 'chip--on' : ''}}"
+          data-idx="{{index}}"
+          bindtap="onChipTap"
+        >
+          <view class="chip__label">{{item.label}}</view>
+          <view class="chip__time">{{item.timeLabel}}</view>
+        </view>
+      </view>
+      <view class="hint">按到达时刻锁位，不足 1 小时按 1 小时计</view>
+    </view>
+
+    <!-- 车牌 -->
+    <view class="card">
+      <view class="card__title">车牌号</view>
+      <input
+        class="plate {{plate && !plateValid ? 'plate--invalid' : ''}}"
+        value="{{plate}}"
+        placeholder="输入车牌，如 京A8F2K9"
+        maxlength="8"
+        bindinput="onPlateInput"
+      />
+      <view class="hint" wx:if="{{plate && !plateValid}}">车牌格式不正确</view>
+      <view class="hint" wx:else>下次预约自动带出</view>
+    </view>
+
+    <!-- 费用试算 -->
+    <view class="card" wx:if="{{quote}}">
+      <view class="card__title">费用明细</view>
+      <view class="row"><text class="row__k">预支停车费（锁位 {{quote.leadHours}} 小时）</text><text class="tnum">¥{{parkingText}}</text></view>
+      <view class="row"><text class="row__k">平台服务费</text><text class="tnum">¥{{serviceText}}</text></view>
+      <view class="row"><text class="row__k">入场截止</text><text>{{deadlineText}}</text></view>
+      <view class="total"><text>合计</text><text class="tnum total__v">¥{{totalText}}</text></view>
+    </view>
+
+    <!-- 预约规则 -->
+    <view class="card">
+      <view class="card__title">预约规则</view>
+      <view class="rule">入场截止为到达时刻后 15 分钟，超时车位自动释放并记违约</view>
+      <view class="rule">下单后 10 分钟内取消全额退还；之后按已占用时长退预支停车费，服务费不退</view>
+      <view class="rule">实际停放费由车场闸机计收，平台不参与</view>
+    </view>
+
+    <view class="tail" />
+  </scroll-view>
+
+  <!-- 底部吸底确认栏：Skyline 不支持 fixed，absolute 贴页面根节点 -->
+  <view class="paybar" wx:if="{{state === 'ready' && quote}}" style="bottom: {{payBottom}}px">
+    <view class="paybar__amount"><text class="paybar__label">合计</text><text class="tnum paybar__value">¥{{totalText}}</text></view>
+    <view
+      class="paybar__btn {{submitting ? 'paybar__btn--disabled' : ''}}"
+      bindtap="onPay"
+    >{{submitting ? '提交中…' : '确认支付'}}</view>
+  </view>
+</view>

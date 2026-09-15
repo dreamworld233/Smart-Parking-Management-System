@@ -1,6 +1,6 @@
 import { WALK_DETOUR_FACTOR } from '../../miniprogram/config'
 import { haversineM } from '../../miniprogram/domain/geo'
-import { fetchLotsAround, fetchSignedLots } from '../../miniprogram/services/lot'
+import { fetchLotById, fetchLotsAround, fetchSignedLots } from '../../miniprogram/services/lot'
 
 interface QueryCaptured {
   cond: Record<string, unknown>
@@ -231,6 +231,36 @@ describe('fetchSignedLots', () => {
     g.wx = {}
     await expect(fetchSignedLots(CENTER)).rejects.toThrow('云开发未初始化')
     g.wx = saved
+  })
+})
+
+describe('fetchLotById', () => {
+  beforeEach(() => {
+    docs = []
+    pois = []
+    captured.length = 0
+    matrixTos = []
+    routes = {}
+    stubCloud()
+  })
+
+  it('按 _id 查询并映射回签约车场', async () => {
+    docs = [doc({})]
+    const lot = await fetchLotById('lot1')
+    expect(lot).not.toBeNull()
+    expect(lot?.id).toBe('lot1')
+    expect(lot?.name).toBe('测试车场')
+    expect(captured[0].cond).toEqual({ _id: 'lot1' })
+  })
+
+  it('查询不到返回 null 而非抛错', async () => {
+    docs = []
+    await expect(fetchLotById('missing')).resolves.toBeNull()
+  })
+
+  it('形状坏的文档返回 null', async () => {
+    docs = [doc({ _id: 'bad', name: 123 })]
+    await expect(fetchLotById('bad')).resolves.toBeNull()
   })
 })
 

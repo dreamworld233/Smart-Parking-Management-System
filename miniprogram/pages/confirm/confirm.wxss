@@ -1,0 +1,219 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* 顶栏：与 search 同套路，z-index 必须写（Skyline 同级按 DOM 顺序绘制） */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.bar__title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.bar__spacer {
+  width: 40rpx;
+}
+
+/* 内容滚动区：从顶栏下沿起，让出底部吸底栏的高度 */
+.body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding: 140rpx 24rpx 0;
+  box-sizing: border-box;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.card__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.card__addr {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: 8rpx;
+}
+
+.card__quota {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: 12rpx;
+}
+
+.card__title {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.chip {
+  padding: 16rpx 28rpx;
+  border-radius: var(--radius-pill);
+  border: 2rpx solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.chip--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.chip__label {
+  font-size: var(--font-body);
+  color: var(--color-text);
+}
+
+.chip--on .chip__label {
+  color: var(--color-primary);
+}
+
+.chip__time {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  margin-top: 4rpx;
+}
+
+.hint {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  margin-top: var(--space-2);
+}
+
+.plate {
+  height: 88rpx;
+  background: var(--color-bg);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0 24rpx;
+  font-size: 30rpx;
+  letter-spacing: 4rpx;
+}
+
+.plate--invalid {
+  border-color: var(--color-danger);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-body);
+  color: var(--color-text-sub);
+  padding: 12rpx 0;
+}
+
+.row__k {
+  color: var(--color-text-sub);
+}
+
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--space-2);
+  border-top: 2rpx solid var(--color-border);
+  font-size: var(--font-body);
+  color: var(--color-text);
+}
+
+.total__v {
+  font-size: var(--font-amount);
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.rule {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  line-height: 1.6;
+  margin-top: 8rpx;
+}
+
+.tail {
+  height: 40rpx;
+}
+
+/* 吸底确认栏：absolute 贴页面根节点（Skyline 不支持 fixed） */
+.paybar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 16rpx 24rpx;
+  background: var(--color-surface);
+  border-top: 2rpx solid var(--color-border);
+}
+
+.paybar__amount {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.paybar__label {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+}
+
+.paybar__value {
+  font-size: var(--font-amount);
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.paybar__btn {
+  padding: 20rpx 56rpx;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-body);
+  font-weight: 600;
+}
+
+.paybar__btn--disabled {
+  opacity: 0.5;
+}

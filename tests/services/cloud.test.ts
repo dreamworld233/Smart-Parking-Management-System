@@ -1,4 +1,9 @@
-import { callFunction, ensureLogin, type CloudApi } from '../../miniprogram/services/cloud'
+import {
+  callFunction,
+  createReservation,
+  ensureLogin,
+  type CloudApi,
+} from '../../miniprogram/services/cloud'
 
 // data 必须可省：CloudApi.callFunction 的入参就是可省的，
 // 桩要是把它收成必填，就跟被桩的签名对不上，编译先过不去
@@ -69,5 +74,42 @@ describe('ensureLogin', () => {
     expect(r.ok).toBe(true)
     expect(lastCall?.name).toBe('login')
     if (r.ok) expect(r.data.userId).toBe('u1')
+  })
+})
+
+describe('createReservation', () => {
+  beforeEach(() => {
+    stubCloud()
+    lastCall = null
+  })
+
+  it('透传入参并调用 createReservation 云函数', async () => {
+    respond = () => ({
+      result: {
+        code: 0,
+        data: {
+          reservationId: 'r1',
+          orderNo: 'PK123',
+          verifyCode: '000001',
+          arriveTime: 1,
+          enterDeadline: 2,
+          leadHours: 1,
+          prepaidParkingFee: 6,
+          serviceFee: 2,
+          totalAmount: 8,
+        },
+      },
+    })
+    const r = await createReservation({ lotId: 'lot1', arriveAt: 1, plateNo: '京A8F2K9' })
+    expect(r.ok).toBe(true)
+    expect(lastCall?.name).toBe('createReservation')
+    expect(lastCall?.data).toEqual({ lotId: 'lot1', arriveAt: 1, plateNo: '京A8F2K9' })
+    if (r.ok) expect(r.data.orderNo).toBe('PK123')
+  })
+
+  it('LOT_FULL 原样透出，调用方据此提示满位', async () => {
+    respond = () => ({ result: { code: 'LOT_FULL', message: '可预约车位已满' } })
+    const r = await createReservation({ lotId: 'lot1', arriveAt: 1, plateNo: '京A8F2K9' })
+    expect(r).toEqual({ ok: false, code: 'LOT_FULL', message: '可预约车位已满' })
   })
 })

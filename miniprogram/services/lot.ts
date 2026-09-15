@@ -135,6 +135,24 @@ export async function fetchSignedLots(
   return lots
 }
 
+/**
+ * 按 id 拉单个**签约**车场（预约确认页用）。
+ *
+ * 复用 toParkingLot 的逐条校验：文档形状坏了返回 null，确认页据此给「车场不可用」提示。
+ * 走 where(_id) + limit(1) 而非 doc().get()：doc().get() 对不存在文档会 reject，
+ * where 对空结果静默返回空数组，调用方统一按 null 处理，省一层 try/catch。
+ * 距离字段对单场无意义，置 0 占位（确认页不展示距离）
+ */
+export async function fetchLotById(id: string): Promise<ParkingLot | null> {
+  const db = getCloudApi()?.database()
+  if (!db) throw new Error('云开发未初始化：请检查 config.local.ts 的 CLOUD_ENV')
+
+  const res = await db.collection('lots').where({ _id: id }).limit(1).get()
+  const doc = res.data[0]
+  if (!doc) return null
+  return toParkingLot(String(doc._id ?? ''), doc)
+}
+
 /** POI 检索结果 → 未签约车场。只有名称/位置/距离是真实数据，价格/余位/额度如实置 null */
 function poiToUnsignedLot(poi: PoiItem): ParkingLot {
   return {

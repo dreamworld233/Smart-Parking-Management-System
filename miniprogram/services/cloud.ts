@@ -71,3 +71,36 @@ export interface LoginResult {
 export function ensureLogin(): Promise<CloudResult<LoginResult>> {
   return callFunction<LoginResult>('login')
 }
+
+export interface CreateReservationData {
+  reservationId: string
+  orderNo: string
+  verifyCode: string
+  /** 到达时刻，毫秒时间戳 */
+  arriveTime: number
+  /** 入场截止，毫秒时间戳 */
+  enterDeadline: number
+  leadHours: number
+  prepaidParkingFee: number
+  serviceFee: number
+  totalAmount: number
+}
+
+export interface CreateReservationInput {
+  lotId: string
+  /** 到达时刻，毫秒时间戳 */
+  arriveAt: number
+  plateNo: string
+}
+
+/**
+ * 预约下单（付费层核心，云函数 createReservation）。
+ * 薄套 callFunction：计价/额度 CAS 全在云端，这里只透传入参与结果
+ */
+export function createReservation(
+  input: CreateReservationInput,
+): Promise<CloudResult<CreateReservationData>> {
+  // 展开成对象字面量再传：接口类型没有 index signature，直接传会与
+  // callFunction 的 `Record<string, unknown>` 参数失配（TS2345）
+  return callFunction<CreateReservationData>('createReservation', { ...input })
+}

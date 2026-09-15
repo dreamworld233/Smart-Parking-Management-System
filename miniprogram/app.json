@@ -4,6 +4,7 @@
     "pages/spike-map/spike-map",
     "pages/home/home",
     "pages/search/search",
+    "pages/confirm/confirm",
     "pages/orders/orders",
     "pages/profile/profile",
     "pages/owner/dashboard/dashboard",
