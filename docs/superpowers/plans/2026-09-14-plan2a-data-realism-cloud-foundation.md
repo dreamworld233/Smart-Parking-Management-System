@@ -14,7 +14,7 @@
 
 ---
 
-## 执行进度（2026-09-14 夜，更新至 Task 4）
+## 执行进度（2026-09-15 早，更新至 Task 5 代码部分）
 
 **本文件的 `- [ ]` 是原始步骤清单，不随执行翻勾**；实际进度以本节为准（Task 2 起一直这么做）。
 
@@ -25,8 +25,8 @@
 | Task 2 领域层真实化 | ✅ | `51b2b96` |
 | Task 3 geo.ts + lot.ts 重写 | ✅ | `4fed08a`、`5ca38eb`（复核后修复） |
 | Task 4 login + ensureLogin | ✅ | `7674d36`、`78e00a8`、`3d120f4` |
-| Task 5 seedLots 种子 | **挂起** —— 待用户实地核实 5 家车场的公示价（用户 2026-09-14 夜决定） | — |
-| Task 6 页面接入 + 真机验收 | 未开始（需用户在场） | — |
+| Task 5 seedLots 种子 | **代码就绪、数据待核** —— 云函数与 5 家候选已写好（用户 2026-09-15 早拍板先落骨架）；填价 → 部署 → 执行 | 见本节下方 |
+| Task 6 页面接入 + 真机验收 | 未开始（需用户在场；接入代码 Task 3 已顺带改完，独立剩两条空态文案） | — |
 
 **云上现状**（这些只存在于云开发控制台，不在 git 里，换环境要重建）：环境 `cloud1-d8gzxlbnq9a5cbf75`；11 个集合已建；**安全规则 11 条已按 Task 1 Step 4 口径配好**；`login` 已部署并端到端验收（`users` 出现一条文档，`_id` 与 `_openid` **都等于用户 openid**、`role: 'driver'`，重编译两次仍只有一条）。
 
@@ -62,6 +62,19 @@
 
 - `cloud.callFunction:fail errCode: -501000 FunctionName parameter could not be found`（`FUNCTION_NOT_FOUND`）= **那个环境里没有这个云函数**，不是环境配错（环境错会报环境找不到）。按序查：工具左侧树有没有该目录（没有 = 工具不认新加的目录，完全退出工具重开项目）→ 控制台云函数列表里有没有 → 是不是部署到了别的环境。
 - **部署完云函数后要在工具里点一次「编译」再测**。本次就是漏了这步，看到 `FUNCTION_NOT_FOUND` 误以为部署失败。
+
+### Task 5 的偏差（2026-09-15 早，写代码时逐条改的）
+
+`cloudfunctions/seedLots/{index.js,seed-data.js,package.json}` 已落盘，**未部署**（等填价）。
+
+1. **`availability.freeSpots` 从 `seed-data.js` 里删掉**（原规格每条都写 `freeSpots: null`）。`index.js` 恒写 `null` 入库，种子里配了也不生效 —— 留着只会让人以为改它有用。已在文件头注明「余位只由车场端上报」。
+2. **`isComplete` 布尔判定改成 `missingFields(lot)` 返回字段名数组**。云端测试结果里直接能看到「还缺 `pricing.capPerDay`」，不必回头数哪一格还是 null。顺手补上原本没校验的 `name` / `address` / `location`（`index.js` 原先直接读 `lot.pricing.firstHour`，条目少写 `pricing` 会整段 TypeError 崩掉，而不是干净地跳过）。
+3. **重跑不再改写 `contract.signedAt`**（原规格每次 `Date.now()`）。幂等的意思就是重跑无害，「什么时候签的」不该被种子的重跑改成今天。首次落库写 `now`，之后保留原值。
+4. **5 家的 `address` / `location` 用 2026-09-15 实测补全**：原规格 Step 1 表格只有 poiId + 名称，Step 2 代码块只给了 2 家的完整地址坐标。以合肥大学南艳湖校区为中心、1 km 半径打了一次真接口（1 次搜索配额，临时 live 用例，用完即删），5 家逐字照抄，另看到「云际路道路停车场」「江淮发动机公司内部停车场」两条未入选（后者是内部场地，不适合签约）。
+5. **`facilities` 的充电桩标签是中文 `'充电桩'`**，不是 `'charging'`：`domain/scoring.ts:244` 靠 `facilities.includes('充电桩')` 判定电动车的充电因子，写成英文会**静默**拿不到这分。已写进 `seed-data.js` 的填写说明。
+6. **当前状态口径**：5 条全 `null`，此时跑 seedLots 的预期结果是 `{ written: [], skipped: [5 条，各带 missing 清单] }` —— 这是**正确**结果，不是失败。已用离线桩（覆盖 `Module._load` 假 `wx-server-sdk`）验证过三条：全 null 一条不写 / 填满一条写入且 `freeSpots` 恒 `null`、`contract.status: 'signed'` / 重跑不新增且 `signedAt` 不变。
+
+**填价时的注意**：`reservableQuota` 是**平台可预约额度**（运营方给的数字），不是车场总车位；`pricing.source` 与 `availability.source` 各填各的，有公示价牌照到的 `'public'`、运营口头声明的 `'ops'`；核实方式记进 `note`（答辩讲数据出处用）。改完 `seed-data.js` 要**重新部署**才生效。
 
 ---
 
