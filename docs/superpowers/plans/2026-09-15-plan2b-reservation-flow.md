@@ -31,14 +31,16 @@
 
 ## 关键口径（先验算过，写代码时照此）
 
-1. **`lots` 额度字段**：2a 种子里是扁平 `reservableQuota`（数量上限），没有「已预约数」。**本轮给 `lots` 加 `reservedCount`（默认 0）**，CAS 用它和 `reservableQuota` 比。`seedLots` 的 upsert 加写 `reservedCount: 0`（幂等，重跑覆盖即可），**已部署的旧种子重跑一次就带上**。
-2. **云函数不能 import 小程序的 TS 领域层**（`wx-server-sdk` 的 CommonJS 环境）：计费/退款公式在 `cloudfunctions/shared/pricing.js` 用 CommonJS **重写一份**，createReservation 与 cancelReservation 共用。**两处实现必须同口径** —— `miniprogram/domain/pricing.ts` 的单测是真值，JS 侧照抄并在文件头互相引用，改一边必须改另一边。
-3. **CAS 抢额度**（spec §5.1，官方 `_.inc()` 原子 + `stats.updated` 判定）：
+1. **`lots` 额度字段**：2a 种子里是扁平 `reservableQuota`（数量上限），没有「已预约数」。**本轮给 `lots` 加 `reservedCount`（默认 0）**，CAS 用它和 `reservableQuota` 比。`seedLots` 的 upsert 加写 `reservedCount: 0`（幂等，重跑覆盖即可），**已部署的旧种子重跑一次就带上**。**本轮 Task 1 就改并重跑**（createReservation 依赖它，不等 Task 5）。
+2. **云函数不能 import 小程序的 TS 领域层**（`wx-server-sdk` 的 CommonJS 环境）：计费/退款公式用 CommonJS **重写一份**，createReservation 与 cancelReservation 各复制一份。**不建 `cloudfunctions/shared/`**：云函数单目录打包上传，跨目录 `require('../shared/pricing')` 部署后取不到（本地工具模拟能跑是假象）。**两处实现必须同口径** —— `miniprogram/domain/pricing.ts` 的单测是真值，JS 侧照抄并在文件头互相引用，改一边必须改另一边。
+3. **CAS 抢额度**（spec §5.1，官方 `_.inc()` 原子 + `stats.updated` 判定）。**2026-09-15 验算修正**：原式 `where({ reservedCount: _.lt(reservableQuota) })` 是字段间比较，云开发 where 指令只接受常量值，字段对字段不可靠（`reservableQuota` 当字符串传则按 BSON 类型序恒真、超额放行；当未声明变量直接 ReferenceError）。改用**读后等值 CAS**：
    ```
-   where({ _id: lotId, reservedCount: _.lt(reservableQuota) }).update({ data: { reservedCount: _.inc(1) } })
-   → stats.updated === 1 抢到，0 已满
+   doc(lotId).get() → 读 reservedCount（兜底 ?? 0）与 reservableQuota
+   if !(reservedCount < reservableQuota) → LOT_FULL
+   where({ _id: lotId, reservedCount }).update({ data: { reservedCount: _.inc(1) } })
+   → stats.updated === 1 抢到；0 = 别人抢先（值已变），重读重试，上限 3 次后 LOT_FULL
    ```
-   `updated === 0` 无法区分「没匹配到」与「匹配到了值没变」，但 `_.inc(1)` 必然改变值，本场景无歧义 —— 注释写明。CAS 成功后再写单，写单失败回补 `_.inc(-1)`。
+   等值 CAS 里 `_.inc(1)` 必然改变值，`updated === 0` 无歧义（匹配失败 = 值已被改，不是「值没变」）—— 注释写明。CAS 成功后再写单，写单失败回补 `_.inc(-1)`。**老 lots 文档没有 `reservedCount`**，读时兜底 `?? 0`（防 seedLots 未重跑前的旧数据）。
 4. **verifyCode**：6 位数字（核销用）。`orderNo`：`'PK' + 时间戳 + 随机 3 位`。
 5. **身份**：云函数内 `cloud.getWXContext().OPENID`，`userId` 存 openid（Task 4 的教训，安全规则 `doc.userId == auth.openid`）。
 6. **前端只读自己的预约**：`reservations` / `orders` 前端直读 `where({ userId: OPENID })`，写一律走云函数（安全规则已按 Task 1 口径配好）。
@@ -52,7 +54,7 @@
 
 | 文件 | 动作 | 职责 |
 |---|---|---|
-| `cloudfunctions/shared/pricing.js` | 建 | 计费/退款公式的 CommonJS 版（与 TS 侧同口径） |
+| `cloudfunctions/{createReservation,cancelReservation}/pricing.js` | 建 | 计费/退款公式 CommonJS 版（与 TS 侧同口径）。**不建 `shared/`**（云函数单目录打包，跨目录 require 部署后失效），复制进每个函数目录各一份 |
 | `cloudfunctions/createReservation/index.js` + `package.json` | 建 | CAS 抢额度 + 建 reservations/orders×2/payments(模拟) |
 | `cloudfunctions/cancelReservation/index.js` + `package.json` | 建 | 退款 + orders(refund) + 回补额度 + 违约落 violations |
 | `cloudfunctions/seedLots/index.js` | 改 | upsert 加 `reservedCount: 0` |
@@ -74,26 +76,36 @@
 - ✅ `services/storage.ts`：**已有 `getDefaultPlate` / `setDefaultPlate`**（车牌记住功能早存在，直接复用，不新建 API）—— 文件结构总览里的 storage 行改为「复用」
 - ✅ `app.ts`：`onLaunch` 已调 `ensureLogin` 建档（身份地基在）
 - ✅ `app.json`：`pages/orders/orders` 已注册（占位页在）；`pages/confirm` 需新增注册
-- ⚠️ `config.ts`：**没有**到达窗口/入场缓冲/时刻步长常量 —— Task 2 加 `ARRIVE_WINDOW_MIN`(120)、`ENTRY_GRACE_MINUTES`(15)、`ARRIVE_STEP_MIN`(15)
+- ⚠️ `config.ts`：无时刻步长常量 —— Task 2 只加 `ARRIVE_STEP_MIN`(15)。**窗口与缓冲复用 `domain/pricing.ts` 的 `MAX_LEAD_HOURS`(2h) / `ENTRY_GRACE_MS`(15min)**，不重复定义分钟常量（两处会漂移）
 - ⚠️ **安全规则待用户控制台核对**：`reservations` / `orders` 是否已有 `doc.userId == auth.openid` 只读（Task 1 配的 11 条，需确认含这两张）
 - ✅ `npm test` 基线 225 全绿
 
 ### Task 1: createReservation 云函数
 
-`cloudfunctions/shared/pricing.js` + `cloudfunctions/createReservation/index.js`：
+**规格验算偏差（2026-09-15 派活前修，见 [[plan-specs-need-verification]]）：**
+- **CAS 改读后等值 CAS**，见「关键口径 3」修正
+- **`pricing.js` 建在 `cloudfunctions/createReservation/pricing.js`**（不建 `shared/`），Task 3 复制到 cancelReservation/
+- **JS 计价函数对齐 TS 真值**（`miniprogram/domain/pricing.ts`，逐行照抄）：
+  - `leadHours(now, arrive)`：`!(diffMs > 0) → 1` 的 NaN/过去时刻兜底**必须照抄** —— 计划原式 `ceilHours(arrive - now)` 在 `arrive == now` 时算 0 元，是 bug
+  - `quoteTotal` 返回**含 `leadHours`**（`{ leadHours, prepaidParkingFee, serviceFee, totalAmount }`），不是计划的 `quoteReservation` 三字段
+  - 补 `isBookableArrival(now, arrive)`（`[now, now+2h]`、NaN 保护）
+  - `cancelRefund` 一并照抄（Task 3 用，同文件导出）
+- **写单失败回补**：CAS 成功后写 `reservations` 失败 → `_.inc(-1)` 返回错误；`reservations` 已建但 `orders`/`payments` 失败 → **删除刚建的 reservation**（`.doc(reservationId).remove()`）+ `_.inc(-1)`，不留孤儿单
+- **车牌正则**：`/^[一-龥][A-Z][A-Z0-9]{5,6}$/`，云函数与前端 `domain/format.ts` 各写一份（两端同源注释）
+- **seedLots 本轮改 `reservedCount: 0`** 并部署重跑（关键口径 1）
+
+`cloudfunctions/createReservation/pricing.js` + `cloudfunctions/createReservation/index.js`：
 
 ```js
-// shared/pricing.js —— 与 miniprogram/domain/pricing.ts 同口径，改一边必须改另一边
+// pricing.js —— 与 miniprogram/domain/pricing.ts 同口径，改一边必须改另一边
+// 本文件复制进 createReservation/ 与 cancelReservation/ 各一份（云函数单目录打包）
 const HOUR_MS = 3600 * 1000
-function ceilHours(diffMs) { return Math.ceil(diffMs / HOUR_MS) }
-function prepaidParkingFee(now, arrive, firstHourRate) { return ceilHours(arrive - now) * firstHourRate }
-function quoteReservation(now, arrive, firstHourRate) {
-  const prepaid = prepaidParkingFee(now, arrive, firstHourRate)
-  return { prepaidParkingFee: prepaid, serviceFee: 2, totalAmount: prepaid + 2 }
-}
-// cancelRefund：见 miniprogram/domain/pricing.ts 的注释与单测，逐行照抄
-function cancelRefund(orderAt, arrive, cancelAt, firstHourRate) { /* ... */ }
-module.exports = { HOUR_MS, ceilHours, prepaidParkingFee, quoteReservation, cancelRefund }
+function leadHours(now, arrive) { /* 照抄 pricing.ts：!(diffMs > 0) → 1 */ }
+function isBookableArrival(now, arrive) { /* 照抄 pricing.ts：[now, now+2h]、NaN 保护 */ }
+function prepaidParkingFee(now, arrive, firstHourRate) { /* 照抄：leadHours × 单价 */ }
+function quoteTotal(now, arrive, firstHourRate) { /* 照抄：含 leadHours */ }
+function cancelRefund(orderAt, arrive, cancelAt, firstHourRate) { /* 照抄：免费窗/公式/isBreach */ }
+module.exports = { HOUR_MS, leadHours, isBookableArrival, prepaidParkingFee, quoteTotal, cancelRefund }
 ```
 
 主函数：
