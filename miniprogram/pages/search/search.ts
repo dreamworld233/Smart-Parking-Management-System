@@ -136,17 +136,21 @@ Page({
 
   onInput(e: WechatMiniprogram.Input) {
     const keyword = e.detail.value
-    // 重新输入 = 开始一次新检索：把上一轮「已出结果」的态拉回 idle，候选框才可能重新出现
-    //（它的可见性门控 state === 'idle'，防止陈旧 resolve 把列表救回来 —— 上一轮真机反馈
-    // 就是这么修好的，代价是搜完一次后 state 停在 ready、再搜索候选框出不来，这里补回来）。
-    // 同时自增 searchSeq 作废上一轮还没返回的检索：否则它稍后把 state 写回 ready，
-    // 候选框又被压掉，问题在加载期间复发
-    if (this.data.state !== 'idle') {
-      this.searchSeq++
-      this.setData({ state: 'idle', detail: null })
-    }
     this.setData({ keyword })
     this.scheduleSuggest(keyword)
+  },
+
+  /**
+   * 点搜索框 = 主动开始一次新检索：把结果态拉回 idle（历史/候选出现）。
+   * **不能在 onInput 里做这件事**（2026-09-15 真机反馈改过头）：结果视图里
+   * 搜索框是「展示所选目的地」的状态，一敲键盘就弹候选、逼用户再选一次，
+   * 属于逻辑错误。候选只在该回输入态时出现 —— 用户明确点进搜索框才算
+   */
+  onInputFocus() {
+    if (this.data.state === 'idle') return
+    // 自增 searchSeq 作废在途检索：否则它稍后把 state 写回 ready，刚拉回的 idle 又被顶掉
+    this.searchSeq++
+    this.setData({ state: 'idle', detail: null })
   },
 
   /**

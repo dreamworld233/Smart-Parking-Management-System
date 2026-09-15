@@ -8,6 +8,7 @@
       confirm-type="search"
       bindinput="onInput"
       bindconfirm="onSearch"
+      bindfocus="onInputFocus"
     />
     <view class="bar__cancel" bindtap="onBack">取消</view>
   </view>
