@@ -13,8 +13,10 @@
   </view>
 
   <!-- 输入联想候选：在搜索栏正下方，替代历史。用户点选哪条就用哪条的坐标，
-       不再静默拿接口首条（2026-09-15 改：suggestion + 显式选择） -->
-  <scroll-view class="suggest" scroll-y wx:if="{{candidates.length}}" style="top: {{mapTop}}px">
+       不再静默拿接口首条（2026-09-15 改：suggestion + 显式选择）。
+       用普通 view 而非 scroll-view：Skyline 下绝对定位的 scroll-view 只给
+       max-height 不给 height 会把高度算成 0，列表整块看不见（2026-09-15 真机反馈） -->
+  <view class="suggest" wx:if="{{candidates.length}}" style="top: {{mapTop}}px">
     <view
       class="suggest__item"
       wx:for="{{candidates}}"
@@ -25,7 +27,10 @@
       <view class="suggest__title">{{item.title}}</view>
       <view class="suggest__addr">{{item.address}}</view>
     </view>
-  </scroll-view>
+  </view>
+
+  <!-- 临时调试行：联想出问题时能看出是「接口没返回」还是「渲染问题」，定位后删 -->
+  <view class="suggest__debug" wx:if="{{suggestDebug}}" style="top: {{mapTop}}px">{{suggestDebug}}</view>
 
   <!-- 还没搜过：只出历史，不出地图（少一次原生组件创建）。候选开着时历史让位 -->
   <view class="hist" wx:if="{{state === 'idle' && !candidates.length}}" style="padding-top: {{mapTop}}px">

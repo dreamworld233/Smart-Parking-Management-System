@@ -46,15 +46,30 @@
 
 /* 联想候选：top 由 search.ts 算成 px 内联传入（搜索栏正下方）。
    z-index 显式给 1：Skyline 没有 Web 层叠上下文，同是绝对定位的兄弟节点按 DOM 顺序绘制，
-   候选排在 map 之前，不给 z-index 会被地图压住点不动（与顶栏同一条坑） */
+   候选排在 map 之前，不给 z-index 会被地图压住点不动（与顶栏同一条坑）。
+   用普通 view：Skyline 下绝对定位 scroll-view 只给 max-height 会算成 0 高度（真机踩到） */
 .suggest {
   position: absolute;
   left: 0;
   right: 0;
   z-index: 1;
   max-height: 560rpx;
+  overflow: hidden;
   padding: 0 24rpx 24rpx;
   box-sizing: border-box;
+}
+
+/* 临时调试行：黄色底，联想出问题能直接看到，定位后删 */
+.suggest__debug {
+  position: absolute;
+  left: 24rpx;
+  right: 24rpx;
+  z-index: 2;
+  padding: 12rpx 20rpx;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 22rpx;
+  border-radius: 8rpx;
 }
 
 .suggest__item {

@@ -186,8 +186,9 @@ describe('suggestPlaces', () => {
     expect(url).toContain('https://apis.map.qq.com/ws/place/v1/suggestion?')
     expect(url).toContain('keyword=南大')
     expect(url).toContain('region=合肥')
-    // region_fix=1 是硬限定：不传它会全国联想，把南京大学带进来（2026-09-15 实测）
-    expect(url).toContain('region_fix=1')
+    // region_fix=0 = 本地优先 + 全国兜底（用户 2026-09-15 拍板全国可搜）：
+    // =1 只出合肥本地，=0 才保留南京大学这类跨城候选
+    expect(url).toContain('region_fix=0')
     expect(url).toContain('page_size=10')
   })
 

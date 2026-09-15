@@ -78,16 +78,19 @@ maybeDescribe('qqmap 真接口', () => {
   )
 
   it(
-    'suggestion 限定合肥：本地地点能出，跨城的进不来',
+    'suggestion 本地优先 + 全国兜底：本地词排第一，跨城也能出',
     async () => {
+      // 合肥为主场景：本地词必须排第一（万象城 → 合肥万象城，不是成都万象城）
       const local = await suggestPlaces('合肥大学', '合肥')
-
       expect(local.length).toBeGreaterThan(0)
       expect(local[0].title).toContain('合肥大学')
 
-      const cross = await suggestPlaces('南京大学', '合肥')
+      // 全国兜底：region_fix=0 下跨城目的地也进得来（用户 2026-09-15 拍板全国可搜）
+      const mall = await suggestPlaces('万象城', '合肥')
+      expect(mall[0].title).toContain('合肥万象城')
 
-      expect(cross.every(p => p.title.indexOf('南京大学') < 0)).toBe(true)
+      const cross = await suggestPlaces('南京大学', '合肥')
+      expect(cross.some(p => p.title.indexOf('南京大学') >= 0)).toBe(true)
     },
     20000,
   )

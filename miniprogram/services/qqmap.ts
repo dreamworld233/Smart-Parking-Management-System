@@ -130,10 +130,12 @@ function toSuggestion(item: RawSuggestion): PoiItem {
 /**
  * 关键词语料联想（`/ws/place/v1/suggestion`）。
  *
- * 页面用它做目的地检索（用户 2026-09-15 拍板）：
- * - **`region` 是硬限定，不是偏好**（2026-09-15 实测）：`南大&region=合肥&region_fix=1`
- *   只出合肥内的南大街/南大郢；不传 region 则全国联想、直接出南京大学。项目以合肥为
- *   中心，跨城检索有意关掉，所以固定 `region_fix=1`
+ * 页面用它做目的地检索：
+ * - **`region=合肥&region_fix=0` = 本地优先 + 全国兜底**（2026-09-15 实测三组对比）：
+ *   `region_fix=1` 只出合肥本地（`万象城` → 全是合肥的）；`region_fix=0` 把合肥结果排
+ *   前面、同时保留全国候选（`万象城` → 合肥万象城第一 + 南通万象城兜底）；完全不传
+ *   region 则纯全国相关度（`万象城` → 成都第一，本地反而被挤掉）。用户 2026-09-15 决定
+ *   要全国可搜、但不能让合肥主场景吃亏，所以取中间档
  * - **返回值不带距离**：候选只有 title/address/location，页面不排序、按接口顺序展示，
  *   用户点选哪条就用哪条的坐标
  * - 联想接口的配额与 place search **分开计**（用户确认），所以输入时每敲一组字打一次
@@ -147,7 +149,7 @@ export async function suggestPlaces(keyword: string, region: string): Promise<Po
   const raw = await get<RawSuggestion[]>(SUGGEST_PATH, {
     keyword,
     region,
-    region_fix: 1,
+    region_fix: 0,
     page_size: 10,
   })
   return (raw ?? []).map(toSuggestion)

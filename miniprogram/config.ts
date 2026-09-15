@@ -80,9 +80,9 @@ export const MAX_PINS = 8
 export const SEARCH_BIAS_RADIUS_M = 50000
 
 /**
- * 目的地检索的行政区限定。项目以合肥为中心（用户 2026-09-15 拍板）：
- * suggestion 的 `region` 是**硬限定**不是偏好（实测 `南大&region=合肥` 只出合肥内
- * 的南大街/南大郢，不传 region 则全国联想出南京大学），所以跨城检索被有意关掉
+ * 目的地检索的行政区限定。合肥为主场景，但**允许全国兜底**（用户 2026-09-15）：
+ * suggestion 配 `region_fix=0` 时合肥结果排前面、全国候选保留 —— 本地常用词（万象城）
+ * 不被成都/南通挤掉，跨城目的地（南京大学）也还能搜到
  */
 export const SEARCH_REGION = '合肥'
 
