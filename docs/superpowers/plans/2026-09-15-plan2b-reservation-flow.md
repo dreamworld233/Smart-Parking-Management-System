@@ -23,7 +23,7 @@
 | Task 0 前置核对与地基 | ✅ | 09ce40d（含 fd060ae 核对） |
 | Task 1 createReservation 云函数 | ✅ | bd2e5f3 + 4b4f320（回补修） |
 | Task 2 预约确认页 | ✅ | （本次提交） |
-| Task 3 cancelReservation 云函数 | — | — |
+| Task 3 cancelReservation 云函数 | ✅ | （本次提交） |
 | Task 4 我的订单页 | — | — |
 | Task 5 接线 + 真机验收 | — | — |
 
