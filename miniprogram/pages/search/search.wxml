@@ -86,7 +86,7 @@
       <state-view
         wx:elif="{{state === 'empty'}}"
         kind="empty"
-        text="目的地周边暂无签约车场"
+        text="目的地周边暂无停车场"
         hint="换个关键词，或直接输入目的地"
       />
 

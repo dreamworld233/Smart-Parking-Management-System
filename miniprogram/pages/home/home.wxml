@@ -48,7 +48,7 @@
       <state-view
         wx:elif="{{state === 'empty'}}"
         kind="empty"
-        text="附近暂无签约车场，签约车场将陆续上线"
+        text="附近暂无停车场"
         hint="试试搜索指定目的地"
         action-text="去搜索"
         bind:action="onSearchTap"

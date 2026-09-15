@@ -10,7 +10,7 @@ import {
   formatRatingSummary,
   sourceNotes,
 } from '../../miniprogram/domain/format'
-import type { ParkingLot } from '../../miniprogram/domain/types'
+import type { LotPricing, ParkingLot } from '../../miniprogram/domain/types'
 
 describe('formatDistance', () => {
   // 分界线画在**四舍五入之后**的米数上，不是入参上：
@@ -166,6 +166,8 @@ describe('sourceNotes', () => {
   function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     return {
       id: 'L1',
+      poiId: 'p1',
+      signed: true,
       name: '万象城地下停车场',
       address: '历下区经十路 1234 号',
       location: { lat: 36.65, lng: 117.12 },
@@ -181,20 +183,30 @@ describe('sourceNotes', () => {
     }
   }
 
+  /** 独立出价格夹具：lot() 的 pricing 现在可空，不再从它身上展开 */
+  function lotPricing(source: 'public' | 'ops' | 'estimated' | 'placeholder'): LotPricing {
+    return { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source }
+  }
+
   it('距离估算、收费运营声明、余位未上报时逐条标注', () => {
     const l = lot({ availability: { freeSpots: null, totalSpots: 500, source: 'ops' } })
     expect(sourceNotes(l)).toEqual(['距离为估算', '收费为运营声明', '余位待车场上报'])
   })
 
+  it('未签约车场一句话标清身份，不再逐条说无数据', () => {
+    const l = lot({ signed: false, poiId: 'poi-x', pricing: null, availability: null, reservableQuota: null })
+    expect(sourceNotes(l)).toEqual(['未签约，暂不开放预约，可导航前往', '距离为估算'])
+  })
+
   it('收费为公示价时标注公示价，不牵连其它', () => {
-    const l = lot({ distanceSource: 'route', pricing: { ...lot().pricing, source: 'public' } })
+    const l = lot({ distanceSource: 'route', pricing: lotPricing('public') })
     expect(sourceNotes(l)).toEqual(['收费来源于车场公示价'])
   })
 
   it('收费为估算时单独标注，不把公示价说成估算', () => {
     const l = lot({
       distanceSource: 'route',
-      pricing: { ...lot().pricing, source: 'estimated' },
+      pricing: lotPricing('estimated'),
       availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
     })
     expect(sourceNotes(l)).toEqual(['收费为估算'])
@@ -203,7 +215,7 @@ describe('sourceNotes', () => {
   it('价格与总车位同为演示暂定值时，合成一条，不标成运营声明', () => {
     const l = lot({
       distanceSource: 'route',
-      pricing: { ...lot().pricing, source: 'placeholder' },
+      pricing: lotPricing('placeholder'),
       availability: { freeSpots: 200, totalSpots: 500, source: 'placeholder' },
     })
     expect(sourceNotes(l)).toEqual(['价格与车位为示例数据，待核实'])
@@ -212,7 +224,7 @@ describe('sourceNotes', () => {
   it('只有价格是暂定值时，不把车位一起说成示例数据', () => {
     const l = lot({
       distanceSource: 'route',
-      pricing: { ...lot().pricing, source: 'placeholder' },
+      pricing: lotPricing('placeholder'),
       availability: { freeSpots: 200, totalSpots: 500, source: 'public' },
     })
     expect(sourceNotes(l)).toEqual(['价格为示例数据，待核实'])
@@ -221,7 +233,7 @@ describe('sourceNotes', () => {
   it('只有车位是暂定值时，不把价格一起说成示例数据', () => {
     const l = lot({
       distanceSource: 'route',
-      pricing: { ...lot().pricing, source: 'public' },
+      pricing: lotPricing('public'),
       availability: { freeSpots: 200, totalSpots: 500, source: 'placeholder' },
     })
     expect(sourceNotes(l)).toEqual(['收费来源于车场公示价', '车位数为示例数据，待核实'])
@@ -234,7 +246,7 @@ describe('sourceNotes', () => {
 
   it('距离估算与收费公示价各自独立标注，不把公示价说成估算', () => {
     const l = lot({
-      pricing: { ...lot().pricing, source: 'public' },
+      pricing: lotPricing('public'),
       availability: { freeSpots: 200, totalSpots: 500, source: 'public' },
     })
     expect(sourceNotes(l)).toEqual(['距离为估算', '收费来源于车场公示价'])

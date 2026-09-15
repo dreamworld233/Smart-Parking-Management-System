@@ -10,6 +10,7 @@
       </view>
       <view class="card__addr">{{vm.lot.address}} · 步行 {{vm.walkText}} · {{vm.distanceText}}</view>
 
+      <!-- 未签约：没有余位/收费数据，两个格子如实标「--」，评分照常（距离驱动的纯距离分） -->
       <view class="stats">
         <view class="stat">
           <view class="stat__k">实时余位</view>
@@ -48,17 +49,22 @@
       </view>
     </view>
 
-    <view class="card">
+    <!-- 未签约：收费规则与额度卡换成一句说明，别摆一排「--」 -->
+    <view class="card" wx:if="{{vm.unsigned}}">
+      <view class="card__title">预约</view>
+      <view class="quota__note">该车场尚未与平台签约，暂不开放在线预约</view>
+      <view class="quota__note">可通过下方「导航前往」直接过去停车</view>
+    </view>
+
+    <view class="card" wx:else>
       <view class="card__title">收费规则</view>
       <view class="row"><text class="row__k">首小时</text><text>¥{{vm.firstHourText}}</text></view>
       <view class="row"><text class="row__k">后续每小时</text><text>¥{{vm.nextHourText}}</text></view>
       <view class="row"><text class="row__k">计费步长</text><text>{{vm.stepText}}</text></view>
       <view class="row"><text class="row__k">单日封顶</text><text>¥{{vm.capText}}</text></view>
       <view class="row"><text class="row__k">夜间 22:00–08:00</text><text>{{vm.nightText}}</text></view>
-    </view>
 
-    <view class="card">
-      <view class="card__title">可预约额度</view>
+      <view class="card__title quota__title">可预约额度</view>
       <view class="quota">本车场已开放 <text class="primary bold">{{vm.quotaText}}</text> 个预约车位</view>
       <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
       <view class="quota__note">可预约额度与设施由平台运营维护</view>
@@ -67,9 +73,10 @@
     <view class="tail" />
   </scroll-view>
 
-  <!-- 双按钮吸在面板底：面板只有窗口的 0.43，跟着内容滚就永远够不着 -->
+  <!-- 双按钮吸在面板底：面板只有窗口的 0.43，跟着内容滚就永远够不着。
+       未签约只有导航一个入口，没有可预约的按钮可以按 -->
   <view class="detail__bar">
     <view class="detail__ghost" bindtap="onNavigate">导航前往</view>
-    <view class="detail__primary" bindtap="onReserve">预约车位</view>
+    <view class="detail__primary" wx:if="{{!vm.unsigned}}" bindtap="onReserve">预约车位</view>
   </view>
 </view>

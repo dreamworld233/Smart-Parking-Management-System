@@ -4,6 +4,8 @@ import type { ParkingLot, Recommendation } from '../../miniprogram/domain/types'
 function lot(id: string, distanceM: number, firstHour: number): ParkingLot {
   return {
     id,
+    poiId: id,
+    signed: true,
     name: `${id}地下停车场`,
     address: '',
     location: { lat: 31.75, lng: 117.25 },
@@ -15,6 +17,17 @@ function lot(id: string, distanceM: number, firstHour: number): ParkingLot {
     reservableQuota: 10,
     ratingSummary: null,
     facilities: [],
+  }
+}
+
+/** 未签约车场：图钉只有距离，没有价格可标 */
+function unsignedLot(id: string, distanceM: number): ParkingLot {
+  return {
+    ...lot(id, distanceM, 0),
+    signed: false,
+    pricing: null,
+    availability: null,
+    reservableQuota: null,
   }
 }
 
@@ -36,6 +49,10 @@ describe('pinLabel', () => {
   it('不带任何「推荐」字样（2026-09-13 用户去掉：选中已经表达了重点，两个蓝块很怪）', () => {
     expect(pinLabel(lot('A', 320, 6))).not.toContain('★')
     expect(pinLabel(lot('A', 320, 6))).not.toContain('推荐')
+  })
+
+  it('未签约车场图钉只标距离，不拿「¥」糊弄', () => {
+    expect(pinLabel(unsignedLot('U', 320))).toBe('320m')
   })
 
   it('车场名不进图钉 —— 名字长了必然互相压死，名字交给卡片', () => {

@@ -1,9 +1,10 @@
 <view class="card {{selected ? 'card--on' : ''}}" bindtap="onCardTap">
   <view class="card__head">
     <view class="card__name">{{item.lot.name}}</view>
+    <!-- 未签约没有价格：整格显示「--」，别渲染出半个「¥/时」 -->
     <view class="card__price">
-      <text class="tnum">¥{{item.lot.pricing.firstHour}}</text>
-      <text class="card__unit">/时</text>
+      <text class="tnum">{{item.lot.signed ? '¥' + item.lot.pricing.firstHour : '--'}}</text>
+      <text class="card__unit" wx:if="{{item.lot.signed}}">/时</text>
     </view>
   </view>
 
@@ -40,6 +41,6 @@
 
   <view class="card__actions" wx:if="{{showActions}}">
     <view class="act act--ghost" catchtap="onNavigate">导航前往</view>
-    <view class="act act--primary" catchtap="onReserve">预约车位</view>
+    <view class="act act--primary" wx:if="{{item.lot.signed}}" catchtap="onReserve">预约车位</view>
   </view>
 </view>

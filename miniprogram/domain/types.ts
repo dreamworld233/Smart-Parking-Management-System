@@ -57,8 +57,21 @@ export interface LotRatingSummary {
   count: number
 }
 
+/**
+ * 一个展示车场。分两类，用 `signed` 判别（不是子类：WXML 分支靠运行时字段，
+ * 判别联合会让所有消费方都套一层收窄，收益不抵复杂度）：
+ * - **签约**（`signed: true`）：数据来自云 `lots` 集合，可预约。`pricing` /
+ *   `availability` / `reservableQuota` 都有值
+ * - **未签约**（`signed: false`）：来自腾讯 POI 检索，只提供名称/位置/距离与导航，
+ *   不可预约。`pricing` / `availability` / `reservableQuota` 为 `null` —— 没有数据
+ *   就如实说没有，不编
+ */
 export interface ParkingLot {
   id: string
+  /** 腾讯 POI id。签约车场 = lots 文档的 poiId，未签约 = 检索结果自身 id；用于去重 */
+  poiId: string
+  /** 是否已签约（可预约）。未签约只提供基础导航 */
+  signed: boolean
   name: string
   address: string
   location: GeoPoint
@@ -66,10 +79,10 @@ export interface ParkingLot {
   walkMinutes: number
   /** 上面两个数的来源，页面据此决定是否标「估算」 */
   distanceSource: DistanceSource
-  pricing: LotPricing
-  availability: LotAvailability
-  /** 车场开放的可预约车位数（运营配置；实时剩余随预约扣减，云函数维护） */
-  reservableQuota: number
+  pricing: LotPricing | null
+  availability: LotAvailability | null
+  /** 车场开放的可预约车位数（运营配置；实时剩余随预约扣减，云函数维护）。未签约无此数据 */
+  reservableQuota: number | null
   /** 平台评价聚合。null = 暂无评价，界面显示「暂无评分」 */
   ratingSummary: LotRatingSummary | null
   /** 设施标签，签约时由运营录入（来源 ops），如 `['充电桩']` */
@@ -78,7 +91,8 @@ export interface ParkingLot {
 
 /** 各维度得分均为归一化后的 0–1 数值；null = 该因子无数据，未参与本次加权 */
 export interface ScoreFactors {
-  fee: number
+  /** 未签约车场没有价格，fee 同样可以为 null */
+  fee: number | null
   distance: number
   availability: number | null
   infra: number

@@ -123,24 +123,28 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
   const weights = ctx.weights ?? DEFAULT_WEIGHTS
 
   // 费用基准只求一次并往下传：归一化与「单价最低」判定必须共用同一份，
-  // 各处自己再算一遍 Math.min，会在归一化口径调整时悄悄失配
-  const fees = ctx.allLots.map(l => l.pricing.firstHour)
-  const minFee = Math.min(...fees)
-  const maxFee = Math.max(...fees)
+  // 各处自己再算一遍 Math.min，会在归一化口径调整时悄悄失配。
+  // 只有签约车场有价格（未签约 pricing 为 null），价格因子缺席时权重重分配
+  const signed = ctx.allLots.filter(l => l.signed)
+  const fees = signed.map(l => l.pricing!.firstHour)
+  const minFee = fees.length ? Math.min(...fees) : NaN
+  const maxFee = fees.length ? Math.max(...fees) : NaN
 
-  const feeFactor = lowerIsBetter(lot.pricing.firstHour, fees)
+  const feeFactor = lot.pricing
+    ? lowerIsBetter(lot.pricing.firstHour, fees)
+    : null
   const distanceFactor = lowerIsBetter(lot.distanceM, ctx.allLots.map(l => l.distanceM))
 
   // 可用性：空闲率低于饱和下限直接归零；高于下限则从下限到满位线性映射到 0–1。
-  // 除零与缺失值口径收敛在 freeRate()。
-  const rate = freeRate(lot.availability)
+  // 除零与缺失值口径收敛在 freeRate()。未签约无余位数据，因子缺席
+  const rate = lot.availability ? freeRate(lot.availability) : NaN
   // 饱和判定只有 isSaturated 一处定义；这里求一次再传给 toneFor / buildReasons。
-  const saturated = isSaturated(rate)
-  // 余位未上报（NaN）时可用性因子整体缺席，而不是记 0 分 ——
+  const saturated = lot.availability ? isSaturated(rate) : false
+  // 余位未上报（NaN）或未签约时可用性因子整体缺席，而不是记 0 分 ——
   // 记 0 分是对「没数据」的系统性惩罚，与口碑同理（数据模型 §5.4）
-  const availabilityFactor = saturated || Number.isNaN(rate)
-    ? (Number.isNaN(rate) ? null : 0)
-    : clamp01((rate - FREE_FLOOR) / (1 - FREE_FLOOR))
+  const availabilityFactor = lot.availability && !Number.isNaN(rate)
+    ? (saturated ? 0 : clamp01((rate - FREE_FLOOR) / (1 - FREE_FLOOR)))
+    : null
 
   // 基础设施：仅纯电/插混车受充电桩影响
   const infraFactor = ctx.userNeedsCharging ? (ctx.hasCharging ? 1 : 0) : 1
@@ -160,7 +164,8 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
   }
 
   // 有效因子权重重分配：缺一个因子就把它那份权重按比例分给剩下的，
-  // 而不是当成 0 分。fee 与 distance 恒有值（权重合计至少 0.45），除零不可达
+  // 而不是当成 0 分。distance 恒有值（权重至少 0.15），除零不可达；
+  // 未签约车场 pricing/availability 缺席，权重重分配后得分退化为纯距离
   let weightSum = 0
   let raw = 0
   const pairs: Array<[number, number | null]> = [
@@ -192,7 +197,8 @@ export function scoreLot(lot: ParkingLot, ctx: ScoreContext): Recommendation {
 function toneFor(saturated: boolean, factors: ScoreFactors): ReasonTone {
   if (saturated) return 'bad'
   const availabilityGood = factors.availability !== null && factors.availability >= 0.6
-  return availabilityGood || factors.fee >= 0.8 || factors.distance >= 0.8 ? 'good' : 'plain'
+  const feeGood = factors.fee !== null && factors.fee >= 0.8
+  return availabilityGood || feeGood || factors.distance >= 0.8 ? 'good' : 'plain'
 }
 
 function buildReasons(
@@ -211,7 +217,8 @@ function buildReasons(
     reasons.push('空位充足')
   }
 
-  if (factors.fee >= 0.8) {
+  // 未签约没有价格，价格类理由一律不出（fee 因子缺席时为 null，自然也到不了 0.8）
+  if (factors.fee !== null && factors.fee >= 0.8 && lot.pricing) {
     const diff = lot.pricing.firstHour - minFee
     // 金额一律走 formatAmount：自己拼会把 5.1 - 5（浮点下 0.09999999999999964）
     // 渲染成 ¥0.1，而同一笔钱在列表里是 ¥0.10

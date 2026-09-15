@@ -8,7 +8,7 @@ import { availabilityLevel, freeRate, topRecommendations } from '../../domain/sc
 import type { AvailabilityLevel } from '../../domain/scoring'
 import { sortLots } from '../../domain/sort'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
-import { fetchSignedLots } from '../../services/lot'
+import { fetchLotsAround } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
 
 type ViewState = 'loading' | 'ready' | 'empty' | 'error'
@@ -41,20 +41,24 @@ interface CardVM {
 }
 
 function toVM(rec: Recommendation): CardVM {
-  const free = rec.lot.availability.freeSpots
-  const total = rec.lot.availability.totalSpots
+  const { lot } = rec
+  // 未签约：没有余位数据，「待上报」是签约车场的状态词，这里该显示「--」
+  const spotsText =
+    lot.signed && lot.availability
+      ? formatSpots(lot.availability.freeSpots, lot.availability.totalSpots)
+      : '--'
   // 空闲率的派生（除零、NaN 兜底）只在领域层一处，页面不再自己算
-  const rate = freeRate(rec.lot.availability)
+  const rate = lot.availability ? freeRate(lot.availability) : NaN
   return {
-    lot: rec.lot,
+    lot,
     score: rec.score,
     reasons: rec.reasons,
     tone: rec.tone,
-    distanceText: formatDistance(rec.lot.distanceM),
-    walkText: `${rec.lot.walkMinutes} 分钟`,
-    spotsText: formatSpots(free, total),
+    distanceText: formatDistance(lot.distanceM),
+    walkText: `${lot.walkMinutes} 分钟`,
+    spotsText,
     freeClass: availabilityLevel(rate),
-    sourceNotes: sourceNotes(rec.lot),
+    sourceNotes: sourceNotes(lot),
   }
 }
 
@@ -145,7 +149,8 @@ Page({
     const fallbackText = loc.ok ? '' : fallbackNotice(loc.reason, FALLBACK_PLACE.name)
 
     try {
-      const lots = await fetchSignedLots(point, DEFAULT_RADIUS_M)
+      // 签约 + 未签约 POI 一起拉：可预约的在前，其余只提供导航（排序由 applySort 处理）
+      const lots = await fetchLotsAround(point, DEFAULT_RADIUS_M)
       if (lots.length === 0) {
         this.setData({ state: 'empty', fallbackText })
         return

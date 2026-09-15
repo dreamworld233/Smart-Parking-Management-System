@@ -9,11 +9,13 @@ import {
   scoreLot,
   topRecommendations,
 } from '../../miniprogram/domain/scoring'
-import type { ParkingLot } from '../../miniprogram/domain/types'
+import type { LotPricing, ParkingLot } from '../../miniprogram/domain/types'
 
 function lot(over: Partial<ParkingLot> = {}): ParkingLot {
   return {
     id: 'L1',
+    poiId: 'p1',
+    signed: true,
     name: '万象城地下停车场',
     address: '历下区经十路 1234 号',
     location: { lat: 36.65, lng: 117.12 },
@@ -31,6 +33,22 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     facilities: [],
     ...over,
   }
+}
+
+/** 未签约车场：只有距离参与评分，价格/余位/口碑因子全缺席 */
+function unsignedLot(id: string, distanceM: number): ParkingLot {
+  return {
+    ...lot({ id, distanceM, signed: false }),
+    poiId: id,
+    pricing: null,
+    availability: null,
+    reservableQuota: null,
+  }
+}
+
+/** 独立出价格夹具：lot() 的 pricing 现在可空，不再从它身上展开 */
+function lotPricing(firstHour: number): LotPricing {
+  return { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'ops' }
 }
 
 describe('DEFAULT_WEIGHTS', () => {
@@ -83,7 +101,7 @@ describe('availabilityLevel', () => {
     const atLine = lot({
       id: 'at',
       distanceM: 100,
-      pricing: { ...lot().pricing, firstHour: 6 },
+      pricing: lotPricing(6),
       availability: { freeSpots: FREE_FLOOR * total, totalSpots: total, source: 'ops' },
     })
     // aboveLine 刻意又远又贵：默认 fixture 两辆车场同价同距离，费用与距离因子都会取 1，
@@ -92,7 +110,7 @@ describe('availabilityLevel', () => {
     const aboveLine = lot({
       id: 'above',
       distanceM: 2000,
-      pricing: { ...lot().pricing, firstHour: 10 },
+      pricing: lotPricing(10),
       availability: { freeSpots: FREE_FLOOR * total + 1, totalSpots: total, source: 'ops' },
     })
     const ctx = { allLots: [atLine, aboveLine], hasCharging: false, userNeedsCharging: false }
@@ -147,15 +165,36 @@ describe('scoreLot', () => {
     expect(near.factors.distance).toBeGreaterThan(far.factors.distance)
   })
 
+  it('未签约车场：价格与余位因子缺席，未签约之间仍按距离分出高低', () => {
+    const signed = lot({ id: 's', distanceM: 2000 })
+    const unsignedNear = unsignedLot('u-near', 100)
+    const unsignedFar = unsignedLot('u-far', 3000)
+    const ctx = { allLots: [signed, unsignedNear, unsignedFar], hasCharging: false, userNeedsCharging: false }
+
+    const near = scoreLot(unsignedNear, ctx)
+    expect(near.factors.fee).toBeNull()
+    expect(near.factors.availability).toBeNull()
+    expect(near.factors.distance).toBe(1)
+    expect(scoreLot(unsignedFar, ctx).factors.distance).toBe(0)
+    // 没有价格就绝不出价格类理由
+    expect(near.reasons.every(r => !/最低|贵/.test(r))).toBe(true)
+  })
+
+  it('topRecommendations 混入未签约车场时照常排序返回', () => {
+    const all = [lot({ id: 's' }), unsignedLot('u', 100)]
+    const recs = topRecommendations(all, { userNeedsCharging: false }, all.length)
+    expect(recs.map(r => r.lot.id)).toEqual(['u', 's'])
+  })
+
   it('费用越低费用因子越高，最低价取 1、最高价取 0', () => {
-    const cheap = lot({ id: 'cheap', pricing: { ...lot().pricing, firstHour: 4 } })
-    const pricey = lot({ id: 'pricey', pricing: { ...lot().pricing, firstHour: 10 } })
+    const cheap = lot({ id: 'cheap', pricing: lotPricing(4) })
+    const pricey = lot({ id: 'pricey', pricing: lotPricing(10) })
     const allLots = [cheap, pricey]
     const ctx = { allLots, hasCharging: false, userNeedsCharging: false }
 
     expect(scoreLot(cheap, ctx).factors.fee).toBe(1)
     expect(scoreLot(pricey, ctx).factors.fee).toBe(0)
-    expect(scoreLot(cheap, ctx).factors.fee).toBeGreaterThan(scoreLot(pricey, ctx).factors.fee)
+    expect(scoreLot(cheap, ctx).factors.fee!).toBeGreaterThan(scoreLot(pricey, ctx).factors.fee!)
   })
 
   it('得分取整且在 0–100 之间', () => {
@@ -207,9 +246,9 @@ describe('scoreLot', () => {
   it('价差文案与 formatAmount 同口径，保留两位小数', () => {
     // 5.1 - 5 在浮点下是 0.09999999999999964。理由文案自己拼金额会渲染成 ¥0.1，
     // 同一笔钱在列表里却是 ¥0.10，两处对不上
-    const near = lot({ id: 'near', pricing: { ...lot().pricing, firstHour: 5.1 } })
-    const cheapest = lot({ id: 'cheap', pricing: { ...lot().pricing, firstHour: 5 } })
-    const far = lot({ id: 'far', pricing: { ...lot().pricing, firstHour: 20 } })
+    const near = lot({ id: 'near', pricing: lotPricing(5.1) })
+    const cheapest = lot({ id: 'cheap', pricing: lotPricing(5) })
+    const far = lot({ id: 'far', pricing: lotPricing(20) })
     const r = scoreLot(near, {
       allLots: [near, cheapest, far],
       hasCharging: false,
@@ -228,7 +267,7 @@ describe('scoreLot', () => {
       facilities: ['充电桩'],
       availability: { freeSpots: 450, totalSpots: 500, source: 'ops' },
     })
-    const other = lot({ id: 'other', distanceM: 900, pricing: { ...lot().pricing, firstHour: 9 } })
+    const other = lot({ id: 'other', distanceM: 900, pricing: lotPricing(9) })
     const r = scoreLot(best, { allLots: [best, other], hasCharging: true, userNeedsCharging: true })
 
     expect(r.reasons).toEqual(['空位充足', '单价最低', '距目的地最近'])
@@ -240,13 +279,13 @@ describe('scoreLot', () => {
     const roomy = lot({
       id: 'roomy',
       distanceM: 2000,
-      pricing: { ...lot().pricing, firstHour: 10 },
+      pricing: lotPricing(10),
       availability: { freeSpots: 480, totalSpots: 500, source: 'ops' },
     })
     const tight = lot({
       id: 'tight',
       distanceM: 100,
-      pricing: { ...lot().pricing, firstHour: 4 },
+      pricing: lotPricing(4),
       availability: { freeSpots: 400, totalSpots: 500, source: 'ops' },
     })
     const r = scoreLot(roomy, { allLots: [roomy, tight], hasCharging: false, userNeedsCharging: false })
@@ -285,13 +324,13 @@ describe('scoreLot', () => {
     const orphan = lot({
       id: 'orphan',
       distanceM: 0,
-      pricing: { ...lot().pricing, firstHour: 0 },
+      pricing: lotPricing(0),
       availability: { freeSpots: 1000, totalSpots: 500, source: 'ops' },
     })
     const r = scoreLot(orphan, {
       allLots: [
-        lot({ id: 'x', distanceM: 1000, pricing: { ...lot().pricing, firstHour: 10 } }),
-        lot({ id: 'y', distanceM: 2000, pricing: { ...lot().pricing, firstHour: 20 } }),
+        lot({ id: 'x', distanceM: 1000, pricing: lotPricing(10) }),
+        lot({ id: 'y', distanceM: 2000, pricing: lotPricing(20) }),
       ],
       hasCharging: false,
       userNeedsCharging: false,

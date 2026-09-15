@@ -49,6 +49,8 @@ export interface MapMarker {
  *   再给推荐那条加前缀会出现两个蓝块，用户换选别的车场时看着很怪
  */
 export function pinLabel(lot: ParkingLot): string {
+  // 未签约没有价格：图钉只标距离，别用「¥」糊弄
+  if (!lot.signed || !lot.pricing) return formatDistance(lot.distanceM)
   return `¥${lot.pricing.firstHour} · ${formatDistance(lot.distanceM)}`
 }
 

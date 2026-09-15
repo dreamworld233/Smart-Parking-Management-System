@@ -4,6 +4,8 @@ import type { ParkingLot, Recommendation } from '../../miniprogram/domain/types'
 function lot(over: Partial<ParkingLot> = {}): ParkingLot {
   return {
     id: 'L1',
+    poiId: 'p1',
+    signed: true,
     name: '万象城地下停车场',
     address: '历下区经十路 1234 号',
     location: { lat: 36.65, lng: 117.12 },
@@ -16,6 +18,14 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     reservableQuota: 120,
     ratingSummary: { score: 4.8, count: 12 },
     facilities: [],
+    ...over,
+  }
+}
+
+/** 未签约车场：只有名称/位置/距离，收费余位额度全无 */
+function unsignedLot(over: Partial<ParkingLot> = {}): ParkingLot {
+  return {
+    ...lot({ pricing: null, availability: null, reservableQuota: null, ratingSummary: null, signed: false }),
     ...over,
   }
 }
@@ -54,7 +64,7 @@ describe('toDetailVM', () => {
   it('缺夜间价时给占位，而不是把 undefined 拼进半句话', () => {
     expect(toDetailVM(rec()).nightText).toBe('--')
     const withNight = rec()
-    withNight.lot.pricing.nightRate = 3
+    if (withNight.lot.pricing) withNight.lot.pricing.nightRate = 3
     expect(toDetailVM(withNight).nightText).toBe('¥3.00/时')
   })
 
@@ -69,7 +79,7 @@ describe('toDetailVM', () => {
     expect(toDetailVM(rec()).sourceNotes).toEqual(['距离为估算', '收费为运营声明'])
     const publicPriced = rec()
     publicPriced.lot.distanceSource = 'route'
-    publicPriced.lot.pricing.source = 'public'
+    if (publicPriced.lot.pricing) publicPriced.lot.pricing.source = 'public'
     // 距离真实（route）不标，收费公示价照标 —— 公示价是「从哪来」的诚实答案
     expect(toDetailVM(publicPriced).sourceNotes).toEqual(['收费来源于车场公示价'])
   })
@@ -77,5 +87,21 @@ describe('toDetailVM', () => {
   it('评分聚合展示走 formatRatingSummary，无评价显示暂无评分', () => {
     expect(toDetailVM(rec()).ratingText).toBe('★ 4.8（12 条）')
     expect(toDetailVM(rec({ ratingSummary: null })).ratingText).toBe('暂无评分')
+  })
+
+  it('未签约车场：价格/余位/额度全占位，标 unsigned 供页面切提示', () => {
+    const vm = toDetailVM(rec(unsignedLot()))
+    expect(vm.unsigned).toBe(true)
+    expect(vm.firstHourText).toBe('--')
+    expect(vm.nextHourText).toBe('--')
+    expect(vm.capText).toBe('--')
+    expect(vm.spotsText).toBe('--')
+    expect(vm.quotaText).toBe('--')
+    // 来源标注直接说清是什么，而不是逐条「无数据」
+    expect(vm.sourceNotes).toEqual(['未签约，暂不开放预约，可导航前往', '距离为估算'])
+  })
+
+  it('签约车场 unsigned 恒为 false', () => {
+    expect(toDetailVM(rec()).unsigned).toBe(false)
   })
 })

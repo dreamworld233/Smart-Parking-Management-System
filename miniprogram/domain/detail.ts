@@ -13,6 +13,8 @@ export interface LotDetailVM {
   score: number
   reasons: string[]
   tone: ReasonTone
+  /** 未签约车场 = true。价格/余位/额度卡不渲染，换成「未签约」提示 + 导航 */
+  unsigned: boolean
   distanceText: string
   walkText: string
   spotsText: string
@@ -36,26 +38,59 @@ const UNKNOWN = '--'
 
 export function toDetailVM(rec: Recommendation): LotDetailVM {
   const { lot } = rec
-  const nightRate = lot.pricing.nightRate
+  // 未签约（或签约数据损坏）时只有名称/位置/距离是真实数据，收费/余位/额度一概没有。
+  // 页面用 unsigned 分支渲染提示，价格/余位/额度卡整个不出现 —— 比一排「--」诚实。
+  // 守卫合并在这里而不是拆两处：让 TS 知道 `!unsigned` 分支里 pricing/availability 非空
+  if (!lot.signed || !lot.pricing || !lot.availability) {
+    return {
+      lot,
+      score: rec.score,
+      reasons: rec.reasons,
+      tone: rec.tone,
+      unsigned: true,
+      distanceText: formatDistance(lot.distanceM),
+      walkText: `${lot.walkMinutes} 分钟`,
+      spotsText: UNKNOWN,
+      freeClass: 'unknown',
+      firstHourText: UNKNOWN,
+      nextHourText: UNKNOWN,
+      stepText: UNKNOWN,
+      capText: UNKNOWN,
+      nightText: UNKNOWN,
+      quotaText:
+        typeof lot.reservableQuota === 'number' && Number.isFinite(lot.reservableQuota)
+          ? String(Math.max(0, lot.reservableQuota))
+          : UNKNOWN,
+      ratingText: formatRatingSummary(lot.ratingSummary),
+      sourceNotes: sourceNotes(lot),
+    }
+  }
+  const pricing = lot.pricing
+  const availability = lot.availability
+  const nightRate = pricing.nightRate
   return {
     lot,
     score: rec.score,
     reasons: rec.reasons,
     tone: rec.tone,
+    unsigned: false,
     distanceText: formatDistance(lot.distanceM),
     walkText: `${lot.walkMinutes} 分钟`,
-    spotsText: formatSpots(lot.availability.freeSpots, lot.availability.totalSpots),
+    spotsText: formatSpots(availability.freeSpots, availability.totalSpots),
     // 档位只由领域层判：页面自定 0.1 / 0.25 会让色条与评分对同一车场给出相反结论
-    freeClass: availabilityLevel(freeRate(lot.availability)),
-    firstHourText: formatAmount(lot.pricing.firstHour),
-    nextHourText: formatAmount(lot.pricing.perHourAfter),
-    stepText: `${lot.pricing.stepMinutes} 分钟`,
-    capText: formatAmount(lot.pricing.capPerDay),
+    freeClass: availabilityLevel(freeRate(availability)),
+    firstHourText: formatAmount(pricing.firstHour),
+    nextHourText: formatAmount(pricing.perHourAfter),
+    stepText: `${pricing.stepMinutes} 分钟`,
+    capText: formatAmount(pricing.capPerDay),
     // 这一格自带单位，与其他几个纯金额字段不同：夜间价可缺省，
     // 分成「¥{{nightText}}/时」渲染时缺值会出来「¥--/时」这种半句话
     nightText: typeof nightRate === 'number' ? `¥${formatAmount(nightRate)}/时` : UNKNOWN,
     // Math.max(0, NaN) 还是 NaN，不挡会在详情里渲染成「已开放 NaN 个预约车位」
-    quotaText: Number.isFinite(lot.reservableQuota) ? String(Math.max(0, lot.reservableQuota)) : UNKNOWN,
+    quotaText:
+      typeof lot.reservableQuota === 'number' && Number.isFinite(lot.reservableQuota)
+        ? String(Math.max(0, lot.reservableQuota))
+        : UNKNOWN,
     ratingText: formatRatingSummary(lot.ratingSummary),
     sourceNotes: sourceNotes(lot),
   }

@@ -1,6 +1,6 @@
 import { WALK_DETOUR_FACTOR } from '../../miniprogram/config'
 import { haversineM } from '../../miniprogram/domain/geo'
-import { fetchSignedLots } from '../../miniprogram/services/lot'
+import { fetchLotsAround, fetchSignedLots } from '../../miniprogram/services/lot'
 
 interface QueryCaptured {
   cond: Record<string, unknown>
@@ -14,6 +14,8 @@ interface ReqOption {
 }
 
 let docs: Record<string, unknown>[] = []
+/** 地点搜索桩下发的 POI 池（未签约候选），fetchLotsAround 用 */
+let pois: Array<Record<string, unknown>> = []
 const captured: QueryCaptured[] = []
 /** 每次矩阵请求带的目的地坐标，如 `['31.753,117.254098']` */
 let matrixTos: string[][] = []
@@ -43,7 +45,13 @@ function stubCloud(): void {
   }
   g.wx = {
     request: o => {
-      const to = decodeURIComponent(o.url).match(/[?&]to=([^&]*)/)?.[1] ?? ''
+      const url = decodeURIComponent(o.url)
+      // 地点搜索（fetchLotsAround 里拉未签约 POI）：信封是顶层 data 数组
+      if (url.includes('/ws/place/v1/search')) {
+        o.success({ data: { status: 0, message: 'query ok', count: pois.length, data: pois } })
+        return
+      }
+      const to = url.match(/[?&]to=([^&]*)/)?.[1] ?? ''
       const keys = to.split(';').filter(Boolean)
       matrixTos.push(keys)
       // 腾讯的两个信封不一致：路径矩阵的结果在顶层 result，不在 data
@@ -80,6 +88,7 @@ function stubCloud(): void {
 function doc(overrides: Record<string, unknown>): Record<string, unknown> {
   return {
     _id: 'lot1',
+    poiId: 'p1',
     name: '测试车场',
     address: '测试地址',
     location: { lat: 31.7527, lng: 117.2541 },
@@ -93,11 +102,17 @@ function doc(overrides: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
+/** 地点搜索桩的 POI 条目（id/标题/地址/坐标/_distance，与 RawPoi 同形） */
+function poi(id: string, lat: number, lng: number, distanceM: number): Record<string, unknown> {
+  return { id, title: `未签约${id}`, address: `地址${id}`, location: { lat, lng }, _distance: distanceM }
+}
+
 describe('fetchSignedLots', () => {
   const CENTER = { lat: 31.752727, lng: 117.254098 }
 
   beforeEach(() => {
     docs = []
+    pois = []
     captured.length = 0
     matrixTos = []
     routes = {}
@@ -146,14 +161,16 @@ describe('fetchSignedLots', () => {
     ]
     const lots = await fetchSignedLots(CENTER)
     expect(lots).toHaveLength(1)
-    expect(lots[0].pricing.source).toBe('placeholder')
-    expect(lots[0].availability.source).toBe('placeholder')
+    expect(lots[0].pricing?.source).toBe('placeholder')
+    expect(lots[0].availability?.source).toBe('placeholder')
+    // 签约车场带出 poiId 与 signed 标记，未签约合并去重要靠它们
+    expect(lots[0].signed).toBe(true)
   })
 
   it('perHourAfter 缺省回落到 firstHour', async () => {
     docs = [doc({ pricing: { firstHour: 5, stepMinutes: 60, capPerDay: 40, source: 'ops' } })]
     const lots = await fetchSignedLots(CENTER)
-    expect(lots[0].pricing.perHourAfter).toBe(5)
+    expect(lots[0].pricing?.perHourAfter).toBe(5)
   })
 
   it('形状坏的文档整条丢弃，不炸整批', async () => {
@@ -214,5 +231,58 @@ describe('fetchSignedLots', () => {
     g.wx = {}
     await expect(fetchSignedLots(CENTER)).rejects.toThrow('云开发未初始化')
     g.wx = saved
+  })
+})
+
+describe('fetchLotsAround', () => {
+  const CENTER = { lat: 31.752727, lng: 117.254098 }
+
+  it('签约 + 未签约合并：签约在前，未签约无价格无余位', async () => {
+    // 一家签约（p1）+ 一家远处未签约（p3）。p3 距中心 1km、_distance 1200，落在 3km 半径内
+    docs = [doc({})]
+    pois = [poi('p3', 31.7527, 117.2641, 1200)]
+
+    const lots = await fetchLotsAround(CENTER)
+
+    expect(lots).toHaveLength(2)
+    expect(lots[0].signed).toBe(true)
+    expect(lots[0].poiId).toBe('p1')
+    expect(lots[1].signed).toBe(false)
+    expect(lots[1].pricing).toBeNull()
+    expect(lots[1].availability).toBeNull()
+    expect(lots[1].reservableQuota).toBeNull()
+    expect(lots[1].distanceM).toBeGreaterThan(0)
+  })
+
+  it('按 poiId 去重：同一家 POI 不以未签约身份再出现一次', async () => {
+    docs = [doc({})]
+    // p1 就是签约那家的 poiId —— 腾讯库里同一条 POI，必须只出现一次（签约版）
+    pois = [poi('p1', 31.7527, 117.2541, 100)]
+
+    const lots = await fetchLotsAround(CENTER)
+
+    expect(lots).toHaveLength(1)
+    expect(lots[0].signed).toBe(true)
+  })
+
+  it('150 米近邻去重：同一片物理车位的相邻 POI 不重复展示', async () => {
+    docs = [doc({})]
+    // 签约在 (31.7527, 117.2541)；这个 POI 就在它旁边约 40 米，是同一片车位
+    pois = [poi('p2', 31.7527, 117.2545, 300)]
+
+    const lots = await fetchLotsAround(CENTER)
+
+    expect(lots).toHaveLength(1)
+    expect(lots[0].signed).toBe(true)
+  })
+
+  it('未签约按距离升序排在签约之后', async () => {
+    docs = [doc({})]
+    pois = [poi('far', 31.7527, 117.2741, 2000), poi('near', 31.7527, 117.2591, 500)]
+
+    const lots = await fetchLotsAround(CENTER)
+
+    // 签约 p1 在前，未签约 near 500m 先于 far 2000m
+    expect(lots.map(l => l.id)).toEqual(['lot1', 'near', 'far'])
   })
 })

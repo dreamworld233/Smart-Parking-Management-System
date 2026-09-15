@@ -1,5 +1,6 @@
 import {
   DEFAULT_RADIUS_M,
+  NEARBY_DEDUP_M,
   WALK_DETOUR_FACTOR,
   WALK_LOOKUP_TOP_N,
   WALK_METERS_PER_MINUTE,
@@ -7,7 +8,8 @@ import {
 import { haversineM } from '../domain/geo'
 import type { GeoPoint, ParkingLot } from '../domain/types'
 import { getCloudApi } from './cloud'
-import { walkingDistances } from './qqmap'
+import { searchNearby, walkingDistances } from './qqmap'
+import type { PoiItem } from './qqmap'
 
 /**
  * lots 集合文档 → ParkingLot。
@@ -42,6 +44,8 @@ function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | nu
 
   return {
     id,
+    poiId: typeof doc.poiId === 'string' ? doc.poiId : '',
+    signed: true,
     name: doc.name,
     address: doc.address,
     location: { lat: loc.lat, lng: loc.lng },
@@ -129,4 +133,55 @@ export async function fetchSignedLots(
   // 否则「按距离升序」只是覆盖前的性质，调用方按返回顺序取最近那条会取错
   lots.sort(byDistance)
   return lots
+}
+
+/** POI 检索结果 → 未签约车场。只有名称/位置/距离是真实数据，价格/余位/额度如实置 null */
+function poiToUnsignedLot(poi: PoiItem): ParkingLot {
+  return {
+    id: poi.id,
+    poiId: poi.id,
+    signed: false,
+    name: poi.title,
+    address: poi.address,
+    location: poi.location,
+    distanceM: 0,
+    walkMinutes: 0,
+    distanceSource: 'estimated',
+    pricing: null,
+    availability: null,
+    reservableQuota: null,
+    ratingSummary: null,
+    facilities: [],
+  }
+}
+
+/**
+ * 拉「周边所有展示车场」：签约库（可预约）+ 周边 POI 停车场（未签约，仅导航）。
+ *
+ * 合并去重口径（2026-09-15）：
+ * - **poiId 精确去重**：签约车场的 poiId 与 POI 的 id 同源（都是腾讯 POI id），
+ *   同名同址的签约车场不会再以未签约身份出现一次
+ * - **150 米近邻去重**：同一片物理车位在腾讯库里常有两条相邻 POI（如改名前后的
+ *   两个校名入口），靠坐标兜一层。150 米是「同一栋建筑」的经验值，宁漏不误杀
+ *
+ * 未签约车场不做步行路线覆盖（省路径矩阵配额），距离保持估算并如实标注；
+ * 顺序上签约在前 —— 展示/排序由页面按「签约固定在前」处理，这里只合并
+ */
+export async function fetchLotsAround(
+  center: GeoPoint,
+  radiusM: number = DEFAULT_RADIUS_M,
+): Promise<ParkingLot[]> {
+  const signed = await fetchSignedLots(center, radiusM)
+  const pois = await searchNearby('停车场', center, radiusM)
+
+  const unsigned = pois
+    .filter(
+      p =>
+        !signed.some(
+          s => s.poiId === p.id || haversineM(s.location, p.location) < NEARBY_DEDUP_M,
+        ),
+    )
+    .map(p => withDistance(poiToUnsignedLot(p), center))
+
+  return [...signed, ...unsigned]
 }

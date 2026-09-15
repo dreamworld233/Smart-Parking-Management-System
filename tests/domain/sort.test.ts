@@ -4,6 +4,8 @@ import type { ParkingLot, Recommendation, SortKey } from '../../miniprogram/doma
 function rec(id: string, score: number, distanceM: number, firstHour: number, freeSpots: number): Recommendation {
   const lot: ParkingLot = {
     id,
+    poiId: id,
+    signed: true,
     name: id,
     address: '',
     location: { lat: 0, lng: 0 },
@@ -20,6 +22,33 @@ function rec(id: string, score: number, distanceM: number, firstHour: number, fr
     lot,
     score,
     factors: { fee: 0, distance: 0, availability: 0, infra: 0, reputation: 0 },
+    reasons: [],
+    tone: 'plain',
+  }
+}
+
+/** 未签约车场：价格/余位/额度全无，只有距离能参与排序 */
+function unsignedRec(id: string, distanceM: number): Recommendation {
+  const lot: ParkingLot = {
+    id,
+    poiId: id,
+    signed: false,
+    name: id,
+    address: '',
+    location: { lat: 0, lng: 0 },
+    distanceM,
+    walkMinutes: 1,
+    distanceSource: 'estimated',
+    pricing: null,
+    availability: null,
+    reservableQuota: null,
+    ratingSummary: null,
+    facilities: [],
+  }
+  return {
+    lot,
+    score: distanceM, // 与排序无关，这里只是占位
+    factors: { fee: null, distance: 0, availability: null, infra: 0, reputation: null },
     reasons: [],
     tone: 'plain',
   }
@@ -59,5 +88,20 @@ describe('sortLots', () => {
     const before = input.map(r => r.lot.id)
     sortLots(input, 'fee')
     expect(input.map(r => r.lot.id)).toEqual(before)
+  })
+
+  it('签约车场固定在前，未签约无论得分多高都排在签约后面', () => {
+    // 未签约这条距离最近、评分也高，但任何排序键下都必须落在签约车场之后
+    const mixed = [unsignedRec('U', 50), ...input]
+    for (const key of ['composite', 'distance', 'fee', 'availability'] as SortKey[]) {
+      const ids = sortLots(mixed, key).map(r => r.lot.id)
+      expect(ids.indexOf('U')).toBe(3)
+    }
+  })
+
+  it('费用档下未签约没有价格，落在所有签约车场之后', () => {
+    // 3 家签约各有价格，U 无价格 → fee 升序里 U 必须在最后，而不是被当成 0 元排最前
+    const mixed = [unsignedRec('U', 50), ...input]
+    expect(sortLots(mixed, 'fee').map(r => r.lot.id)).toEqual(['C', 'B', 'A', 'U'])
   })
 })

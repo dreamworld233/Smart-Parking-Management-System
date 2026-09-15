@@ -92,3 +92,10 @@ export const SEARCH_REGION = '合肥'
  * 开发期几天就能把额度打光
  */
 export const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000
+
+/**
+ * 签约车场与未签约 POI 合并时的近邻去重半径（米）。
+ * 同一片物理车位在腾讯库里常有相邻的两条 POI（改名前后的校名入口等），
+ * 距签约车场小于该值的未签约 POI 视为同一处，丢弃
+ */
+export const NEARBY_DEDUP_M = 150

@@ -24,22 +24,29 @@ export const SORT_LABELS: Record<SortKey, { short: string; long: string }> = {
  */
 export function sourceNotes(lot: ParkingLot): string[] {
   const notes: string[] = []
+  // 未签约：没有价格/余位/额度任何数据，只有名称位置距离是真实的（来自腾讯 POI 检索）。
+  // 与其逐条标「无数据」，不如一句说清它是什么，别让用户把「未签约」看成「签约但没数据」
+  if (!lot.signed) {
+    notes.push('未签约，暂不开放预约，可导航前往')
+    if (lot.distanceSource === 'estimated') notes.push('距离为估算')
+    return notes
+  }
   if (lot.distanceSource === 'estimated') notes.push('距离为估算')
-  if (lot.pricing.source === 'public') notes.push('收费来源于车场公示价')
-  else if (lot.pricing.source === 'ops') notes.push('收费为运营声明')
-  else if (lot.pricing.source === 'estimated') notes.push('收费为估算')
+  if (lot.pricing?.source === 'public') notes.push('收费来源于车场公示价')
+  else if (lot.pricing?.source === 'ops') notes.push('收费为运营声明')
+  else if (lot.pricing?.source === 'estimated') notes.push('收费为估算')
 
   // 总车位数只在是示例值时才标注：真实值标出来只是噪音，编的值不标就是骗人。
   // 与价格同为暂定时合成一条 —— 卡片上一家公司挂两行「示例数据」太挤。
   // **只在两者都是暂定时才合**：核到价格而车位还没核到时，写成「价格与车位」
   // 会把真价格说成编的，这句本身就是假话
-  const pricePlaceholder = lot.pricing.source === 'placeholder'
-  const spotsPlaceholder = lot.availability.source === 'placeholder'
+  const pricePlaceholder = lot.pricing?.source === 'placeholder'
+  const spotsPlaceholder = lot.availability?.source === 'placeholder'
   if (pricePlaceholder && spotsPlaceholder) notes.push('价格与车位为示例数据，待核实')
   else if (pricePlaceholder) notes.push('价格为示例数据，待核实')
   else if (spotsPlaceholder) notes.push('车位数为示例数据，待核实')
 
-  if (lot.availability.freeSpots === null) notes.push('余位待车场上报')
+  if (lot.availability?.freeSpots === null) notes.push('余位待车场上报')
   return notes
 }
 
