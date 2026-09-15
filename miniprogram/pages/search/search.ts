@@ -62,8 +62,6 @@ Page({
     keyword: '',
     /** 输入时的联想候选（suggestion）。空数组 = 候选区隐藏，展示历史或地图 */
     candidates: [] as PoiItem[],
-    /** 临时调试：联想结果/错误透出到页面（黄色条），定位后删 */
-    suggestDebug: '',
     history: [] as string[],
     state: 'idle' as ViewState,
     sortKey: 'composite' as SortKey,
@@ -160,11 +158,9 @@ Page({
         const pois = await suggestPlaces(kw, SEARCH_REGION)
         // 联想是异步的，结果回来时输入可能已经变了：按当前输入对不上就整批丢弃
         if (this.data.keyword.trim() !== kw) return
-        this.setData({ candidates: pois, suggestDebug: `ok:${pois.length}` })
-      } catch (e) {
-        // 失败不能静默：真机上「无联想」既可能是渲染问题也可能是接口问题，
-        // 调试行把错误透出来再决定怎么修（定位后去掉这里的 debug 行为）
-        this.setData({ suggestDebug: `err:${(e as Error).message}` })
+        this.setData({ candidates: pois })
+      } catch {
+        // 联想失败静默：用户还能直接搜索，别把打字体验打断成错误态
       }
     }, 300)
   },

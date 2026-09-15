@@ -59,19 +59,6 @@
   box-sizing: border-box;
 }
 
-/* 临时调试行：黄色底，联想出问题能直接看到，定位后删 */
-.suggest__debug {
-  position: absolute;
-  left: 24rpx;
-  right: 24rpx;
-  z-index: 2;
-  padding: 12rpx 20rpx;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 22rpx;
-  border-radius: 8rpx;
-}
-
 .suggest__item {
   padding: 22rpx 24rpx;
   background: var(--color-surface);
