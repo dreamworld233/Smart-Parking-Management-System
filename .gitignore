@@ -42,3 +42,6 @@ miniprogram/config.local.ts
 
 # brainstorming 可视化伴侣产物
 .superpowers/
+
+# 个人工单素材（提交历史的逐条总结草稿，不是项目交付物）
+工单素材/
