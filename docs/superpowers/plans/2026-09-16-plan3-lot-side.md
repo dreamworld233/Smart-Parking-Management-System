@@ -34,6 +34,11 @@
 
 **规格执行偏差**：Task 3 / Task 5 的云函数（reportAvailability / adminUpdateLot）在 Task 2 前提前实现，让看板一次铺全；Task 4 实际新增两个云函数（verifyReservation + adminReservations，后者因安全规则缺口走云函数而非前端直读）；Task 2 看板统计走 adminDashboard 云函数（同一原因）。**新云函数共 6 个**：adminGetLot / adminDashboard / reportAvailability / verifyReservation / adminReservations / adminUpdateLot。
 
+**2026-09-16 追加（验收后优化）**：
+- **切身份写 DB + 自助绑定车场**（`7b39659`）：用户拍板身份切换要改 `users.role`（新增 switchRole 云函数），车场主自助列表选车场绑定（新增 adminListLots + bindLot + `pages/owner/bind-lot`），绑定证明验证暂不做。`lots.adminUserId` 字段原不存在，靠 bindLot 写入。4 个车场端页 no_lot 态接「绑定车场」入口。
+- **缓存策略**（`81d37b0` + `e1481d4`）：双 subagent 并行。owner dashboard/reservations 内存缓存（页面实例字段 lastData + lastLoadedAt）先渲染旧快照不闪 loading、后台静默刷新。**用户纠正方向**：看板/预约是高频变应短缓存（TTL 60s），车场配置/个人信息是低频变应长缓存（TTL 10 分钟，`e1481d4` 把 lot/profile 也加上缓存）。数据变更操作（上报/额度/核销/编辑保存/绑定）强制重拉，NO_AUTH/no_lot 权威态清缓存。
+- **定时任务三件套**（§5.5）：超时释放 `releaseExpiredReservations`（`2032430`，5 分钟）已做；余位采样 `sampleAvailability`（15 分钟）+ 每日对账 `dailyReconcile`（凌晨 3 点）并行 agent 实现中。reservedCount 对账口径：`status ∈ {pending_entry, entered, completed}` 的单数（cancelled/released 已 -1）。
+
 ---
 
 ## 关键口径（先验算过，写代码时照此）

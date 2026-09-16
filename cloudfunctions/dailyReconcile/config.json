@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    {
+      "name": "daily-reconcile",
+      "type": "timer",
+      "config": "0 0 3 * * * *"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    {
+      "name": "sample-availability",
+      "type": "timer",
+      "config": "0 */15 * * * * *"
+    }
+  ]
+}
