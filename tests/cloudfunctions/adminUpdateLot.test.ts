@@ -159,9 +159,9 @@ describe('adminUpdateLot', () => {
 
     const change = [...mockStore.lot_price_changes.values()][0]
     expect(change.lotId).toBe('lot1')
-    expect(change.old).toEqual({ firstHour: 3 })
-    expect(change.new).toEqual({ firstHour: 4 })
-    expect(change.changedBy).toBe('openid-test-1')
+    expect(change.before).toEqual({ firstHour: 3 })
+    expect(change.after).toEqual({ firstHour: 4 })
+    expect(change.operatorId).toBe('openid-test-1')
     expect(change.note).toBe('车场管理员调整')
   })
 

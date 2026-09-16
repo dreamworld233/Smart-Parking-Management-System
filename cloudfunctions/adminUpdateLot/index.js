@@ -7,8 +7,10 @@
 //   pricing.firstHour / perHourAfter / stepMinutes / capPerDay / nightRate
 //   reservableQuota / facilities / name / address / openHours
 //
-// 改价（patch 含任一 pricing 字段）落 lot_price_changes 留痕：
-//   { lotId, old, new, changedBy, changedAt, note } —— old 读当前值，逐字段记变更。
+// 改价（patch 含任一 pricing 字段）落 lot_price_changes 留痕（字段名照数据模型 §4）：
+//   { lotId, before, after, operatorId, at, note, evidenceFileID? }
+//   —— before 读当前值、after 是新值，逐字段记变更；evidenceFileID 是公示价照片
+//   （Web 端上传用，本轮车场端不传照片）。
 // 额度（reservableQuota）与设施不落价格留痕（那是价格历史，不是配置历史）。
 // 收费来源标注（pricing.source）保持不变：车场主改的是值，不改来源等级
 // （placeholder 仍是「示例数据待核实」，谁都不许自行升成 public/ops）。
@@ -150,22 +152,22 @@ exports.main = async (event) => {
 
   if (priceChanged) {
     try {
-      // 只记变更过的价格字段：old 是当前值，new 是新值
-      const oldPricing = {}
-      const newPricing = {}
+      // 只记变更过的价格字段：before 是当前值，after 是新值（数据模型 §4 字段名）
+      const before = {}
+      const after = {}
       for (const k of PRICING_KEYS) {
         if (s.pricing[k] !== undefined && s.pricing[k] !== (lotDoc.pricing || {})[k]) {
-          oldPricing[k] = (lotDoc.pricing || {})[k] ?? null
-          newPricing[k] = s.pricing[k]
+          before[k] = (lotDoc.pricing || {})[k] ?? null
+          after[k] = s.pricing[k]
         }
       }
       await priceChanges.add({
         data: {
           lotId,
-          old: oldPricing,
-          new: newPricing,
-          changedBy: OPENID,
-          changedAt: now,
+          before,
+          after,
+          operatorId: OPENID,
+          at: now,
           note: role === 'ops_admin' ? '平台运营调整' : '车场管理员调整',
         },
       })
