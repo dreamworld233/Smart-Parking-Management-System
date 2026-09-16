@@ -43,6 +43,10 @@ Page({
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 
+  onBindLot() {
+    wx.navigateTo({ url: '/pages/owner/bind-lot/bind-lot' })
+  },
+
   onRetry() {
     this.load()
   },

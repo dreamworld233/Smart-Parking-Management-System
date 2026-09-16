@@ -254,3 +254,38 @@ export interface AdminReservationsData {
 export function fetchAdminReservations(): Promise<CloudResult<AdminReservationsData>> {
   return callFunction<AdminReservationsData>('adminReservations')
 }
+
+export interface SwitchRoleData {
+  role: 'driver' | 'lot_admin' | 'ops_admin'
+}
+
+/** 切换身份并写 users.role（云函数 switchRole）。角色页选完身份后调用 */
+export function switchRole(role: string): Promise<CloudResult<SwitchRoleData>> {
+  return callFunction<SwitchRoleData>('switchRole', { role })
+}
+
+export interface LotBriefItem {
+  _id: string
+  name: string
+  address: string
+  adminUserId: string | null
+}
+
+export interface ListAllLotsData {
+  list: LotBriefItem[]
+}
+
+/** 全部签约车场（云函数 adminListLots）。车场主绑定页用，不鉴权（绑定前身份是 driver） */
+export function listAllLots(): Promise<CloudResult<ListAllLotsData>> {
+  return callFunction<ListAllLotsData>('adminListLots')
+}
+
+export interface BindLotData {
+  lotId: string
+  name: string
+}
+
+/** 车场主绑定车场（云函数 bindLot）：写 lots.adminUserId + users.role = lot_admin */
+export function bindLot(lotId: string): Promise<CloudResult<BindLotData>> {
+  return callFunction<BindLotData>('bindLot', { lotId })
+}

@@ -108,6 +108,11 @@ Page({
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 
+  /** 未绑定车场 → 跳绑定页选车场 */
+  onBindLot() {
+    wx.navigateTo({ url: '/pages/owner/bind-lot/bind-lot' })
+  },
+
   onRetry() {
     this.load()
   },

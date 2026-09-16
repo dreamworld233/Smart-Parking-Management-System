@@ -1,0 +1,34 @@
+<view class="wrap">
+  <view class="bar" style="top: {{navTop}}px">
+    <view class="bar__back" bindtap="onBack">‹</view>
+    <view class="bar__title">绑定车场</view>
+    <view class="bar__spacer" />
+  </view>
+
+  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在加载车场…" />
+  <state-view
+    wx:elif="{{state === 'error'}}"
+    kind="error"
+    text="车场列表加载失败"
+    hint="请检查网络后重试"
+    action-text="重试"
+    bind:action="onRetry"
+  />
+
+  <scroll-view wx:elif="{{state === 'ready'}}" class="body" scroll-y>
+    <view class="hint">选择你要管理的车场。已被其他管理员绑定的不可选</view>
+    <view
+      wx:for="{{lots}}"
+      wx:key="id"
+      class="lot {{item.boundByOther ? 'lot--bound' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onBind"
+    >
+      <view class="lot__main">
+        <view class="lot__name">{{item.name}}</view>
+        <view class="lot__addr">{{item.address}}</view>
+      </view>
+      <view class="lot__action">{{item.boundByOther ? '已绑定' : '绑定'}}</view>
+    </view>
+  </scroll-view>
+</view>

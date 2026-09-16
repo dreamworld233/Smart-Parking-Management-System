@@ -10,7 +10,8 @@
     "pages/owner/dashboard/dashboard",
     "pages/owner/reservations/reservations",
     "pages/owner/lot/lot",
-    "pages/owner/profile/profile"
+    "pages/owner/profile/profile",
+    "pages/owner/bind-lot/bind-lot"
   ],
   "tabBar": {
     "custom": true,

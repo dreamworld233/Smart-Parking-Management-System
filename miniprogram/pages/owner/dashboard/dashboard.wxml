@@ -12,7 +12,9 @@
     wx:elif="{{state === 'no_lot'}}"
     kind="empty"
     text="尚未绑定车场"
-    hint="由平台运营为你的账号绑定车场后即可使用"
+    hint="绑定车场后即可管理余位与预约"
+    action-text="绑定车场"
+    bind:action="onBindLot"
   />
   <state-view
     wx:elif="{{state === 'error'}}"
