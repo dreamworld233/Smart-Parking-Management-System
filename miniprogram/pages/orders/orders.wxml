@@ -50,10 +50,13 @@
     </view>
 
     <view class="tail" />
-    <view class="btnbar" wx:if="{{detail.cancellable}}">
-      <view class="btn-danger" data-id="{{detail.id}}" bindtap="onCancel">取消预约</view>
-    </view>
   </scroll-view>
+
+  <!-- 吸底取消按钮：absolute 贴页面根节点（Skyline 不支持 fixed），
+       tab 页要停在 tabBar 之上，bottom 让出 --tabbar-h -->
+  <view class="btnbar" wx:if="{{detail && detail.cancellable}}">
+    <view class="btn-danger" data-id="{{detail.id}}" bindtap="onCancel">取消预约</view>
+  </view>
 
   <!-- 列表视图 -->
   <block wx:else>

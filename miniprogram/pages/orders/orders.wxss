@@ -39,9 +39,9 @@
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
-/* 详情视图：取消按钮吸底，内容区让出按钮高度 */
+/* 详情视图：取消按钮吸底，内容区让出 tabBar + 按钮两层高度 */
 .detail-body {
-  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--tabbar-h, 100rpx) + 120rpx + env(safe-area-inset-bottom));
 }
 
 .card {
@@ -128,14 +128,15 @@
   height: 40rpx;
 }
 
-/* 详情页吸底取消按钮：Skyline 不支持 fixed，absolute 贴页面根节点 */
+/* 详情页吸底取消按钮：Skyline 不支持 fixed，absolute 贴页面根节点；
+   orders 是 tab 页，tabBar 是覆盖层，按钮要停在它上面（bottom 让出 --tabbar-h） */
 .btnbar {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: calc(var(--tabbar-h, 100rpx) + env(safe-area-inset-bottom));
   z-index: 1;
-  padding: 16rpx 24rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  padding: 16rpx 24rpx;
   background: var(--color-surface);
   border-top: 2rpx solid var(--color-border);
 }

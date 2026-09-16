@@ -46,6 +46,8 @@ Page({
     navTop: 100,
     /** 吸底确认栏 bottom（px）：tabBar 高度 + 安全区，别压在 tabBar 下面 */
     payBottom: 100,
+    /** 内容区底部让位（px）：paybar 偏移 + 栏自身高，最后一张卡不被吸底栏盖住 */
+    bodyBottom: 100,
   },
 
   lotId: '',
@@ -59,7 +61,9 @@ Page({
     const rpx = info.windowWidth / 750
     const safeBottom = info.safeArea ? Math.max(0, info.screenHeight - info.safeArea.bottom) : 0
     // confirm 页非 tabBar 页（从详情 navigateTo 进入），吸底栏贴屏幕底 + 安全区即可
-    this.setData({ payBottom: Math.round(safeBottom + 16 * rpx) })
+    // bodyBottom = 栏底部偏移 + 栏自身高（约 112rpx，按钮+内边距），与 wxss .paybar 高度对应
+    const payBottom = Math.round(safeBottom + 16 * rpx)
+    this.setData({ payBottom, bodyBottom: Math.round(payBottom + 112 * rpx) })
     if (!this.lotId) {
       this.setData({ state: 'error' })
       return
