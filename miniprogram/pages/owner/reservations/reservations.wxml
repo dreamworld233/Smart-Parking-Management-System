@@ -1,1 +1,83 @@
-<view class="page">车场预约（待实现）</view>
+<view class="wrap">
+  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在加载预约…" />
+  <state-view
+    wx:elif="{{state === 'no_role'}}"
+    kind="empty"
+    text="当前是车主身份"
+    hint="车场端功能需要车场管理员身份"
+    action-text="选择身份"
+    bind:action="onPickRole"
+  />
+  <state-view
+    wx:elif="{{state === 'no_lot'}}"
+    kind="empty"
+    text="尚未绑定车场"
+    hint="由平台运营为你的账号绑定车场后即可使用"
+  />
+  <state-view
+    wx:elif="{{state === 'error'}}"
+    kind="error"
+    text="预约加载失败"
+    hint="请检查网络后重试"
+    action-text="重试"
+    bind:action="onRetry"
+  />
+
+  <block wx:elif="{{state === 'ready'}}">
+    <scroll-view class="page" scroll-y>
+      <view class="head">
+        <view class="head__title">预约核销</view>
+        <view class="head__hint">点待入场的单，输码或按车牌核销入场</view>
+      </view>
+
+      <block wx:if="{{cards.length}}">
+        <view
+          wx:for="{{cards}}"
+          wx:key="id"
+          class="oc {{item.pending ? 'oc--pending' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onCardTap"
+        >
+          <view class="oc__head">
+            <view class="oc__plate">{{item.plateText}}</view>
+            <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="oc__sub">到达 {{item.arriveText}}</view>
+          <view class="oc__code" wx:if="{{item.pending}}">核销码 {{item.verifyCode}}</view>
+        </view>
+      </block>
+      <view wx:else class="empty">暂无预约记录</view>
+    </scroll-view>
+
+    <!-- 核销弹窗 -->
+    <view class="mask" wx:if="{{verifyDialog}}" bindtap="onCloseVerify">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">核销入场</view>
+        <view class="dialog__plate">{{target.plateText}}</view>
+
+        <view class="tabs">
+          <view class="tab {{mode === 'code' ? 'tab--on' : ''}}" bindtap="onModeCode">输码</view>
+          <view class="tab {{mode === 'manual' ? 'tab--on' : ''}}" bindtap="onModeManual">按车牌</view>
+        </view>
+
+        <block wx:if="{{mode === 'code'}}">
+          <input
+            class="dialog__input {{codeInvalid ? 'dialog__input--invalid' : ''}}"
+            type="number"
+            maxlength="6"
+            value="{{codeInput}}"
+            bindinput="onCodeInput"
+            placeholder="输入 6 位核销码"
+          />
+          <view class="dialog__hint" wx:if="{{codeInvalid}}">核销码须为 6 位数字</view>
+        </block>
+        <view wx:else class="dialog__manual">确认该车到场，按车牌核销入场</view>
+
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseVerify">取消</view>
+          <view class="dialog__btn primary" bindtap="onConfirmVerify">{{submitting ? '核销中…' : '确认核销'}}</view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

@@ -219,3 +219,38 @@ export function updateLot(
 ): Promise<CloudResult<UpdateLotData>> {
   return callFunction<UpdateLotData>('adminUpdateLot', { lotId, patch })
 }
+
+export interface VerifyReservationData {
+  reservationId: string
+  plateNo: string
+  status: string
+  verifyCode: string | null
+  enteredAt: number
+}
+
+/**
+ * 车场端核销（云函数 verifyReservation）。method 是 'code'（输码）或 'manual'（手动）
+ */
+export function verifyReservation(
+  input: { lotId: string; method: 'code' | 'manual'; verifyCode?: string; plateNo?: string },
+): Promise<CloudResult<VerifyReservationData>> {
+  return callFunction<VerifyReservationData>('verifyReservation', { ...input })
+}
+
+export interface AdminReservationItem {
+  _id: string
+  plateNo: string
+  arriveTime: number
+  status: string
+  verifyCode: string
+}
+
+export interface AdminReservationsData {
+  lot: { _id: string; name: string } | null
+  list: AdminReservationItem[]
+}
+
+/** 车场端预约核销列表（云函数 adminReservations） */
+export function fetchAdminReservations(): Promise<CloudResult<AdminReservationsData>> {
+  return callFunction<AdminReservationsData>('adminReservations')
+}
