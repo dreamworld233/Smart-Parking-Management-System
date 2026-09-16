@@ -1,6 +1,62 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+  padding-top: var(--space-4);
+  box-sizing: border-box;
+}
+
 .page {
   padding: var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+.me {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-6) 0;
+}
+
+.me__avatar {
+  font-size: 80rpx;
+}
+
+.me__identity {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-top: var(--space-3);
+}
+
+.me__lot {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: var(--space-2);
+}
+
+.card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+  font-size: var(--font-body);
+  color: var(--color-text);
+}
+
+.card__arrow {
   color: var(--color-text-weak);
+}
+
+.version {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  text-align: center;
+  margin-top: var(--space-6);
 }

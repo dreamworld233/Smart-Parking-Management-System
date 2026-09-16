@@ -1,1 +1,36 @@
-<view class="page">车场我的（待实现）</view>
+<view class="wrap">
+  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="加载中…" />
+  <state-view
+    wx:elif="{{state === 'no_role'}}"
+    kind="empty"
+    text="当前是车主身份"
+    hint="车场端功能需要车场管理员身份"
+    action-text="选择身份"
+    bind:action="onPickRole"
+  />
+  <state-view
+    wx:elif="{{state === 'error'}}"
+    kind="error"
+    text="加载失败"
+    hint="请检查网络后重试"
+    action-text="重试"
+    bind:action="onRetry"
+  />
+
+  <block wx:elif="{{state === 'ready'}}">
+    <view class="page">
+      <view class="me">
+        <view class="me__avatar">🏢</view>
+        <view class="me__identity">{{identityText}}</view>
+        <view class="me__lot">{{lotName}}</view>
+      </view>
+
+      <view class="card" bindtap="onPickRole">
+        <text>切换身份</text>
+        <text class="card__arrow">›</text>
+      </view>
+
+      <view class="version">智慧停车 · 车场端</view>
+    </view>
+  </block>
+</view>
