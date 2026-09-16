@@ -3,6 +3,11 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
+// 角色白名单（数据模型 §4）：DB 里手标的值可能带下划线/大小写错误，出口一律收窄，
+// 不认识的值落 'driver'（默认安全：车场端判定 `role !== 'lot_admin'` 会引导切角色，
+// 不会把未知值当车场端放行）。别把 DB 值当类型用（backlog #2）
+const ROLE_WHITELIST = ['driver', 'lot_admin', 'ops_admin']
+
 exports.main = async () => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
@@ -47,7 +52,7 @@ exports.main = async () => {
       // userId 存 openid（设计稿 §4）：cars / reservations / orders / reviews 的安全规则是
       // `doc.userId == auth.openid`，返回文档 _id 会让 2b 写进去的值永远比不中
       userId: OPENID,
-      role: u.role || 'driver',
+      role: ROLE_WHITELIST.includes(u.role) ? u.role : 'driver',
       violationCount: credit.violationCount || 0,
       banned,
     },

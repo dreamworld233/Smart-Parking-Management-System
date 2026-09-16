@@ -1,4 +1,4 @@
-export type Role = 'driver' | 'owner'
+export type Role = 'driver' | 'lot_admin'
 
 const ROLE_KEY = 'qnt.role'
 const PLATE_KEY = 'qnt.defaultPlate'
@@ -12,7 +12,8 @@ export interface Session {
 
 export function getRole(): Role | null {
   const v = wx.getStorageSync(ROLE_KEY)
-  return v === 'driver' || v === 'owner' ? v : null
+  // 旧版本存过 'owner'（2b 之前的车场端命名），白名单外 → null → 回角色页重选
+  return v === 'driver' || v === 'lot_admin' ? v : null
 }
 
 export function setRole(role: Role): void {

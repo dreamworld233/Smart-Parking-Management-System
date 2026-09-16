@@ -16,8 +16,8 @@
   </view>
 
   <view
-    class="role {{role === 'owner' ? 'role--on' : ''}}"
-    data-role="owner"
+    class="role {{role === 'lot_admin' ? 'role--on' : ''}}"
+    data-role="lot_admin"
     bindtap="onPick"
   >
     <view class="role__emoji">🏢</view>

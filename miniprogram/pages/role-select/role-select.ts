@@ -2,7 +2,7 @@ import { getRole, setRole, type Role } from '../../services/storage'
 
 const HOME: Record<Role, string> = {
   driver: '/pages/home/home',
-  owner: '/pages/owner/dashboard/dashboard',
+  lot_admin: '/pages/owner/dashboard/dashboard',
 }
 
 Page({
