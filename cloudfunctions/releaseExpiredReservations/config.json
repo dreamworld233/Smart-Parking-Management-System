@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    {
+      "name": "release-expired",
+      "type": "timer",
+      "config": "0 */5 * * * * *"
+    }
+  ]
+}

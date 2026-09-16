@@ -19,6 +19,18 @@ interface CardVM {
   verifyCode: string
 }
 
+/**
+ * 预约列表渲染快照缓存（内存，data 外的实例字段）。
+ * 切 tab 回来先显示这份旧数据、后台静默刷新；不落 wx.setStorageSync —— 车场端要新鲜
+ */
+interface ReservationCache {
+  lotId: string
+  cards: CardVM[]
+}
+
+/** 缓存有效期：30 秒内的旧数据允许先渲染，超过则走完整 loading */
+const CACHE_TTL_MS = 30 * 1000
+
 function statusClass(status: string): string {
   switch (status) {
     case 'pending_entry':
@@ -51,6 +63,10 @@ Page({
 
   /** 当前车场 id（data 外实例字段） */
   lotId: '',
+  /** 上次成功渲染的列表快照（缓存命中时先显示它，不闪 loading） */
+  lastData: null as ReservationCache | null,
+  /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
+  lastLoadedAt: 0,
 
   onLoad() {
     const rect = wx.getMenuButtonBoundingClientRect()
@@ -60,15 +76,38 @@ Page({
   onShow() {
     const tabBar = this.getTabBar?.()
     tabBar?.setSelected(1)
-    // 从看板「待核销」跳来、核销完返回都要刷新
+    // 从看板「待核销」跳来、核销完返回：缓存命中先渲染旧数据，后台静默刷新
     void this.load()
   },
 
-  async load() {
+  /**
+   * 加载预约列表。缓存有效且非强制时：先用缓存渲染（state='ready'，不闪 loading），
+   * 再后台静默刷新；缓存过期或无缓存走原 loading 流程。
+   * force=true 用于核销成功等数据已变的操作——跳过缓存强制重拉
+   */
+  async load(force = false) {
+    const cached = this.lastData
+    if (cached && !force && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
+      this.applyCache(cached)
+      void this.refresh(true)
+      return
+    }
     this.setData({ state: 'loading' })
+    await this.refresh(false)
+  },
+
+  /**
+   * 拉取预约列表并更新缓存。
+   * silent=true（缓存命中后的后台刷新）：失败静默保留缓存、不 toast；
+   * silent=false：走原 loading 的错误 / no_role / no_lot 分支
+   */
+  async refresh(silent: boolean) {
     const r = await fetchAdminReservations()
     if (!r.ok) {
+      if (silent) return
       if (r.code === 'NO_AUTH') {
+        this.lastData = null
+        this.lastLoadedAt = 0
         this.setData({ state: 'no_role' })
         return
       }
@@ -76,13 +115,15 @@ Page({
       return
     }
     if (r.data.lot === null) {
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'no_lot' })
       return
     }
-    this.lotId = r.data.lot._id
     const now = new Date()
-    this.setData({
-      state: 'ready',
+    const cache: ReservationCache = {
+      lotId: r.data.lot._id,
       cards: r.data.list.map((x: AdminReservationItem) => ({
         id: x._id,
         plateText: formatPlate(x.plateNo),
@@ -93,7 +134,16 @@ Page({
         pending: x.status === 'pending_entry',
         verifyCode: String(x.verifyCode || ''),
       })),
-    })
+    }
+    this.lastData = cache
+    this.lastLoadedAt = Date.now()
+    this.applyCache(cache)
+  },
+
+  /** 把（缓存的）渲染快照落到 data。lotId 依赖 load 成功赋值，缓存命中分支也要正确设置 */
+  applyCache(c: ReservationCache) {
+    this.lotId = c.lotId
+    this.setData({ state: 'ready', cards: c.cards })
   },
 
   onPickRole() {
@@ -106,7 +156,7 @@ Page({
   },
 
   onRetry() {
-    this.load()
+    this.load(true)
   },
 
   /** 点待入场单 → 打开核销弹窗 */
@@ -159,7 +209,7 @@ Page({
     }
     this.setData({ verifyDialog: false })
     wx.showToast({ title: '已核销入场', icon: 'success' })
-    this.load()
+    this.load(true)
   },
 
   noop() {},

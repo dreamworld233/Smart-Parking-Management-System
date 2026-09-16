@@ -20,6 +20,30 @@ interface QuotaVM {
   percent: number
 }
 
+interface PendingItemVM {
+  id: string
+  plateText: string
+  arriveText: string
+  verifyCode: string
+}
+
+/**
+ * 看板渲染快照缓存（内存，data 外的实例字段）。
+ * 切 tab 回来先显示这份旧数据、后台静默刷新；不落 wx.setStorageSync —— 车场端要新鲜
+ */
+interface DashboardCache {
+  lotId: string
+  lotName: string
+  lotAddress: string
+  stat: StatVM
+  quota: QuotaVM
+  spotsText: string
+  pendingList: PendingItemVM[]
+}
+
+/** 缓存有效期：30 秒内的旧数据允许先渲染，超过则走完整 loading */
+const CACHE_TTL_MS = 30 * 1000
+
 Page({
   data: {
     state: 'loading' as ViewState,
@@ -29,7 +53,7 @@ Page({
     quota: { reserved: 0, total: 0, left: 0, percent: 0 } as QuotaVM,
     spotsText: '待上报',
     /** 待核销列表（只显示车牌 + 到达 + 核销码） */
-    pendingList: [] as { id: string; plateText: string; arriveText: string; verifyCode: string }[],
+    pendingList: [] as PendingItemVM[],
     // 调整额度弹窗
     quotaDialog: false,
     quotaInput: '',
@@ -45,6 +69,10 @@ Page({
 
   /** 当前车场 id（load 成功后赋值，data 外的实例字段） */
   lotId: '',
+  /** 上次成功渲染的看板快照（缓存命中时先显示它，不闪 loading） */
+  lastData: null as DashboardCache | null,
+  /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
+  lastLoadedAt: 0,
 
   onLoad() {
     const rect = wx.getMenuButtonBoundingClientRect()
@@ -57,13 +85,36 @@ Page({
     void this.load()
   },
 
-  async load() {
+  /**
+   * 加载看板。缓存有效且非强制时：先用缓存渲染（state='ready'，不闪 loading），
+   * 再后台静默刷新；缓存过期或无缓存走原 loading 流程。
+   * force=true 用于数据已变的操作（余位上报 / 额度调整成功后）——跳过缓存强制重拉
+   */
+  async load(force = false) {
+    const cached = this.lastData
+    if (cached && !force && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
+      this.applyCache(cached)
+      void this.refresh(true)
+      return
+    }
     this.setData({ state: 'loading' })
+    await this.refresh(false)
+  },
+
+  /**
+   * 拉取看板并更新缓存。
+   * silent=true（缓存命中后的后台刷新）：失败静默保留缓存、不 toast；
+   * silent=false：走原 loading 的错误 / no_role / no_lot 分支
+   */
+  async refresh(silent: boolean) {
     const r = await fetchAdminDashboard()
     if (!r.ok) {
+      if (silent) return
       // NO_AUTH = 当前身份不是 lot_admin（DB 里 role 还没标，或本就是个普通车主）：
       // 归 no_role 态给「选择身份」入口，别归 error —— error 态切不回角色页
       if (r.code === 'NO_AUTH') {
+        this.lastData = null
+        this.lastLoadedAt = 0
         this.setData({ state: 'no_role' })
         return
       }
@@ -72,6 +123,9 @@ Page({
     }
     if (r.data.lot === null) {
       // adminDashboard 里未绑定车场返回 lot: null（与 adminGetLot 的 no_lot 同一语义）
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'no_lot' })
       return
     }
@@ -88,9 +142,8 @@ Page({
         ? `${avail.freeSpots} / ${avail.totalSpots}`
         : '待上报'
 
-    this.lotId = lot._id
-    this.setData({
-      state: 'ready',
+    const cache: DashboardCache = {
+      lotId: lot._id,
       lotName: lot.name,
       lotAddress: lot.address,
       stat: {
@@ -106,6 +159,23 @@ Page({
         arriveText: formatTimeRangeLabel(new Date(), new Date(x.arriveTime)),
         verifyCode: String(x.verifyCode || '--'),
       })),
+    }
+    this.lastData = cache
+    this.lastLoadedAt = Date.now()
+    this.applyCache(cache)
+  },
+
+  /** 把（缓存的）渲染快照落到 data。lotId 依赖 load 成功赋值，缓存命中分支也要正确设置 */
+  applyCache(c: DashboardCache) {
+    this.lotId = c.lotId
+    this.setData({
+      state: 'ready',
+      lotName: c.lotName,
+      lotAddress: c.lotAddress,
+      stat: c.stat,
+      quota: c.quota,
+      spotsText: c.spotsText,
+      pendingList: c.pendingList,
     })
   },
 
@@ -115,13 +185,14 @@ Page({
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 
-  /** 未绑定车场 → 跳绑定页选车场 */
+  /** 未绑定车场 → 跳绑定页选车场。绑定会改 lot 归属，先失效缓存，回来时强制重拉 */
   onBindLot() {
+    this.lastLoadedAt = 0
     wx.navigateTo({ url: '/pages/owner/bind-lot/bind-lot' })
   },
 
   onRetry() {
-    this.load()
+    this.load(true)
   },
 
   /** 待核销列表 → 跳到预约核销页 */
@@ -161,7 +232,7 @@ Page({
     }
     this.setData({ quotaDialog: false })
     wx.showToast({ title: '额度已更新', icon: 'success' })
-    this.load()
+    this.load(true)
   },
 
   // ---- 余位上报弹窗 ----
@@ -193,6 +264,6 @@ Page({
     }
     this.setData({ reportDialog: false })
     wx.showToast({ title: '余位已上报', icon: 'success' })
-    this.load()
+    this.load(true)
   },
 })
