@@ -1,0 +1,99 @@
+/* 全局设计系统：清爽现代（Linear / Notion 风）—— 浅底、留白、单一品牌蓝、细边框轻阴影。 */
+
+:root {
+  /* 品牌蓝（唯一强调色） */
+  --el-color-primary: #2f6bff;
+  --el-color-primary-light-3: #6391ff;
+  --el-color-primary-light-5: #8fb0ff;
+  --el-color-primary-light-7: #bcd0ff;
+  --el-color-primary-light-8: #d1e0ff;
+  --el-color-primary-light-9: #eef4ff;
+  --el-color-primary-dark-2: #2458d9;
+
+  --el-border-radius-base: 8px;
+  --el-font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  /* 中性色 token */
+  --sp-bg: #f7f8fa;
+  --sp-surface: #ffffff;
+  --sp-border: #eef0f3;
+  --sp-border-strong: #e5e7eb;
+  --sp-text: #111827;
+  --sp-text-2: #667085;
+  --sp-text-3: #98a2b3;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: var(--sp-bg);
+  color: var(--sp-text);
+  font-family: var(--el-font-family);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 卡片：细边框 + 轻阴影 */
+.el-card {
+  border-radius: 12px;
+  border: 1px solid var(--sp-border);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  background: var(--sp-surface);
+}
+.el-card__header {
+  font-weight: 600;
+  color: var(--sp-text);
+  border-bottom: 1px solid var(--sp-border);
+  padding: 14px 20px;
+}
+.el-card__body {
+  padding: 20px;
+}
+
+/* 表格：浅表头、细边框、更轻的 hover */
+.el-table {
+  --el-table-border-color: var(--sp-border);
+  --el-table-header-bg-color: #fafbfc;
+  --el-table-row-hover-bg-color: #fafbfc;
+  color: var(--sp-text);
+}
+.el-table th.el-table__cell {
+  color: var(--sp-text-2);
+  font-weight: 600;
+}
+
+/* 按钮 / 输入框 / 弹窗 圆角统一 */
+.el-button {
+  border-radius: 8px;
+}
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: 8px;
+}
+.el-dialog {
+  border-radius: 14px;
+}
+
+/* 主内容区 */
+.el-main {
+  padding: 24px;
+}
+
+/* 分页右对齐（页面里已用 justify-content，这里兜底） */
+.el-pagination {
+  --el-pagination-button-bg-color: var(--sp-surface);
+}
+
+/* 空态文案弱化 */
+.el-table__empty-text {
+  color: var(--sp-text-3);
+}
+
+/* 通用微交互 */
+.el-button,
+.el-card,
+.el-menu-item {
+  transition: all 0.2s ease;
+}
