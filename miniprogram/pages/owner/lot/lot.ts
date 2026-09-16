@@ -14,6 +14,14 @@ interface PricingVM {
   sourceLabel: string
 }
 
+interface LotVM {
+  lotName: string
+  lotAddress: string
+  pricing: PricingVM
+  quotaText: string
+  facilitiesText: string
+}
+
 type Field = 'firstHour' | 'perHourAfter' | 'stepMinutes' | 'capPerDay' | 'nightRate' | 'name' | 'address' | 'reservableQuota'
 
 interface EditVM {
@@ -23,6 +31,19 @@ interface EditVM {
   /** 数字字段 */
   numeric: boolean
 }
+
+/**
+ * 车场配置渲染快照缓存（内存，data 外的实例字段）。
+ * 车场信息/收费是低频数据（不会每次切 tab 都变），TTL 放长到 10 分钟；
+ * 编辑保存后强制刷新。不落 wx.setStorageSync —— 身份与绑定状态要新鲜
+ */
+interface LotCache {
+  lot: AdminLot
+  vm: LotVM
+}
+
+/** 车场配置低频变：10 分钟内切 tab 直接用旧渲染，超过才重拉 */
+const CACHE_TTL_MS = 10 * 60 * 1000
 
 Page({
   data: {
@@ -43,6 +64,10 @@ Page({
 
   /** 当前车场数据（data 外实例字段） */
   lot: null as AdminLot | null,
+  /** 上次成功渲染的快照（缓存命中先显示它，不闪 loading） */
+  lastData: null as LotCache | null,
+  /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
+  lastLoadedAt: 0,
 
   onLoad() {
     const rect = wx.getMenuButtonBoundingClientRect()
@@ -55,11 +80,33 @@ Page({
     void this.load()
   },
 
-  async load() {
+  /**
+   * 加载车场配置。缓存有效且非强制时：先用缓存渲染（不闪 loading），再后台静默刷新；
+   * 缓存过期或无缓存走原 loading 流程。force=true 用于编辑保存后——跳过缓存强制重拉
+   */
+  async load(force = false) {
+    const cached = this.lastData
+    if (cached && !force && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
+      this.applyCache(cached)
+      void this.refresh(true)
+      return
+    }
     this.setData({ state: 'loading' })
+    await this.refresh(false)
+  },
+
+  /**
+   * 拉取车场配置并更新缓存。
+   * silent=true（缓存命中后的后台刷新）：失败静默保留缓存、不 toast；
+   * silent=false：走原 loading 的错误 / no_role / no_lot 分支
+   */
+  async refresh(silent: boolean) {
     const r = await fetchAdminLot()
     if (!r.ok) {
+      if (silent) return
       if (r.code === 'NO_AUTH') {
+        this.lastData = null
+        this.lastLoadedAt = 0
         this.setData({ state: 'no_role' })
         return
       }
@@ -67,33 +114,36 @@ Page({
       return
     }
     if (r.data.role !== 'lot_admin') {
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'no_role' })
       return
     }
     if (!r.data.lot) {
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'no_lot' })
       return
     }
     const lot = r.data.lot
-    const p = lot.pricing || {}
-    const sourceLabel = p.source === 'public' || p.source === 'ops'
-      ? '已核实'
-      : '示例数据，待核实'
-    this.lot = lot
+    const cache: LotCache = { lot, vm: toVM(lot) }
+    this.lastData = cache
+    this.lastLoadedAt = Date.now()
+    this.applyCache(cache)
+  },
+
+  /** 把（缓存的）渲染快照落到 data。lot 依赖 load 成功赋值，缓存命中分支也要正确设置 */
+  applyCache(c: LotCache) {
+    this.lot = c.lot
     this.setData({
       state: 'ready',
-      lotName: lot.name,
-      lotAddress: lot.address,
-      pricing: {
-        firstHour: fmtNum(p.firstHour),
-        perHourAfter: fmtNum(p.perHourAfter),
-        stepMinutes: fmtNum(p.stepMinutes),
-        capPerDay: fmtNum(p.capPerDay),
-        nightRate: p.nightRate === null || p.nightRate === undefined ? '无' : fmtNum(p.nightRate),
-        sourceLabel,
-      },
-      quotaText: typeof lot.reservableQuota === 'number' ? String(lot.reservableQuota) : '--',
-      facilitiesText: lot.facilities && lot.facilities.length ? lot.facilities.join('、') : '暂无设施',
+      lotName: c.vm.lotName,
+      lotAddress: c.vm.lotAddress,
+      pricing: c.vm.pricing,
+      quotaText: c.vm.quotaText,
+      facilitiesText: c.vm.facilitiesText,
     })
   },
 
@@ -103,11 +153,13 @@ Page({
   },
 
   onBindLot() {
+    // 绑定会改车场归属，先失效缓存，回来时强制重拉
+    this.lastLoadedAt = 0
     wx.navigateTo({ url: '/pages/owner/bind-lot/bind-lot' })
   },
 
   onRetry() {
-    this.load()
+    this.load(true)
   },
 
   // ---- 编辑弹窗 ----
@@ -191,11 +243,34 @@ Page({
     }
     this.setData({ editDialog: false })
     wx.showToast({ title: '已保存', icon: 'success' })
-    this.load()
+    // 编辑改了数据，强制重拉，不信任旧缓存
+    this.load(true)
   },
 
   noop() {},
 })
+
+/** 车场配置 → 渲染 VM（缓存载体，纯函数便于复用） */
+function toVM(lot: AdminLot): LotVM {
+  const p = lot.pricing || {}
+  const sourceLabel = p.source === 'public' || p.source === 'ops'
+    ? '已核实'
+    : '示例数据，待核实'
+  return {
+    lotName: lot.name,
+    lotAddress: lot.address,
+    pricing: {
+      firstHour: fmtNum(p.firstHour),
+      perHourAfter: fmtNum(p.perHourAfter),
+      stepMinutes: fmtNum(p.stepMinutes),
+      capPerDay: fmtNum(p.capPerDay),
+      nightRate: p.nightRate === null || p.nightRate === undefined ? '无' : fmtNum(p.nightRate),
+      sourceLabel,
+    },
+    quotaText: typeof lot.reservableQuota === 'number' ? String(lot.reservableQuota) : '--',
+    facilitiesText: lot.facilities && lot.facilities.length ? lot.facilities.join('、') : '暂无设施',
+  }
+}
 
 function fmtNum(v: unknown): string {
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : '--'

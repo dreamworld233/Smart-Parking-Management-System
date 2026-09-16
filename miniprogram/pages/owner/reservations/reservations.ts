@@ -28,8 +28,9 @@ interface ReservationCache {
   cards: CardVM[]
 }
 
-/** 缓存有效期：30 秒内的旧数据允许先渲染，超过则走完整 loading */
-const CACHE_TTL_MS = 30 * 1000
+/** 缓存有效期：60 秒内的旧数据允许先渲染，超过则走完整 loading。
+ *  预约列表高频变（核销/取消/超时释放），一分钟拉一次足够新 */
+const CACHE_TTL_MS = 60 * 1000
 
 function statusClass(status: string): string {
   switch (status) {

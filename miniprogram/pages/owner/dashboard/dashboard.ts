@@ -41,8 +41,9 @@ interface DashboardCache {
   pendingList: PendingItemVM[]
 }
 
-/** 缓存有效期：30 秒内的旧数据允许先渲染，超过则走完整 loading */
-const CACHE_TTL_MS = 30 * 1000
+/** 缓存有效期：60 秒内的旧数据允许先渲染，超过则走完整 loading。
+ *  看板高频变（余位/额度/待核销），一分钟拉一次足够新，别用更长 */
+const CACHE_TTL_MS = 60 * 1000
 
 Page({
   data: {
