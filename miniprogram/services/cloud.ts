@@ -229,12 +229,35 @@ export interface VerifyReservationData {
 }
 
 /**
- * 车场端核销（云函数 verifyReservation）。method 是 'code'（输码）或 'manual'（手动）
+ * 车场端核销（云函数 verifyReservation）。
+ * method：'code' 输码 / 'manual' 手动 / 'plate' 车牌识别（OCR 命中，confidence + imageFileID 透传留痕）
  */
 export function verifyReservation(
-  input: { lotId: string; method: 'code' | 'manual'; verifyCode?: string; plateNo?: string },
+  input: {
+    lotId: string
+    method: 'code' | 'manual' | 'plate'
+    verifyCode?: string
+    plateNo?: string
+    confidence?: number
+    imageFileID?: string
+  },
 ): Promise<CloudResult<VerifyReservationData>> {
   return callFunction<VerifyReservationData>('verifyReservation', { ...input })
+}
+
+export interface RecognizePlateData {
+  plate: string
+  confidence: number | null
+  fileID: string
+}
+
+/**
+ * 车牌识别（云函数 recognizePlate）：上传的车牌照 → 腾讯云 OCR → 车牌 + 置信度。
+ * 前端拿到车牌后再调 verifyReservation(method:'plate') 完成核销 —— 识别与核销分离，
+ * 低置信度/识别失败可直接降级输码/手动
+ */
+export function recognizePlate(fileID: string): Promise<CloudResult<RecognizePlateData>> {
+  return callFunction<RecognizePlateData>('recognizePlate', { fileID })
 }
 
 export interface AdminReservationItem {

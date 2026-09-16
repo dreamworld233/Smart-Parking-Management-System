@@ -142,6 +142,38 @@
   margin: var(--space-3) 0;
 }
 
+.ocr {
+  padding: 20rpx 0;
+  text-align: center;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: var(--radius-card);
+  font-size: var(--font-body);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+.ocr-result {
+  font-size: var(--font-sub);
+  color: var(--color-text);
+  text-align: center;
+  margin-bottom: var(--space-2);
+}
+
+.ocr-result__plate {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 4rpx;
+}
+
+.ocr-error {
+  font-size: var(--font-micro);
+  color: var(--color-danger);
+  text-align: center;
+  margin-bottom: var(--space-3);
+}
+
 .tabs {
   display: flex;
   gap: var(--space-2);

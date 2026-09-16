@@ -1,6 +1,6 @@
 import { formatPlate, formatTimeRangeLabel, RESERVATION_STATUS_LABELS } from '../../../domain/format'
-import { fetchAdminReservations, verifyReservation } from '../../../services/cloud'
-import type { AdminReservationItem } from '../../../services/cloud'
+import { fetchAdminReservations, recognizePlate, verifyReservation } from '../../../services/cloud'
+import type { AdminReservationItem, RecognizePlateData } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
 import { clearRole } from '../../../services/storage'
 
@@ -56,10 +56,19 @@ Page({
     // 核销弹窗
     verifyDialog: false,
     target: null as { id: string; plateText: string; rawPlate: string } | null,
-    mode: 'code' as 'code' | 'manual',
+    mode: 'code' as 'code' | 'manual' | 'plate',
     codeInput: '',
     submitting: false,
     codeInvalid: false,
+    /** OCR 进行中（拍照→上传→识别），防连点 */
+    ocrBusy: false,
+    /** OCR 识别结果（识别成功后才填核销，低置信度给降级提示） */
+    ocrPlate: '',
+    ocrConfidence: null as number | null,
+    /** OCR 原图 fileID（核销时透传给 entry_logs） */
+    ocrFileID: '',
+    /** 识别失败/低置信度的提示文案 */
+    ocrError: '',
   },
 
   /** 当前车场 id（data 外实例字段） */
@@ -171,6 +180,10 @@ Page({
       mode: 'code',
       codeInput: '',
       codeInvalid: false,
+      ocrPlate: '',
+      ocrConfidence: null,
+      ocrFileID: '',
+      ocrError: '',
     })
   },
 
@@ -190,6 +203,74 @@ Page({
     this.setData({ codeInput: e.detail.value, codeInvalid: false })
   },
 
+  /** 拍照识别车牌：拍照 → 压缩 → 上传云存储 → recognizePlate 云函数 */
+  onOcr() {
+    if (this.data.ocrBusy) return
+    this.setData({ ocrBusy: true, ocrError: '' })
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['camera'],
+      success: res => {
+        const filePath = res.tempFiles[0]?.tempFilePath
+        if (!filePath) {
+          this.setData({ ocrBusy: false, ocrError: '未拍到照片' })
+          return
+        }
+        void this.uploadAndRecognize(filePath)
+      },
+      fail: () => {
+        // 用户取消拍照不是错误，不提示
+        this.setData({ ocrBusy: false })
+      },
+    })
+  },
+
+  /**
+   * 上传原图 → 调 OCR。压缩失败/上传失败/识别失败各自给明确提示，
+   * 都可直接降级到输码或手动核销（§10 三级降级链）
+   */
+  async uploadAndRecognize(filePath: string) {
+    // 拍照原图可能几 MB，先压缩再传（§10 要核的点）。压缩失败用原图兜底
+    let uploadPath = filePath
+    try {
+      const comp = await new Promise<WechatMiniprogram.CompressImageSuccessCallbackResult>((resolve, reject) => {
+        wx.compressImage({ src: filePath, quality: 80, success: resolve, fail: reject })
+      })
+      if (comp.tempFilePath) uploadPath = comp.tempFilePath
+    } catch {
+      // 压缩失败：用原图，OCR 4MB 上限在云端兜底
+    }
+    try {
+      const up = await wx.cloud.uploadFile({
+        cloudPath: `plate-ocr/${Date.now()}.jpg`,
+        filePath: uploadPath,
+      })
+      const r = await recognizePlate(up.fileID)
+      if (!r.ok) {
+        this.setData({
+          ocrBusy: false,
+          ocrError: r.message || '识别失败',
+        })
+        return
+      }
+      const data: RecognizePlateData = r.data
+      // 低置信度：不做「猜」（§10）——仍显示结果但明确提示可能不准，由车场端决定
+      const lowConf = typeof data.confidence === 'number' && data.confidence < 80
+      this.setData({
+        ocrBusy: false,
+        ocrPlate: data.plate,
+        ocrConfidence: data.confidence,
+        ocrFileID: data.fileID,
+        ocrError: lowConf ? `置信度 ${data.confidence}%，请核对车牌后再核销` : '',
+        mode: 'plate',
+        codeInput: data.plate,
+      })
+    } catch {
+      this.setData({ ocrBusy: false, ocrError: '图片上传失败，可改为输码或手动核销' })
+    }
+  },
+
   async onConfirmVerify() {
     if (this.data.submitting || !this.data.target) return
     const { target, mode, codeInput } = this.data
@@ -198,10 +279,19 @@ Page({
       return
     }
     this.setData({ submitting: true })
+    // plate 分支：OCR 识别出的车牌 + 原图 fileID + 置信度（entry_logs 留痕）
     const r = await verifyReservation(
       mode === 'code'
         ? { lotId: this.lotId, method: 'code', verifyCode: codeInput }
-        : { lotId: this.lotId, method: 'manual', plateNo: target.rawPlate },
+        : mode === 'plate'
+          ? {
+              lotId: this.lotId,
+              method: 'plate',
+              plateNo: this.data.ocrPlate,
+              confidence: this.data.ocrConfidence ?? undefined,
+              imageFileID: this.data.ocrFileID || undefined,
+            }
+          : { lotId: this.lotId, method: 'manual', plateNo: target.rawPlate },
     )
     this.setData({ submitting: false })
     if (!r.ok) {

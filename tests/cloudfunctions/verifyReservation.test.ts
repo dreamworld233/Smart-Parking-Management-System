@@ -197,6 +197,50 @@ describe('verifyReservation', () => {
     expect(r.code).toBe('NO_MATCH')
   })
 
+  it('plate（OCR 命中）：按车牌核销，entry_logs 记 method plate + confidence + imageFileID', async () => {
+    seedUser()
+    seedLot()
+    seedReservation('r1')
+    const r = await main({
+      lotId: 'lot1',
+      method: 'plate',
+      plateNo: '京A12345',
+      confidence: 98,
+      imageFileID: 'cloud://x/plate.png',
+    })
+    expect(r.code).toBe(0)
+    expect(r.data.status).toBe('entered')
+    expect(mockStore.reservations.get('r1')!.status).toBe('entered')
+    expect(mockStore.reservations.get('r1')!.entryMethod).toBe('plate')
+    const log = [...mockStore.entry_logs.values()][0]
+    expect(log.method).toBe('plate')
+    expect(log.confidence).toBe(98)
+    expect(log.imageFileID).toBe('cloud://x/plate.png')
+  })
+
+  it('plate 无匹配（OCR 识别出的车牌没预约）→ NO_MATCH，提示降级', async () => {
+    seedUser()
+    seedLot()
+    seedReservation('r1')
+    const r = await main({
+      lotId: 'lot1',
+      method: 'plate',
+      plateNo: '皖B88888',
+      confidence: 95,
+      imageFileID: 'cloud://x/plate.png',
+    })
+    expect(r.code).toBe('NO_MATCH')
+    expect(mockStore.reservations.get('r1')!.status).toBe('pending_entry')
+    expect(mockStore.entry_logs.size).toBe(0)
+  })
+
+  it('plate 缺车牌 → BAD_REQUEST', async () => {
+    seedUser()
+    seedLot()
+    const r = await main({ lotId: 'lot1', method: 'plate', confidence: 90 })
+    expect(r.code).toBe('BAD_REQUEST')
+  })
+
   it('CAS 并发：双击只成功一次，第二次 ALREADY_PROCESSED', async () => {
     seedUser()
     seedLot()

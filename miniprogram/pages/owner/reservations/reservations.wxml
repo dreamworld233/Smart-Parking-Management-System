@@ -57,6 +57,16 @@
         <view class="dialog__title">核销入场</view>
         <view class="dialog__plate">{{target.plateText}}</view>
 
+        <!-- 拍照识别（OCR，三级降级链最上一级）。失败/低置信度可降级输码或手动 -->
+        <view class="ocr" bindtap="onOcr">
+          {{ocrBusy ? '识别中…' : '📷 拍照识别车牌'}}
+        </view>
+        <view class="ocr-result" wx:if="{{ocrPlate}}">
+          识别到 <text class="ocr-result__plate">{{ocrPlate}}</text>
+          <text wx:if="{{ocrConfidence !== null}}">（置信度 {{ocrConfidence}}%）</text>
+        </view>
+        <view class="ocr-error" wx:if="{{ocrError}}">{{ocrError}}</view>
+
         <view class="tabs">
           <view class="tab {{mode === 'code' ? 'tab--on' : ''}}" bindtap="onModeCode">输码</view>
           <view class="tab {{mode === 'manual' ? 'tab--on' : ''}}" bindtap="onModeManual">按车牌</view>
