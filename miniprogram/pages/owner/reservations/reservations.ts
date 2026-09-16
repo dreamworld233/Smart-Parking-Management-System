@@ -2,6 +2,7 @@ import { formatPlate, formatTimeRangeLabel, RESERVATION_STATUS_LABELS } from '..
 import { fetchAdminReservations, verifyReservation } from '../../../services/cloud'
 import type { AdminReservationItem } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
+import { clearRole } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -61,6 +62,10 @@ Page({
     this.setData({ state: 'loading' })
     const r = await fetchAdminReservations()
     if (!r.ok) {
+      if (r.code === 'NO_AUTH') {
+        this.setData({ state: 'no_role' })
+        return
+      }
       this.setData({ state: 'error' })
       return
     }
@@ -86,6 +91,7 @@ Page({
   },
 
   onPickRole() {
+    clearRole()
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 

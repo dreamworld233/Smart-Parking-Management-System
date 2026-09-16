@@ -1,5 +1,6 @@
 import { fetchAdminLot, updateLot } from '../../../services/cloud'
 import type { AdminLot } from '../../../services/cloud'
+import { clearRole } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -52,6 +53,10 @@ Page({
     this.setData({ state: 'loading' })
     const r = await fetchAdminLot()
     if (!r.ok) {
+      if (r.code === 'NO_AUTH') {
+        this.setData({ state: 'no_role' })
+        return
+      }
       this.setData({ state: 'error' })
       return
     }
@@ -87,6 +92,7 @@ Page({
   },
 
   onPickRole() {
+    clearRole()
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 

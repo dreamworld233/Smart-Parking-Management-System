@@ -20,6 +20,10 @@ Page({
     this.setData({ state: 'loading' })
     const r = await fetchAdminLot()
     if (!r.ok) {
+      if (r.code === 'NO_AUTH') {
+        this.setData({ state: 'no_role' })
+        return
+      }
       this.setData({ state: 'error' })
       return
     }

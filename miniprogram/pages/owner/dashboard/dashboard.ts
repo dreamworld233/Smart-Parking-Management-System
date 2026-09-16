@@ -1,6 +1,7 @@
 import { formatAmount, formatTimeRangeLabel } from '../../../domain/format'
 import { fetchAdminDashboard, reportAvailability, updateLot } from '../../../services/cloud'
 import type { AdminDashboardData } from '../../../services/cloud'
+import { clearRole } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -53,6 +54,12 @@ Page({
     this.setData({ state: 'loading' })
     const r = await fetchAdminDashboard()
     if (!r.ok) {
+      // NO_AUTH = 当前身份不是 lot_admin（DB 里 role 还没标，或本就是个普通车主）：
+      // 归 no_role 态给「选择身份」入口，别归 error —— error 态切不回角色页
+      if (r.code === 'NO_AUTH') {
+        this.setData({ state: 'no_role' })
+        return
+      }
       this.setData({ state: 'error' })
       return
     }
@@ -96,6 +103,8 @@ Page({
   },
 
   onPickRole() {
+    // 必须清 role：role-select onLoad 发现已有角色会直接 reLaunch 回本端，死循环
+    clearRole()
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 
