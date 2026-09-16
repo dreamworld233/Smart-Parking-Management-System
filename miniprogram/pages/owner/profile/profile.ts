@@ -1,4 +1,5 @@
 import { fetchAdminLot } from '../../../services/cloud'
+import { clearRole } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -32,7 +33,9 @@ Page({
     })
   },
 
+  /** 切换身份：先清 role，否则 role-select onLoad 会 reLaunch 回本端首页，进不了选择页 */
   onPickRole() {
+    clearRole()
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
 

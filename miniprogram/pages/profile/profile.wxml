@@ -1,1 +1,16 @@
-<view class="page">我的（待实现）</view>
+<view class="wrap">
+  <view class="page">
+    <view class="me">
+      <view class="me__avatar">🚗</view>
+      <view class="me__identity">{{identityText}}</view>
+      <view class="me__plate">常用车牌 {{plateText}}</view>
+    </view>
+
+    <view class="card" bindtap="onSwitchRole">
+      <text>切换身份</text>
+      <text class="card__arrow">›</text>
+    </view>
+
+    <view class="version">智慧停车 · 车主端</view>
+  </view>
+</view>
