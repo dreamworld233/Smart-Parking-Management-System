@@ -166,7 +166,7 @@ export function formatTimeRangeLabel(now: Date, time: Date): string {
  * 预约状态标签文案。状态机见数据模型 §5.2：
  * pending_entry 待入场 / entered 已入场 / completed 已完成 /
  * cancelled 已取消 / released 已释放（超时未入场）。
- * 'violated' 已从状态机移除（2b），这里不再提供标签
+ * 车位侧结果用 released，用户侧后果进 violations 表，状态里没有 violated
  */
 export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
   pending_entry: '待入场',
@@ -174,8 +174,6 @@ export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
   completed: '已完成',
   cancelled: '已取消',
   released: '已释放',
-  // 'violated' 待 Task 5 从状态机移除，移除前先保留标签避免类型缺项
-  violated: '已违约',
 }
 
 /**

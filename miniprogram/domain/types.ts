@@ -115,13 +115,11 @@ export interface Recommendation {
 
 export type SortKey = 'composite' | 'distance' | 'fee' | 'availability'
 
-// 注：'violated' 从状态机移除一事推迟到 2b（见计划头部偏差表）
 export type ReservationStatus =
   | 'pending_entry'
   | 'entered'
   | 'completed'
   | 'cancelled'
-  | 'violated'
   | 'released'
 
 export interface Reservation {

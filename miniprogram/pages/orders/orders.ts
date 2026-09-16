@@ -50,7 +50,6 @@ function statusClass(status: ReservationStatus): string {
     case 'released':
       return 'tag--warning'
     case 'cancelled':
-    case 'violated':
       return 'tag--muted'
   }
 }

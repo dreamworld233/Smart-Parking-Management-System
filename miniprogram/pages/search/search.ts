@@ -366,9 +366,11 @@ Page({
     this.openDetail(e.detail.id)
   },
 
-  /** 详情里的「预约车位」：付费链路在计划 2，这里先给出提示 */
-  onDetailReserve() {
-    wx.showToast({ title: '预约流程将在下一阶段接入', icon: 'none' })
+  /** 详情里的「预约车位」→ 预约确认页（lot-detail 的 reserve 事件带 lotId） */
+  onDetailReserve(e: WechatMiniprogram.CustomEvent<{ id: string }>) {
+    const id = e.detail.id
+    if (!id) return
+    wx.navigateTo({ url: `/pages/confirm/confirm?lotId=${id}` })
   },
 
   onRetry() {

@@ -198,10 +198,6 @@ describe('RESERVATION_STATUS_LABELS', () => {
     expect(RESERVATION_STATUS_LABELS.cancelled).toBe('已取消')
     expect(RESERVATION_STATUS_LABELS.released).toBe('已释放')
   })
-
-  it('violated 标签保留（Task 5 从状态机移除前不炸类型）', () => {
-    expect(RESERVATION_STATUS_LABELS.violated).toBe('已违约')
-  })
 })
 
 describe('sourceNotes', () => {
