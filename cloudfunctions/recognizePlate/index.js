@@ -38,17 +38,9 @@ function getOcrClient() {
 }
 
 exports.main = async (event) => {
-  const { OPENID } = cloud.getWXContext()
-  if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
-
-  const { fileID } = event || {}
-  if (typeof fileID !== 'string' || fileID === '') {
-    return { code: 'BAD_REQUEST', message: '缺少图片' }
-  }
-
-  // 调试分支（云端测试用，真机正常调用不触发）：无微信身份时验密钥是否注入。
-  // 云端测试没有用户上下文 → OPENID 恒空，走到这里前就被 NO_AUTH 拒；
-  // 传 debug: true 且带 fileID 时跳过身份校验，直接验证环境变量 + OCR 连通。
+  // 调试分支（云端测试用，真机正常调用不触发）：必须先于身份校验 ——
+  // 云端测试没有用户上下文 → OPENID 恒空，若放在 NO_AUTH 之后永远到不了。
+  // 传 debug: true 时跳过身份校验，直接验证环境变量是否注入 + OCR 连通。
   // 只显密钥前 6 位 + 后 4 位，避免整个密钥回显到测试结果里
   if (event && event.debug === true) {
     const sid = process.env.TENCENT_SECRET_ID || ''
@@ -61,6 +53,14 @@ exports.main = async (event) => {
       code: 0,
       data: { debug: true, secretId: mask(sid), secretKey: mask(skey) },
     }
+  }
+
+  const { OPENID } = cloud.getWXContext()
+  if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
+
+  const { fileID } = event || {}
+  if (typeof fileID !== 'string' || fileID === '') {
+    return { code: 'BAD_REQUEST', message: '缺少图片' }
   }
 
   // 身份：车场端核销是 lot_admin / ops_admin 的操作

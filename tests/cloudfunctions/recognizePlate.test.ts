@@ -160,6 +160,15 @@ describe('recognizePlate', () => {
     expect(capturedBase64).toBeNull() // 没走 SDK
   })
 
+  it('debug 分支：无微信身份也能走（必须先于 NO_AUTH）——云端测试的用例', async () => {
+    mockOpenid = null
+    process.env.TENCENT_SECRET_ID = 'AKIDabcdef1234567890'
+    process.env.TENCENT_SECRET_KEY = 'secretkey1234567890'
+    const r = await main({ fileID: 'cloud://x/1.png', debug: true })
+    expect(r.code).toBe(0)
+    expect(r.data.debug).toBe(true)
+  })
+
   it('debug 分支：密钥缺失 → NO_CREDENTIAL', async () => {
     delete process.env.TENCENT_SECRET_ID
     const r = await main({ fileID: 'cloud://x/1.png', debug: true })
