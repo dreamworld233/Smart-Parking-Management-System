@@ -23,14 +23,16 @@
 
 | Task | 状态 | 提交 |
 |---|---|---|
-| Task 0 角色统一 lot_admin | — | — |
-| Task 1 车场端登录与身份 | — | — |
-| Task 2 看板页 | — | — |
-| Task 3 余位上报 | — | — |
-| Task 4 核销（输码+手动） | — | — |
-| Task 5 车场配置页 | — | — |
-| Task 6 我的页 | — | — |
-| Task 7 部署 + 真机验收 | — | — |
+| Task 0 角色统一 lot_admin | ✅ | 8a3ee0d |
+| Task 1 车场端登录与身份 | ✅ | 8924657 |
+| Task 2 看板页 | ✅ | 368a779 |
+| Task 3 余位上报 | ✅（云函数提前做） | f4ad6fd |
+| Task 4 核销（输码+手动） | ✅ | 652ff01 |
+| Task 5 车场配置页 | ✅ | cb7a171 |
+| Task 6 我的页 | ✅ | 9584feb |
+| Task 7 部署 + 真机验收 | ⏳ 待用户 | — |
+
+**规格执行偏差**：Task 3 / Task 5 的云函数（reportAvailability / adminUpdateLot）在 Task 2 前提前实现，让看板一次铺全；Task 4 实际新增两个云函数（verifyReservation + adminReservations，后者因安全规则缺口走云函数而非前端直读）；Task 2 看板统计走 adminDashboard 云函数（同一原因）。**新云函数共 6 个**：adminGetLot / adminDashboard / reportAvailability / verifyReservation / adminReservations / adminUpdateLot。
 
 ---
 
