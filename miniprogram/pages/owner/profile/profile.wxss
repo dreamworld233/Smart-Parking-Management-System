@@ -4,12 +4,11 @@
   height: 100vh;
   overflow: hidden;
   background: var(--color-bg);
-  padding-top: var(--space-4);
-  box-sizing: border-box;
 }
 
 .page {
-  padding: var(--space-4);
+  /* padding-top 由 TS 算成 px 内联传入（navTop = 胶囊下沿 + 8），刘海屏不被状态栏盖住 */
+  padding: 0 var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }

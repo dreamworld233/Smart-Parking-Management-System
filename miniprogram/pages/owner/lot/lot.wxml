@@ -26,7 +26,7 @@
   />
 
   <block wx:elif="{{state === 'ready'}}">
-    <scroll-view class="page" scroll-y>
+    <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
       <!-- 车场信息 -->
       <view class="card">
         <view class="card__title">车场信息</view>

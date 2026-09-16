@@ -26,7 +26,7 @@
   />
 
   <block wx:elif="{{state === 'ready'}}">
-    <scroll-view class="page" scroll-y>
+    <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
       <view class="head">
         <view class="head__title">预约核销</view>
         <view class="head__hint">点待入场的单，输码或按车牌核销入场</view>

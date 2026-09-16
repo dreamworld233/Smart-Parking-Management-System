@@ -27,6 +27,7 @@ interface EditVM {
 Page({
   data: {
     state: 'loading' as ViewState,
+    navTop: 100,
     lotName: '',
     lotAddress: '',
     pricing: null as PricingVM | null,
@@ -42,6 +43,11 @@ Page({
 
   /** 当前车场数据（data 外实例字段） */
   lot: null as AdminLot | null,
+
+  onLoad() {
+    const rect = wx.getMenuButtonBoundingClientRect()
+    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+  },
 
   onShow() {
     const tabBar = this.getTabBar?.()

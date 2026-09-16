@@ -9,11 +9,17 @@ Page({
     lots: [] as { id: string; name: string; address: string; boundByOther: boolean }[],
     binding: false,
     navTop: 100,
+    /** 内容区顶部让位（px）：navTop + 顶栏高 + 间距，标题文字不压内容 */
+    bodyTop: 100,
   },
 
   onLoad() {
+    // 与 confirm 页同一套 px 口径：胶囊下沿 + 8 是顶栏 top，内容区再让出顶栏自身高
+    const info = wx.getWindowInfo()
+    const rpx = info.windowWidth / 750
     const rect = wx.getMenuButtonBoundingClientRect()
-    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+    const navTop = rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100
+    this.setData({ navTop, bodyTop: navTop + Math.round(80 * rpx) + Math.round(16 * rpx) })
     this.load()
   },
 

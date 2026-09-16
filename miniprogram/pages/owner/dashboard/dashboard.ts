@@ -39,10 +39,17 @@ Page({
     submitting: false,
     /** 弹窗输入非法态 */
     inputInvalid: false,
+    /** 内容顶部让位（px）：胶囊下沿 + 8，刘海屏内容不被状态栏盖住 */
+    navTop: 100,
   },
 
   /** 当前车场 id（load 成功后赋值，data 外的实例字段） */
   lotId: '',
+
+  onLoad() {
+    const rect = wx.getMenuButtonBoundingClientRect()
+    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+  },
 
   onShow() {
     const tabBar = this.getTabBar?.()

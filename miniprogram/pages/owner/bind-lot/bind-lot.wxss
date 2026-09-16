@@ -35,13 +35,14 @@
   width: 40rpx;
 }
 
+/* padding-top 由 TS 算成 px 内联传入（bodyTop = navTop + 顶栏高 + 间距） */
 .body {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  padding: 140rpx 24rpx 0;
+  padding: 0 24rpx;
   box-sizing: border-box;
 }
 

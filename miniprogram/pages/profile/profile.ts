@@ -5,6 +5,12 @@ Page({
   data: {
     plateText: '',
     identityText: '车主',
+    navTop: 100,
+  },
+
+  onLoad() {
+    const rect = wx.getMenuButtonBoundingClientRect()
+    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
   },
 
   onShow() {

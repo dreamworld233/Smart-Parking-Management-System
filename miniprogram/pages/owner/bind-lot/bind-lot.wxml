@@ -15,7 +15,7 @@
     bind:action="onRetry"
   />
 
-  <scroll-view wx:elif="{{state === 'ready'}}" class="body" scroll-y>
+  <scroll-view wx:elif="{{state === 'ready'}}" class="body" scroll-y style="padding-top: {{bodyTop}}px">
     <view class="hint">选择你要管理的车场。已被其他管理员绑定的不可选</view>
     <view
       wx:for="{{lots}}"

@@ -6,13 +6,16 @@
   background: var(--color-bg);
 }
 
+/* padding-top 由 TS 算成 px 内联传入（navTop = 胶囊下沿 + 8），
+   刘海屏内容不被状态栏盖住；写死 rpx 与胶囊下沿 px 不对齐 */
 .page {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  padding: var(--space-4);
+  padding-right: var(--space-4);
+  padding-left: var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   box-sizing: border-box;

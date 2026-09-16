@@ -38,6 +38,7 @@ function statusClass(status: string): string {
 Page({
   data: {
     state: 'loading' as ViewState,
+    navTop: 100,
     cards: [] as CardVM[],
     // 核销弹窗
     verifyDialog: false,
@@ -50,6 +51,11 @@ Page({
 
   /** 当前车场 id（data 外实例字段） */
   lotId: '',
+
+  onLoad() {
+    const rect = wx.getMenuButtonBoundingClientRect()
+    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+  },
 
   onShow() {
     const tabBar = this.getTabBar?.()

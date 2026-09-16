@@ -6,8 +6,14 @@ type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 Page({
   data: {
     state: 'loading' as ViewState,
+    navTop: 100,
     lotName: '',
     identityText: '车场管理员',
+  },
+
+  onLoad() {
+    const rect = wx.getMenuButtonBoundingClientRect()
+    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
   },
 
   onShow() {
