@@ -162,3 +162,60 @@ export interface AdminGetLotData {
 export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
   return callFunction<AdminGetLotData>('adminGetLot')
 }
+
+/** adminDashboard 返回的看板数据 */
+export interface AdminDashboardData {
+  lot: {
+    _id: string
+    name: string
+    address: string
+    availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
+    reservableQuota: number | null
+    reservedCount: number
+  } | null
+  todayReservations: number
+  pendingEntry: number
+  todayIncome: number
+  pendingList: {
+    _id: string
+    plateNo: string
+    arriveTime: number
+    verifyCode: string
+    lotName: string
+  }[]
+}
+
+/** 车场端看板：统计 + 待核销列表（云函数 adminDashboard，规避安全规则缺口） */
+export function fetchAdminDashboard(): Promise<CloudResult<AdminDashboardData>> {
+  return callFunction<AdminDashboardData>('adminDashboard')
+}
+
+export interface ReportAvailabilityData {
+  reportedAt: number
+  freeSpots: number
+  totalSpots: number
+}
+
+/** 余位上报（云函数 reportAvailability） */
+export function reportAvailability(
+  lotId: string,
+  freeSpots: number,
+): Promise<CloudResult<ReportAvailabilityData>> {
+  return callFunction<ReportAvailabilityData>('reportAvailability', { lotId, freeSpots })
+}
+
+export interface UpdateLotData {
+  lotId: string
+  priceChanged: boolean
+}
+
+/**
+ * 车场配置更新（云函数 adminUpdateLot）。patch 白名单在云端校验，
+ * 这里只透传；pricing 是子对象，其余扁平字段
+ */
+export function updateLot(
+  lotId: string,
+  patch: { pricing?: Record<string, unknown>; reservableQuota?: number; facilities?: string[]; name?: string; address?: string; openHours?: string | null },
+): Promise<CloudResult<UpdateLotData>> {
+  return callFunction<UpdateLotData>('adminUpdateLot', { lotId, patch })
+}
