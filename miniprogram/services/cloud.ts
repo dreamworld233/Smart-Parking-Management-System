@@ -129,3 +129,36 @@ export function cancelReservation(
 ): Promise<CloudResult<CancelReservationData>> {
   return callFunction<CancelReservationData>('cancelReservation', { reservationId })
 }
+
+/** adminGetLot 返回的车场精简字段（云函数 pickLot 白名单，见 adminGetLot/index.js） */
+export interface AdminLot {
+  _id: string
+  name: string
+  address: string
+  location: { lat: number; lng: number } | null
+  pricing: {
+    firstHour?: number
+    perHourAfter?: number
+    stepMinutes?: number
+    capPerDay?: number
+    nightRate?: number | null
+    source?: string
+  } | null
+  availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
+  reservableQuota: number | null
+  reservedCount: number
+  facilities: string[]
+}
+
+export interface AdminGetLotData {
+  role: 'driver' | 'lot_admin' | 'ops_admin'
+  lot: AdminLot | null
+}
+
+/**
+ * 车场端身份：取当前用户管理的车场（云函数 adminGetLot）。
+ * lot 为 null 表示是车场管理员但未绑定车场，前端显示空态
+ */
+export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
+  return callFunction<AdminGetLotData>('adminGetLot')
+}

@@ -1,6 +1,37 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+  padding-top: var(--space-4);
+  box-sizing: border-box;
+}
+
 .page {
   padding: var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+.page__head {
+  margin-bottom: var(--space-4);
+}
+
+.page__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.page__addr {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: 8rpx;
+}
+
+.todo {
+  font-size: var(--font-sub);
   color: var(--color-text-weak);
+  padding: var(--space-4) 0;
 }
