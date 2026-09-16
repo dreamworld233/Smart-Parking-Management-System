@@ -97,13 +97,20 @@ Page({
     cards: [] as CardVM[],
     detail: null as DetailVM | null,
     navTop: 100,
+    /** 内容区顶部让位（px）：navTop + 顶栏高 + 间距，标题文字不压内容 */
+    bodyTop: 100,
   },
 
   userId: '',
 
   onLoad() {
+    // 与 search 页同套路：胶囊下沿 + 8 是顶栏 top，内容区再让出顶栏自身高（80rpx）与间距（16rpx）
+    const info = wx.getWindowInfo()
+    const rpx = info.windowWidth / 750
     const rect = wx.getMenuButtonBoundingClientRect()
-    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+    const navTop = rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100
+    const bodyTop = navTop + Math.round(80 * rpx) + Math.round(16 * rpx)
+    this.setData({ navTop, bodyTop })
   },
 
   async onShow() {

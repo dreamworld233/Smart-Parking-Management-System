@@ -35,14 +35,15 @@
   width: 40rpx;
 }
 
-/* 内容滚动区：从顶栏下沿起，让出底部吸底栏的高度 */
+/* 内容滚动区。padding-top 由 TS 算成 px 内联传入（navTop + 顶栏高，见 onLoad），
+   写死 rpx 会与胶囊下沿 px 不对齐，标题文字压进内容（真机踩到） */
 .body {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  padding: 140rpx 24rpx 0;
+  padding: 0 24rpx;
   box-sizing: border-box;
 }
 

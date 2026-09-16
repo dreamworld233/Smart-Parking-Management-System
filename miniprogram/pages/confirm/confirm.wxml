@@ -15,7 +15,7 @@
     bind:action="onRetry"
   />
 
-  <scroll-view class="body" wx:else scroll-y style="padding-bottom: {{bodyBottom}}px">
+  <scroll-view class="body" wx:else scroll-y style="padding-top: {{bodyTop}}px; padding-bottom: {{bodyBottom}}px">
     <!-- 车场信息卡 -->
     <view class="card">
       <view class="card__name">{{lot.name}}</view>

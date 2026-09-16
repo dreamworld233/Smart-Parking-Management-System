@@ -44,6 +44,8 @@ Page({
     submitting: false,
     /** 导航栏 top（px），胶囊下沿推算，避免返回键钻进胶囊下面 */
     navTop: 100,
+    /** 内容区顶部让位（px）：navTop + 顶栏高 + 间距，标题文字不压内容 */
+    bodyTop: 100,
     /** 吸底确认栏 bottom（px）：tabBar 高度 + 安全区，别压在 tabBar 下面 */
     payBottom: 100,
     /** 内容区底部让位（px）：paybar 偏移 + 栏自身高，最后一张卡不被吸底栏盖住 */
@@ -55,10 +57,13 @@ Page({
   onLoad(options: Record<string, string | undefined>) {
     this.lotId = options.lotId ?? ''
     // 与 home/search 同套路：胶囊下沿 + 8px，取不到时退回 100px
-    const rect = wx.getMenuButtonBoundingClientRect()
-    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
     const info = wx.getWindowInfo()
     const rpx = info.windowWidth / 750
+    const rect = wx.getMenuButtonBoundingClientRect()
+    const navTop = rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100
+    // 内容区顶部 = 顶栏下沿 + 间距（与 search 页同一套 px 口径，避免标题压内容）
+    const bodyTop = navTop + Math.round(80 * rpx) + Math.round(16 * rpx)
+    this.setData({ navTop, bodyTop })
     const safeBottom = info.safeArea ? Math.max(0, info.screenHeight - info.safeArea.bottom) : 0
     // confirm 页非 tabBar 页（从详情 navigateTo 进入），吸底栏贴屏幕底 + 安全区即可
     // bodyBottom = 栏底部偏移 + 栏自身高（约 112rpx，按钮+内边距），与 wxss .paybar 高度对应

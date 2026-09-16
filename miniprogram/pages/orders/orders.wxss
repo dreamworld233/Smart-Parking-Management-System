@@ -23,14 +23,15 @@
   color: var(--color-text);
 }
 
-/* 内容滚动区：让出顶栏 + tabBar 高度 */
+/* 内容滚动区。padding-top 由 TS 算成 px 内联传入（navTop + 顶栏高，见 onLoad），
+   写死 rpx 会与胶囊下沿 px 不对齐，标题文字压进内容（真机踩到） */
 .body {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  padding: 120rpx 24rpx 0;
+  padding: 0 24rpx;
   box-sizing: border-box;
 }
 
@@ -39,9 +40,10 @@
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
-/* 详情视图：取消按钮吸底，内容区让出 tabBar + 按钮两层高度 */
+/* 详情视图：取消按钮在 scroll-view 内吸底（bottom 让出 tabBar），
+   内容区要让出 tabBar + 按钮两层高度，否则最后一张卡被按钮盖住 */
 .detail-body {
-  padding-bottom: calc(var(--tabbar-h, 100rpx) + 120rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--tabbar-h, 100rpx) + 140rpx + env(safe-area-inset-bottom));
 }
 
 .card {
