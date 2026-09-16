@@ -1,1 +1,6 @@
-{ "navigationStyle": "custom", "usingComponents": {} }
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "state-view": "/components/state-view/state-view"
+  }
+}

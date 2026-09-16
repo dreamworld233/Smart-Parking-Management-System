@@ -1,1 +1,136 @@
-<view class="page">车场看板（待实现）</view>
+<view class="wrap">
+  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在加载车场看板…" />
+  <state-view
+    wx:elif="{{state === 'no_role'}}"
+    kind="empty"
+    text="当前是车主身份"
+    hint="车场端功能需要车场管理员身份"
+    action-text="选择身份"
+    bind:action="onPickRole"
+  />
+  <state-view
+    wx:elif="{{state === 'no_lot'}}"
+    kind="empty"
+    text="尚未绑定车场"
+    hint="绑定车场后即可管理余位与预约"
+    action-text="绑定车场"
+    bind:action="onBindLot"
+  />
+  <state-view
+    wx:elif="{{state === 'error'}}"
+    kind="error"
+    text="看板加载失败"
+    hint="请检查网络后重试"
+    action-text="重试"
+    bind:action="onRetry"
+  />
+
+  <block wx:elif="{{state === 'ready'}}">
+    <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
+      <view class="head">
+        <view class="head__name">{{lotName}}</view>
+        <view class="head__addr">{{lotAddress}}</view>
+      </view>
+
+      <!-- 三统计块 -->
+      <view class="stats">
+        <view class="stat">
+          <view class="stat__v">{{stat.todayReservations}}</view>
+          <view class="stat__k">今日预约</view>
+        </view>
+        <view class="stat">
+          <view class="stat__v primary">{{stat.pendingEntry}}</view>
+          <view class="stat__k">待核销</view>
+        </view>
+        <view class="stat">
+          <view class="stat__v">{{stat.todayIncome}}</view>
+          <view class="stat__k">今日收入</view>
+        </view>
+      </view>
+
+      <!-- 余位上报卡 -->
+      <view class="card">
+        <view class="card__row">
+          <view>
+            <view class="card__title">实时余位</view>
+            <view class="card__sub">当前空闲 {{spotsText}}</view>
+          </view>
+          <view class="btn" bindtap="onOpenReport">上报</view>
+        </view>
+      </view>
+
+      <!-- 可预约额度条 -->
+      <view class="card">
+        <view class="card__row">
+          <view>
+            <view class="card__title">可预约额度</view>
+            <view class="card__sub">已预约 {{quota.reserved}} · 可预约 {{quota.total}} · 剩余 {{quota.left}}</view>
+          </view>
+          <view class="btn" bindtap="onOpenQuota">调整</view>
+        </view>
+        <view class="bar">
+          <view class="bar__fill" style="width: {{quota.percent}}%" />
+        </view>
+      </view>
+
+      <!-- 待核销列表 -->
+      <view class="card">
+        <view class="card__row card__row--head">
+          <view class="card__title">待核销</view>
+          <view class="card__more" bindtap="onPendingTap">全部 ›</view>
+        </view>
+        <block wx:if="{{pendingList.length}}">
+          <view
+            wx:for="{{pendingList}}"
+            wx:key="id"
+            class="pending"
+            data-id="{{item.id}}"
+            bindtap="onPendingTap"
+          >
+            <view class="pending__plate">{{item.plateText}}</view>
+            <view class="pending__arrive">{{item.arriveText}}</view>
+            <view class="pending__code">{{item.verifyCode}}</view>
+          </view>
+        </block>
+        <view wx:else class="card__empty">暂无待核销预约</view>
+      </view>
+    </scroll-view>
+
+    <!-- 额度调整弹窗 -->
+    <view class="mask" wx:if="{{quotaDialog}}" bindtap="onCloseQuota">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">调整可预约额度</view>
+        <input
+          class="dialog__input {{inputInvalid ? 'dialog__input--invalid' : ''}}"
+          type="number"
+          value="{{quotaInput}}"
+          bindinput="onQuotaInput"
+        />
+        <view class="dialog__hint" wx:if="{{inputInvalid}}">请输入非负整数</view>
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseQuota">取消</view>
+          <view class="dialog__btn primary" bindtap="onConfirmQuota">{{submitting ? '保存中…' : '保存'}}</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 余位上报弹窗 -->
+    <view class="mask" wx:if="{{reportDialog}}" bindtap="onCloseReport">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">上报实时余位</view>
+        <input
+          class="dialog__input {{inputInvalid ? 'dialog__input--invalid' : ''}}"
+          type="number"
+          value="{{reportInput}}"
+          bindinput="onReportInput"
+          placeholder="当前空闲车位数"
+        />
+        <view class="dialog__hint" wx:if="{{inputInvalid}}">请输入非负整数</view>
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseReport">取消</view>
+          <view class="dialog__btn primary" bindtap="onConfirmReport">{{submitting ? '上报中…' : '上报'}}</view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

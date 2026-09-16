@@ -1,38 +1,30 @@
-// 车场库列表（任务书 §5 adminListLots）。读操作，但仍在入口校验登录态与角色。
+// 车场绑定页用的车场列表：全部签约车场（名称/地址），供车场主选一家绑定。
 //
-// 支持按名称/地址模糊搜索 + 分页。Web 后台的读也走云函数：角色判定一致、
-// 且列表要按 admin 的口径做字段清洗（freeSpots 为 null 时要如实显示「待上报」，
-// 不能像小程序端那样直接消费）。
+// 车场主初次选身份后还没有绑定任何车场，所以这个函数**不做角色鉴权**——
+// 任何登录用户都能列出车场（绑定入口本来就在角色切换之后）。绑定证明验证留后续。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-const { requireAdmin } = require('./auth')
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-exports.main = async (event) => {
-  const gate = requireAdmin(event)
-  if (gate.error) return gate.error
+exports.main = async () => {
+  const { OPENID } = cloud.getWXContext()
+  if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
 
   const db = cloud.database()
-  const _ = db.command
   const lots = db.collection('lots')
 
-  const { keyword = '', page = 1, pageSize = 20 } = event || {}
-  const size = Math.min(Math.max(Number(pageSize) || 20, 1), 100)
-  const offset = (Math.max(Number(page) || 1, 1) - 1) * size
-
-  let query = lots
-  if (typeof keyword === 'string' && keyword.trim() !== '') {
-    const re = db.RegExp({ regexp: escapeRegExp(keyword.trim()), options: 'i' })
-    query = lots.where(_.or([{ name: re }, { address: re }]))
+  let list = []
+  try {
+    const r = await lots.limit(100).get()
+    list = r.data.map(x => ({
+      _id: x._id,
+      name: x.name,
+      address: x.address || '',
+      // 已绑定给谁：前端可显示「已被 X 绑定」，避免误选已被管的车场
+      adminUserId: x.adminUserId || null,
+    }))
+  } catch (e) {
+    return { code: 'UNKNOWN', message: '车场列表读取失败' }
   }
 
-  const countRes = await query.count()
-  const res = await query.orderBy('updatedAt', 'desc').skip(offset).limit(size).get()
-
-  console.log('[adminListLots] 查询车场 keyword=' + (keyword || '') + ' page=' + page + ' 命中=' + countRes.total)
-  return { code: 0, data: { total: countRes.total, list: res.data } }
+  return { code: 0, data: { list } }
 }

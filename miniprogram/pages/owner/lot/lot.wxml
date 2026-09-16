@@ -1,1 +1,103 @@
-<view class="page">车场配置（待实现）</view>
+<view class="wrap">
+  <state-view wx:if="{{state === 'loading'}}" kind="loading" text="正在加载车场配置…" />
+  <state-view
+    wx:elif="{{state === 'no_role'}}"
+    kind="empty"
+    text="当前是车主身份"
+    hint="车场端功能需要车场管理员身份"
+    action-text="选择身份"
+    bind:action="onPickRole"
+  />
+  <state-view
+    wx:elif="{{state === 'no_lot'}}"
+    kind="empty"
+    text="尚未绑定车场"
+    hint="绑定车场后即可配置收费与额度"
+    action-text="绑定车场"
+    bind:action="onBindLot"
+  />
+  <state-view
+    wx:elif="{{state === 'error'}}"
+    kind="error"
+    text="车场配置加载失败"
+    hint="请检查网络后重试"
+    action-text="重试"
+    bind:action="onRetry"
+  />
+
+  <block wx:elif="{{state === 'ready'}}">
+    <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
+      <!-- 车场信息 -->
+      <view class="card">
+        <view class="card__title">车场信息</view>
+        <view class="row" bindtap="onEditName">
+          <text class="row__k">名称</text>
+          <text class="row__v">{{lotName}}</text>
+        </view>
+        <view class="row" bindtap="onEditAddress">
+          <text class="row__k">地址</text>
+          <text class="row__v">{{lotAddress}}</text>
+        </view>
+      </view>
+
+      <!-- 收费规则 -->
+      <view class="card">
+        <view class="card__title">收费规则</view>
+        <view class="row" bindtap="onEditFirstHour">
+          <text class="row__k">首小时</text>
+          <text class="row__v">¥{{pricing.firstHour}} / 时</text>
+        </view>
+        <view class="row" bindtap="onEditPerHourAfter">
+          <text class="row__k">后续每小时</text>
+          <text class="row__v">¥{{pricing.perHourAfter}} / 时</text>
+        </view>
+        <view class="row" bindtap="onEditStep">
+          <text class="row__k">计费步长</text>
+          <text class="row__v">{{pricing.stepMinutes}} 分钟</text>
+        </view>
+        <view class="row" bindtap="onEditCap">
+          <text class="row__k">单日封顶</text>
+          <text class="row__v">¥{{pricing.capPerDay}}</text>
+        </view>
+        <view class="row" bindtap="onEditNight">
+          <text class="row__k">夜间费率</text>
+          <text class="row__v">{{pricing.nightRate}}</text>
+        </view>
+        <view class="source">收费数据：{{pricing.sourceLabel}}。修改收费会记录变更留痕</view>
+      </view>
+
+      <!-- 可预约额度 -->
+      <view class="card">
+        <view class="card__title">可预约额度</view>
+        <view class="row" bindtap="onEditQuota">
+          <text class="row__k">可预约车位数</text>
+          <text class="row__v">{{quotaText}} 个</text>
+        </view>
+      </view>
+
+      <!-- 设施 -->
+      <view class="card">
+        <view class="card__title">设施</view>
+        <view class="fac">{{facilitiesText}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- 编辑弹窗 -->
+    <view class="mask" wx:if="{{editDialog}}" bindtap="onCloseEdit">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">{{edit.label}}</view>
+        <input
+          class="dialog__input {{inputInvalid ? 'dialog__input--invalid' : ''}}"
+          type="{{edit.numeric ? 'digit' : 'text'}}"
+          value="{{editInput}}"
+          bindinput="onEditInput"
+        />
+        <view class="dialog__hint" wx:if="{{inputInvalid}}">输入不合法</view>
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseEdit">取消</view>
+          <view class="dialog__btn primary" bindtap="onConfirmEdit">{{submitting ? '保存中…' : '保存'}}</view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

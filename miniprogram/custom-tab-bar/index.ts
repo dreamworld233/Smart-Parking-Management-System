@@ -12,7 +12,7 @@ const TABS: Record<Role, TabItem[]> = {
     { pagePath: '/pages/orders/orders', text: '订单', icon: '▤' },
     { pagePath: '/pages/profile/profile', text: '我的', icon: '◍' },
   ],
-  owner: [
+  lot_admin: [
     { pagePath: '/pages/owner/dashboard/dashboard', text: '看板', icon: '◉' },
     { pagePath: '/pages/owner/reservations/reservations', text: '预约', icon: '▤' },
     { pagePath: '/pages/owner/lot/lot', text: '车场', icon: '▦' },

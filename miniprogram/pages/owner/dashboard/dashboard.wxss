@@ -1,6 +1,236 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* padding-top 由 TS 算成 px 内联传入（navTop = 胶囊下沿 + 8），
+   刘海屏内容不被状态栏盖住；写死 rpx 与胶囊下沿 px 不对齐 */
 .page {
-  padding: var(--space-4);
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding-right: var(--space-4);
+  padding-left: var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.head {
+  margin-bottom: var(--space-4);
+}
+
+.head__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.head__addr {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+  margin-top: 8rpx;
+}
+
+/* 三统计块 */
+.stats {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.stat {
+  flex: 1;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.stat__v {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stat__v.primary {
+  color: var(--color-primary);
+}
+
+.stat__k {
+  font-size: var(--font-micro);
   color: var(--color-text-weak);
+  margin-top: 8rpx;
+}
+
+/* 通用卡 */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.card__row--head {
+  margin-bottom: var(--space-2);
+}
+
+.card__title {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.card__sub {
+  font-size: var(--font-micro);
+  color: var(--color-text-sub);
+  margin-top: 8rpx;
+}
+
+.card__more {
+  font-size: var(--font-sub);
+  color: var(--color-primary);
+}
+
+.card__empty {
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+  padding: var(--space-3) 0;
+  text-align: center;
+}
+
+.btn {
+  padding: 14rpx 40rpx;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* 额度条 */
+.bar {
+  height: 16rpx;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  margin-top: var(--space-3);
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
+}
+
+/* 待核销列表项 */
+.pending {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 2rpx solid var(--color-bg);
+}
+
+.pending__plate {
+  flex: 1;
+  font-size: var(--font-body);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pending__arrive {
+  font-size: var(--font-sub);
+  color: var(--color-text-sub);
+}
+
+.pending__code {
+  font-size: var(--font-body);
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 4rpx;
+}
+
+/* 弹窗 */
+.mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  width: 560rpx;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+}
+
+.dialog__title {
+  font-size: var(--font-body);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-4);
+}
+
+.dialog__input {
+  height: 88rpx;
+  background: var(--color-bg);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0 24rpx;
+  font-size: 30rpx;
+}
+
+.dialog__input--invalid {
+  border-color: var(--color-danger);
+}
+
+.dialog__hint {
+  font-size: var(--font-micro);
+  color: var(--color-danger);
+  margin-top: var(--space-2);
+}
+
+.dialog__btns {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.dialog__btn {
+  flex: 1;
+  padding: 20rpx 0;
+  text-align: center;
+  background: var(--color-bg);
+  color: var(--color-text-sub);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-body);
+}
+
+.dialog__btn.primary {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
 }

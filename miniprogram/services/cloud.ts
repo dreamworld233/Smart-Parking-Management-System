@@ -129,3 +129,163 @@ export function cancelReservation(
 ): Promise<CloudResult<CancelReservationData>> {
   return callFunction<CancelReservationData>('cancelReservation', { reservationId })
 }
+
+/** adminGetLot 返回的车场精简字段（云函数 pickLot 白名单，见 adminGetLot/index.js） */
+export interface AdminLot {
+  _id: string
+  name: string
+  address: string
+  location: { lat: number; lng: number } | null
+  pricing: {
+    firstHour?: number
+    perHourAfter?: number
+    stepMinutes?: number
+    capPerDay?: number
+    nightRate?: number | null
+    source?: string
+  } | null
+  availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
+  reservableQuota: number | null
+  reservedCount: number
+  facilities: string[]
+}
+
+export interface AdminGetLotData {
+  role: 'driver' | 'lot_admin' | 'ops_admin'
+  lot: AdminLot | null
+}
+
+/**
+ * 车场端身份：取当前用户管理的车场（云函数 adminGetLot）。
+ * lot 为 null 表示是车场管理员但未绑定车场，前端显示空态
+ */
+export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
+  return callFunction<AdminGetLotData>('adminGetLot')
+}
+
+/** adminDashboard 返回的看板数据 */
+export interface AdminDashboardData {
+  lot: {
+    _id: string
+    name: string
+    address: string
+    availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
+    reservableQuota: number | null
+    reservedCount: number
+  } | null
+  todayReservations: number
+  pendingEntry: number
+  todayIncome: number
+  pendingList: {
+    _id: string
+    plateNo: string
+    arriveTime: number
+    verifyCode: string
+    lotName: string
+  }[]
+}
+
+/** 车场端看板：统计 + 待核销列表（云函数 adminDashboard，规避安全规则缺口） */
+export function fetchAdminDashboard(): Promise<CloudResult<AdminDashboardData>> {
+  return callFunction<AdminDashboardData>('adminDashboard')
+}
+
+export interface ReportAvailabilityData {
+  reportedAt: number
+  freeSpots: number
+  totalSpots: number
+}
+
+/** 余位上报（云函数 reportAvailability） */
+export function reportAvailability(
+  lotId: string,
+  freeSpots: number,
+): Promise<CloudResult<ReportAvailabilityData>> {
+  return callFunction<ReportAvailabilityData>('reportAvailability', { lotId, freeSpots })
+}
+
+export interface UpdateLotData {
+  lotId: string
+  priceChanged: boolean
+}
+
+/**
+ * 车场配置更新（云函数 adminUpdateLot）。patch 白名单在云端校验，
+ * 这里只透传；pricing 是子对象，其余扁平字段
+ */
+export function updateLot(
+  lotId: string,
+  patch: { pricing?: Record<string, unknown>; reservableQuota?: number; facilities?: string[]; name?: string; address?: string; openHours?: string | null },
+): Promise<CloudResult<UpdateLotData>> {
+  return callFunction<UpdateLotData>('adminUpdateLot', { lotId, patch })
+}
+
+export interface VerifyReservationData {
+  reservationId: string
+  plateNo: string
+  status: string
+  verifyCode: string | null
+  enteredAt: number
+}
+
+/**
+ * 车场端核销（云函数 verifyReservation）。method 是 'code'（输码）或 'manual'（手动）
+ */
+export function verifyReservation(
+  input: { lotId: string; method: 'code' | 'manual'; verifyCode?: string; plateNo?: string },
+): Promise<CloudResult<VerifyReservationData>> {
+  return callFunction<VerifyReservationData>('verifyReservation', { ...input })
+}
+
+export interface AdminReservationItem {
+  _id: string
+  plateNo: string
+  arriveTime: number
+  status: string
+  verifyCode: string
+}
+
+export interface AdminReservationsData {
+  lot: { _id: string; name: string } | null
+  list: AdminReservationItem[]
+}
+
+/** 车场端预约核销列表（云函数 adminReservations） */
+export function fetchAdminReservations(): Promise<CloudResult<AdminReservationsData>> {
+  return callFunction<AdminReservationsData>('adminReservations')
+}
+
+export interface SwitchRoleData {
+  role: 'driver' | 'lot_admin' | 'ops_admin'
+}
+
+/** 切换身份并写 users.role（云函数 switchRole）。角色页选完身份后调用 */
+export function switchRole(role: string): Promise<CloudResult<SwitchRoleData>> {
+  return callFunction<SwitchRoleData>('switchRole', { role })
+}
+
+export interface LotBriefItem {
+  _id: string
+  name: string
+  address: string
+  adminUserId: string | null
+}
+
+export interface ListAllLotsData {
+  list: LotBriefItem[]
+}
+
+/** 全部签约车场（云函数 adminListLots）。车场主绑定页用，不鉴权（绑定前身份是 driver） */
+export function listAllLots(): Promise<CloudResult<ListAllLotsData>> {
+  return callFunction<ListAllLotsData>('adminListLots')
+}
+
+export interface BindLotData {
+  lotId: string
+  name: string
+}
+
+/** 车场主绑定车场（云函数 bindLot）：写 lots.adminUserId + users.role = lot_admin */
+export function bindLot(lotId: string): Promise<CloudResult<BindLotData>> {
+  return callFunction<BindLotData>('bindLot', { lotId })
+}

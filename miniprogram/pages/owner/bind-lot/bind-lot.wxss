@@ -1,0 +1,96 @@
+.wrap {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* 顶栏：与 confirm 页同套路，px 内联 */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.bar__title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.bar__spacer {
+  width: 40rpx;
+}
+
+/* padding-top 由 TS 算成 px 内联传入（bodyTop = navTop + 顶栏高 + 间距） */
+.body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.hint {
+  font-size: var(--font-micro);
+  color: var(--color-text-sub);
+  margin-bottom: var(--space-3);
+}
+
+.lot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.lot--bound {
+  opacity: 0.5;
+}
+
+.lot__name {
+  font-size: var(--font-body);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.lot__addr {
+  font-size: var(--font-micro);
+  color: var(--color-text-sub);
+  margin-top: 6rpx;
+}
+
+.lot__action {
+  flex-shrink: 0;
+  padding: 12rpx 32rpx;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sub);
+  font-weight: 600;
+}
+
+.lot--bound .lot__action {
+  background: var(--color-bg);
+  color: var(--color-text-weak);
+}
