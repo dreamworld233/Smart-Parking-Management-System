@@ -148,4 +148,21 @@ describe('recognizePlate', () => {
     expect(r.code).toBe(0)
     expect(r.data.confidence).toBe(40)
   })
+
+  it('debug 分支：有密钥 → 返回掩码后的前 6 后 4，不调 SDK', async () => {
+    process.env.TENCENT_SECRET_ID = 'AKIDabcdef1234567890'
+    process.env.TENCENT_SECRET_KEY = 'secretkey1234567890'
+    const r = await main({ fileID: 'cloud://x/1.png', debug: true })
+    expect(r.code).toBe(0)
+    expect(r.data.debug).toBe(true)
+    expect(r.data.secretId).toBe('AKIDab…7890')
+    expect(r.data.secretKey).toBe('secret…7890')
+    expect(capturedBase64).toBeNull() // 没走 SDK
+  })
+
+  it('debug 分支：密钥缺失 → NO_CREDENTIAL', async () => {
+    delete process.env.TENCENT_SECRET_ID
+    const r = await main({ fileID: 'cloud://x/1.png', debug: true })
+    expect(r.code).toBe('NO_CREDENTIAL')
+  })
 })

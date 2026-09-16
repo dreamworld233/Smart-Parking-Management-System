@@ -46,6 +46,23 @@ exports.main = async (event) => {
     return { code: 'BAD_REQUEST', message: '缺少图片' }
   }
 
+  // 调试分支（云端测试用，真机正常调用不触发）：无微信身份时验密钥是否注入。
+  // 云端测试没有用户上下文 → OPENID 恒空，走到这里前就被 NO_AUTH 拒；
+  // 传 debug: true 且带 fileID 时跳过身份校验，直接验证环境变量 + OCR 连通。
+  // 只显密钥前 6 位 + 后 4 位，避免整个密钥回显到测试结果里
+  if (event && event.debug === true) {
+    const sid = process.env.TENCENT_SECRET_ID || ''
+    const skey = process.env.TENCENT_SECRET_KEY || ''
+    if (!sid || !skey) {
+      return { code: 'NO_CREDENTIAL', message: '环境变量缺失（TENCENT_SECRET_ID / TENCENT_SECRET_KEY）' }
+    }
+    const mask = (s) => (s.length > 10 ? `${s.slice(0, 6)}…${s.slice(-4)}` : '(空)')
+    return {
+      code: 0,
+      data: { debug: true, secretId: mask(sid), secretKey: mask(skey) },
+    }
+  }
+
   // 身份：车场端核销是 lot_admin / ops_admin 的操作
   const db = cloud.database()
   let role = 'driver'
