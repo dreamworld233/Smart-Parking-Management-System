@@ -1,5 +1,9 @@
 // 管理员云函数的薄封装：透传入参 + 自动带上登录票据。
 // 所有写操作走云函数，前端不含任何 DB 直写（任务书验收标准）。
+//
+// 命名：云函数统一用 `web*` 前缀（webLogin / webCreateUser / webListLots ...），
+// 与小程序车场端那批 `admin*` 函数（adminGetLot / adminUpdateLot ...）区分开，避免撞名。
+// 这里导出函数名保留 admin* 是为了少动各页面调用点，实际调的是 web* 云函数。
 import { callCloud } from './cloudbase'
 import type { ApiResult } from './cloudbase'
 import { getToken } from '../store/auth'
@@ -19,21 +23,21 @@ export function adminCreateUser(input: {
   role: string
   nickname?: string
 }): Promise<ApiResult<{ userId: string; username: string; role: string }>> {
-  return callCloud('adminCreateUser', withToken({ ...input }))
+  return callCloud('webCreateUser', withToken({ ...input }))
 }
 
 export function adminListLots(
   params: { keyword?: string; page?: number; pageSize?: number } = {},
 ): Promise<ApiResult<{ total: number; list: Lot[] }>> {
-  return callCloud('adminListLots', withToken({ ...params }))
+  return callCloud('webListLots', withToken({ ...params }))
 }
 
 export function adminUpsertLot(lot: Partial<Lot>): Promise<ApiResult<{ id: string; created: boolean }>> {
-  return callCloud('adminUpsertLot', withToken({ lot }))
+  return callCloud('webUpsertLot', withToken({ lot }))
 }
 
 export function adminDeleteLot(lotId: string): Promise<ApiResult<{ lotId: string; status: string }>> {
-  return callCloud('adminDeleteLot', withToken({ lotId }))
+  return callCloud('webDeleteLot', withToken({ lotId }))
 }
 
 export function adminPriceChange(input: {
@@ -42,13 +46,13 @@ export function adminPriceChange(input: {
   evidenceFileID?: string
   note?: string
 }): Promise<ApiResult<{ lotId: string; before: unknown; after: unknown; at: number }>> {
-  return callCloud('adminPriceChange', withToken({ ...input }))
+  return callCloud('webPriceChange', withToken({ ...input }))
 }
 
 export function adminLookup(
   params: { plateNo?: string; orderNo?: string; status?: string; page?: number; pageSize?: number } = {},
 ): Promise<ApiResult<{ total: number; list: Reservation[] }>> {
-  return callCloud('adminLookup', withToken({ ...params }))
+  return callCloud('webLookup', withToken({ ...params }))
 }
 
 export type VerifyInput =
@@ -57,9 +61,9 @@ export type VerifyInput =
   | { mode: 'code'; verifyCode: string; lotId?: string }
 
 export function adminVerifyPlate(input: VerifyInput): Promise<ApiResult<Record<string, unknown>>> {
-  return callCloud('adminVerifyPlate', withToken({ ...input }))
+  return callCloud('webVerifyPlate', withToken({ ...input }))
 }
 
 export function adminStats(): Promise<ApiResult<StatsData>> {
-  return callCloud('adminStats', withToken())
+  return callCloud('webStats', withToken())
 }

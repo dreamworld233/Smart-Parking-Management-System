@@ -1,4 +1,4 @@
-// 运营看板（任务书 §5 adminStats，加分项）。只读，ops_admin 与 lot_admin 可见。
+// 运营看板（任务书 §5 webStats，加分项）。只读，ops_admin 与 lot_admin 可见。
 //
 // 核心四数：签约数 / 预约数 / 核销数 / 余位上报及时率。
 // 余位上报及时率 = 最近 15 分钟内有 availability_samples 上报的车场数 / 签约车场数。
@@ -48,7 +48,7 @@ exports.main = async (event) => {
   reportFreshLots = uniqueLots.size
 
   const reportFreshRate = signedLots > 0 ? Math.round((reportFreshLots / signedLots) * 100) : 0
-  console.log('[adminStats] 看板：签约=' + signedLots + ' 预约=' + totalReservations + ' 核销=' + entered + ' 余位及时率=' + reportFreshRate + '%')
+  console.log('[webStats] 看板：签约=' + signedLots + ' 预约=' + totalReservations + ' 核销=' + entered + ' 余位及时率=' + reportFreshRate + '%')
   return {
     code: 0,
     data: {

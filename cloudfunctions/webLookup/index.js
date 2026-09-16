@@ -1,4 +1,4 @@
-// 车辆信息 / 订单流水查询（任务书 §5 adminLookup，对应课程「车辆信息管理」）。
+// 车辆信息 / 订单流水查询（任务书 §5 webLookup，对应课程「车辆信息管理」）。
 //
 // 按 plateNo / orderNo / status 过滤 reservations，并组合出每单的 orders 流水
 // （预支停车费 prepaid / 服务费 service / 退款 refund，三笔都在一张 orders 表里）。
@@ -55,7 +55,7 @@ exports.main = async (event) => {
     }
   }
 
-  console.log('[adminLookup] 查询流水 plateNo=' + (plateNo || '') + ' orderNo=' + (orderNo || '') + ' status=' + (status || '') + ' 命中=' + countRes.total)
+  console.log('[webLookup] 查询流水 plateNo=' + (plateNo || '') + ' orderNo=' + (orderNo || '') + ' status=' + (status || '') + ' 命中=' + countRes.total)
   return {
     code: 0,
     data: {

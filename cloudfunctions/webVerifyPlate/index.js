@@ -1,4 +1,4 @@
-// 车牌识别复核 + 核销（任务书 §5 adminVerifyPlate，对应课程「车牌识别」）。
+// 车牌识别复核 + 核销（任务书 §5 webVerifyPlate，对应课程「车牌识别」）。
 //
 // 两种模式：
 // - mode=ocr：上传停车照片（云存储 fileID）→ 腾讯云 OCR 识别车牌 → 匹配 pending_entry 预约
@@ -34,7 +34,7 @@ async function verifyOne(db, match, extra) {
     .where({ _id: match._id, status: 'pending_entry' })
     .update({ data: { status: 'entered', enteredAt: Date.now(), entryMethod: extra.method } })
   if (cas.stats.updated !== 1) {
-    console.log('[adminVerifyPlate] 核销失败：预约已被并发处理 reservationId=' + match._id)
+    console.log('[webVerifyPlate] 核销失败：预约已被并发处理 reservationId=' + match._id)
     return { code: 'ALREADY_PROCESSED', message: '该预约已被处理' }
   }
   await entryLogs.add({
@@ -49,7 +49,7 @@ async function verifyOne(db, match, extra) {
       imageFileID: extra.imageFileID || '',
     },
   })
-  console.log('[adminVerifyPlate] 核销成功 reservationId=' + match._id + ' plate=' + (extra.plateNo || match.plateNo) + ' method=' + extra.method)
+  console.log('[webVerifyPlate] 核销成功 reservationId=' + match._id + ' plate=' + (extra.plateNo || match.plateNo) + ' method=' + extra.method)
   return {
     code: 0,
     data: {
@@ -72,7 +72,7 @@ exports.main = async (event) => {
   const reservations = db.collection('reservations')
 
   const { mode, imageFileID, lotId, reservationId, verifyCode } = event || {}
-  console.log('[adminVerifyPlate] 收到核销请求 mode=' + mode)
+  console.log('[webVerifyPlate] 收到核销请求 mode=' + mode)
 
   // —— OCR 模式 ——
   if (mode === 'ocr') {
@@ -101,7 +101,7 @@ exports.main = async (event) => {
     }
     if (!plate) return { code: 'OCR_NO_PLATE', message: '未能识别出车牌，请转手动输码核销' }
 
-    console.log('[adminVerifyPlate] OCR 识别结果 plate=' + plate + ' confidence=' + confidence)
+    console.log('[webVerifyPlate] OCR 识别结果 plate=' + plate + ' confidence=' + confidence)
 
     // 匹配 pending_entry 预约（可选 lotId 过滤）
     const where = { plateNo: plate, status: 'pending_entry' }
@@ -109,7 +109,7 @@ exports.main = async (event) => {
     const match = (await reservations.where(where).orderBy('createdAt', 'asc').limit(1).get()).data[0]
 
     if (!match) {
-      console.log('[adminVerifyPlate] OCR 命中车牌但无待入场预约 plate=' + plate)
+      console.log('[webVerifyPlate] OCR 命中车牌但无待入场预约 plate=' + plate)
       return { code: 0, data: { matched: false, plate, confidence, imageFileID } }
     }
     return verifyOne(db, match, {

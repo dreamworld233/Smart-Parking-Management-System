@@ -1,4 +1,4 @@
-// 创建运营/车场管理员账号（任务书 §5 adminCreateUser）。
+// 创建运营/车场管理员账号（任务书 §5 webCreateUser）。
 //
 // 只有 ops_admin 能建号 —— 但库里还没有任何 ops_admin 时进入「引导模式」：
 // 允许无票据创建第一个运营账号，否则「第一个账号没人能建」就死锁了。
@@ -25,7 +25,7 @@ exports.main = async (event) => {
   const existingOps = await users.where({ role: 'ops_admin' }).limit(1).get()
   const isBootstrap = existingOps.data.length === 0
   if (isBootstrap) {
-    console.log('[adminCreateUser] 引导模式：库中尚无 ops_admin，允许无票据创建首个账号')
+    console.log('[webCreateUser] 引导模式：库中尚无 ops_admin，允许无票据创建首个账号')
   }
   if (!isBootstrap) {
     const gate = requireOps(event)
@@ -45,7 +45,7 @@ exports.main = async (event) => {
 
   const dup = await users.where({ 'webAccount.username': username }).limit(1).get()
   if (dup.data.length > 0) {
-    console.log('[adminCreateUser] 用户名已存在 username=' + username)
+    console.log('[webCreateUser] 用户名已存在 username=' + username)
     return { code: 'DUPLICATE', message: '用户名已存在' }
   }
 
@@ -66,6 +66,6 @@ exports.main = async (event) => {
     // 若将来给 webAccount.username 建唯一索引，冲突会在这里抛，一并归到「已存在」
     return { code: 'DUPLICATE', message: '用户名已存在' }
   }
-  console.log('[adminCreateUser] 已创建账号 userId=' + doc._id + ' username=' + username + ' role=' + role)
+  console.log('[webCreateUser] 已创建账号 userId=' + doc._id + ' username=' + username + ' role=' + role)
   return { code: 0, data: { userId: doc._id, username, role, nickname: doc.nickname } }
 }

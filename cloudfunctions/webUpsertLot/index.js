@@ -1,4 +1,4 @@
-// 车场新增/编辑（任务书 §5 adminUpsertLot）。只有 ops_admin 可写。
+// 车场新增/编辑（任务书 §5 webUpsertLot）。只有 ops_admin 可写。
 //
 // 口径与 seedLots 的 missingFields 同源：
 // - 名称/地址/坐标必填，坐标由前端从腾讯 POI 带出（不手敲），这里只验是数字
@@ -73,7 +73,7 @@ exports.main = async (event) => {
     if (got.data.length === 0) return { code: 'NOT_FOUND', message: '车场不存在' }
     // 编辑：reservedCount / ratingSummary / contract / freeSpots 全部保持不动
     await lots.doc(id).update({ data: doc })
-    console.log('[adminUpsertLot] 已更新车场 id=' + id + ' name=' + doc.name)
+    console.log('[webUpsertLot] 已更新车场 id=' + id + ' name=' + doc.name)
     return { code: 0, data: { id, created: false } }
   }
 
@@ -85,6 +85,6 @@ exports.main = async (event) => {
       ratingSummary: null,
     },
   })
-  console.log('[adminUpsertLot] 已新增车场 id=' + added._id + ' name=' + doc.name)
+  console.log('[webUpsertLot] 已新增车场 id=' + added._id + ' name=' + doc.name)
   return { code: 0, data: { id: added._id, created: true } }
 }

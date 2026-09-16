@@ -1,4 +1,4 @@
-// 腾讯云 OCR LicensePlateOCR 调用（任务书 §5 adminVerifyPlate）。
+// 腾讯云 OCR LicensePlateOCR 调用（任务书 §5 webVerifyPlate）。
 //
 // 密钥（SecretId / SecretKey）放云函数环境变量 TENCENTCLOUD_SECRET_ID / TENCENTCLOUD_SECRET_KEY，
 // 绝不放前端。签名走 TC3-HMAC-SHA256（腾讯云 API v3），只用 Node 内置 crypto + https，

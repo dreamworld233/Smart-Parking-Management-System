@@ -1,4 +1,4 @@
-// 收费录入 + 改价（任务书 §5 adminPriceChange）。只有 ops_admin。
+// 收费录入 + 改价（任务书 §5 webPriceChange）。只有 ops_admin。
 //
 // 每次改价写一条 lot_price_changes 留痕（before / after / evidenceFileID 公示价照片 /
 // operatorId / at / note）。这个集合就是「收费数据从哪来」的存证链（数据模型 §4）：
@@ -64,6 +64,6 @@ exports.main = async (event) => {
   })
   await lots.doc(lotId).update({ data: { pricing: after, updatedAt: now } })
 
-  console.log('[adminPriceChange] 已改价 lotId=' + lotId + ' 首小时 ' + (before && before.firstHour) + '→' + after.firstHour + ' 来源=' + after.source)
+  console.log('[webPriceChange] 已改价 lotId=' + lotId + ' 首小时 ' + (before && before.firstHour) + '→' + after.firstHour + ' 来源=' + after.source)
   return { code: 0, data: { lotId, before, after, at: now } }
 }

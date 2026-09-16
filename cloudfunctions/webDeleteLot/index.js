@@ -1,4 +1,4 @@
-// 车场停用/启用（任务书 §5 adminDeleteLot / §6「停用」）。只有 ops_admin。
+// 车场停用/启用（任务书 §5 webDeleteLot / §6「停用」）。只有 ops_admin。
 //
 // 用**软停用**而不是物理删除：reservations 里存了 lotId 快照，物理删掉会断历史单。
 // 实现为 contract.status 在 signed / disabled 之间翻转（幂等，点一次停用、再点启用），
@@ -30,6 +30,6 @@ exports.main = async (event) => {
     data: { contract: { status, signedAt }, updatedAt: Date.now() },
   })
 
-  console.log('[adminDeleteLot] 车场状态已切换 lotId=' + lotId + ' status=' + status)
+  console.log('[webDeleteLot] 车场状态已切换 lotId=' + lotId + ' status=' + status)
   return { code: 0, data: { lotId, status } }
 }
