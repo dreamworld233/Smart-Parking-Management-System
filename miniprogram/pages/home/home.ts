@@ -10,6 +10,7 @@ import { sortLots } from '../../domain/sort'
 import type { ParkingLot, ReasonTone, Recommendation, SortKey } from '../../domain/types'
 import { fetchLotsAround } from '../../services/lot'
 import { getCurrentPoint, openNavigation } from '../../services/location'
+import { consumeLotDataDirty } from '../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -130,8 +131,9 @@ Page({
 
   onShow() {
     this.getTabBar?.()?.setSelected(0)
-    // 只在首次进入时拉取；从详情页返回时保留原有列表与排序，避免闪一下
-    if (!this.loaded) {
+    // 只在首次进入时拉取；从详情页返回时保留原有列表与排序，避免闪一下。
+    // 预约/取消后余位变了，脏标志由 confirm 置位、这里消费并强制重拉
+    if (!this.loaded || consumeLotDataDirty()) {
       this.loaded = true
       this.load()
     }

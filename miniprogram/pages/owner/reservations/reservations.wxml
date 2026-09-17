@@ -67,7 +67,8 @@
         </view>
         <view class="ocr-error" wx:if="{{ocrError}}">{{ocrError}}</view>
 
-        <view class="tabs">
+        <!-- plate 模式锁死：识别结果即核销对象，禁止切回输码/按车牌绕过车牌校验 -->
+        <view class="tabs" wx:if="{{mode !== 'plate'}}">
           <view class="tab {{mode === 'code' ? 'tab--on' : ''}}" bindtap="onModeCode">输码</view>
           <view class="tab {{mode === 'manual' ? 'tab--on' : ''}}" bindtap="onModeManual">按车牌</view>
         </view>
@@ -83,7 +84,8 @@
           />
           <view class="dialog__hint" wx:if="{{codeInvalid}}">核销码须为 6 位数字</view>
         </block>
-        <view wx:else class="dialog__manual">确认该车到场，按车牌核销入场</view>
+        <view wx:elif="{{mode === 'manual'}}" class="dialog__manual">确认该车到场，按车牌核销入场</view>
+        <view wx:else class="dialog__manual">识别车牌须与所选预约一致方可核销</view>
 
         <view class="dialog__btns">
           <view class="dialog__btn" bindtap="onCloseVerify">取消</view>

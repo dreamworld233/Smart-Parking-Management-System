@@ -5,7 +5,7 @@ import { buildArrivalOptions, enterDeadline, isWithinWindow } from '../../domain
 import type { ArrivalOption } from '../../domain/time'
 import { createReservation } from '../../services/cloud'
 import { fetchLotById } from '../../services/lot'
-import { getDefaultPlate, setDefaultPlate } from '../../services/storage'
+import { getDefaultPlate, markLotDataDirty, setDefaultPlate } from '../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error'
 
@@ -194,6 +194,8 @@ Page({
     if (r.ok) {
       // 记住这次车牌，下次预约预填
       setDefaultPlate(plate)
+      // 余位已在云端 -1：置脏，让首页/搜索页下次 onShow 强制重拉，别显示旧余位
+      markLotDataDirty()
       wx.showToast({ title: '支付成功（模拟）', icon: 'success' })
       // 跳订单页：详情视图在 Task 4 落地，先到列表
       setTimeout(() => wx.switchTab({ url: '/pages/orders/orders' }), 800)

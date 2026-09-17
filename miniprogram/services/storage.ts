@@ -3,6 +3,8 @@ export type Role = 'driver' | 'lot_admin'
 const ROLE_KEY = 'qnt.role'
 const PLATE_KEY = 'qnt.defaultPlate'
 const SESSION_KEY = 'qnt.session'
+/** 车场数据脏标志：预约/取消后置位，首页/搜索页 onShow 消费并强制重拉（余位变了） */
+const LOT_DIRTY_KEY = 'qnt.lotDirty'
 
 export interface Session {
   token: string
@@ -69,6 +71,20 @@ const SEARCH_HISTORY_MAX = 8
  * `history.filter(...)` 就是 `is not a function` 当场抛，而且抛在 setData 之前，
  * 整页白屏。非字符串项逐条剔掉而不是整批作废 —— 一条脏数据不该让历史全没了
  */
+/** 标记车场数据已变（预约/取消成功）—— 下次进首页/搜索页强制重拉余位 */
+export function markLotDataDirty(): void {
+  wx.setStorageSync(LOT_DIRTY_KEY, Date.now())
+}
+
+/** 消费脏标志：有则清除并返回 true，调用方据此强制刷新。无则 false */
+export function consumeLotDataDirty(): boolean {
+  if (wx.getStorageSync(LOT_DIRTY_KEY)) {
+    wx.removeStorageSync(LOT_DIRTY_KEY)
+    return true
+  }
+  return false
+}
+
 export function getSearchHistory(): string[] {
   const v = wx.getStorageSync(SEARCH_HISTORY_KEY)
   if (!Array.isArray(v)) return []
