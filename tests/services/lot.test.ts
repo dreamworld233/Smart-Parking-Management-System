@@ -173,6 +173,21 @@ describe('fetchSignedLots', () => {
     expect(lots[0].pricing?.perHourAfter).toBe(5)
   })
 
+  it('车场端上报过余位（source=reported）的车场照常可预约', async () => {
+    // reportAvailability 把 availability.source 写成 'reported'。曾经不在白名单里，
+    // toParkingLot 判 null → 首页过滤掉 + 确认页不可预约。回归钉死：必须放行
+    docs = [
+      doc({
+        availability: { freeSpots: 42, totalSpots: 200, source: 'reported' },
+      }),
+    ]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots).toHaveLength(1)
+    expect(lots[0].availability?.source).toBe('reported')
+    expect(lots[0].availability?.freeSpots).toBe(42)
+    expect(lots[0].signed).toBe(true)
+  })
+
   it('形状坏的文档整条丢弃，不炸整批', async () => {
     docs = [doc({}), doc({ _id: 'bad', name: 123 }), doc({})]
     const lots = await fetchSignedLots(CENTER)

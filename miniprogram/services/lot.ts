@@ -40,7 +40,16 @@ function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | nu
     return null
   }
   const spotsSource = availability.source
-  if (spotsSource !== 'public' && spotsSource !== 'ops' && spotsSource !== 'placeholder') return null
+  // 'reported' = 车场端上报的实时余位（reportAvailability 写入），是真实数据必须放行；
+  // 漏掉它会导致上报过余位的车场被前端判成坏文档 → 首页过滤 + 确认页不可预约
+  if (
+    spotsSource !== 'public' &&
+    spotsSource !== 'ops' &&
+    spotsSource !== 'placeholder' &&
+    spotsSource !== 'reported'
+  ) {
+    return null
+  }
 
   return {
     id,

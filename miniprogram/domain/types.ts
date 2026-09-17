@@ -39,7 +39,8 @@ export interface LotAvailability {
    * 空闲率整体偏移，且这个偏移在界面上看不出来
    */
   totalSpots: number
-  source: 'public' | 'ops' | 'placeholder'
+  /** `reported` = 车场端上报的实时余位（reportAvailability 写入） */
+  source: 'public' | 'ops' | 'placeholder' | 'reported'
 }
 
 /**
