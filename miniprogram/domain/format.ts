@@ -202,3 +202,14 @@ export function formatPlate(plate: string): string {
   if (raw.length < 4) return plate
   return `${raw.slice(0, 2)}·${raw.slice(2)}`
 }
+
+/**
+ * 车牌比对：OCR 识别结果与库里车牌是否同一辆。两边格式可能不同——
+ * 展示态带「·」分隔符（formatPlate）、OCR 偶发带空白，比较前统一去掉，
+ * 只留核心字符。用于车场端核销弹窗的 OCR 路径：识别出的车牌必须与
+ * 所选预约一致才放行核销，防止「识别出别的车也当这单核销」
+ */
+export function platesMatch(a: string, b: string): boolean {
+  const norm = (s: string) => s.replace(/[\s·]/g, '')
+  return norm(a) === norm(b)
+}

@@ -1,4 +1,4 @@
-import { formatPlate, formatTimeRangeLabel, RESERVATION_STATUS_LABELS } from '../../../domain/format'
+import { formatPlate, formatTimeRangeLabel, platesMatch, RESERVATION_STATUS_LABELS } from '../../../domain/format'
 import { fetchAdminReservations, recognizePlate, verifyReservation } from '../../../services/cloud'
 import type { AdminReservationItem, RecognizePlateData } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
@@ -277,6 +277,18 @@ Page({
     if (mode === 'code' && !/^\d{6}$/.test(codeInput)) {
       this.setData({ codeInvalid: true })
       return
+    }
+    // plate（OCR）路径必须严格：真识别到车牌 + 与所选预约同一辆车，否则拒绝。
+    // 防止「没识别 / 识别出别的车也当这单核销」——OCR 是确认「这辆车=这单」，不是摆设
+    if (mode === 'plate') {
+      if (!this.data.ocrPlate) {
+        wx.showToast({ title: '未识别到车牌，可改为输码或按车牌核销', icon: 'none' })
+        return
+      }
+      if (!platesMatch(this.data.ocrPlate, target.rawPlate)) {
+        wx.showToast({ title: '识别车牌与所选预约不一致，请核对', icon: 'none' })
+        return
+      }
     }
     this.setData({ submitting: true })
     // plate 分支：OCR 识别出的车牌 + 原图 fileID + 置信度（entry_logs 留痕）

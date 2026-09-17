@@ -9,6 +9,7 @@ import {
   formatTimeRangeLabel,
   formatRatingSummary,
   isValidPlate,
+  platesMatch,
   RESERVATION_STATUS_LABELS,
   sourceNotes,
 } from '../../miniprogram/domain/format'
@@ -187,6 +188,29 @@ describe('isValidPlate', () => {
 
   it('空串拒绝', () => {
     expect(isValidPlate('')).toBe(false)
+  })
+})
+
+describe('platesMatch', () => {
+  it('完全一致', () => {
+    expect(platesMatch('皖A88888', '皖A88888')).toBe(true)
+  })
+
+  it('一侧带 formatPlate 的「·」分隔符也算同一辆', () => {
+    expect(platesMatch('皖A88888', '皖A·88888')).toBe(true)
+    expect(platesMatch('皖A·88888', '皖A·88888')).toBe(true)
+  })
+
+  it('OCR 偶发带空白：去空白后一致', () => {
+    expect(platesMatch('皖A 88888', '皖A88888')).toBe(true)
+  })
+
+  it('不同车牌拒绝', () => {
+    expect(platesMatch('皖A88888', '皖B99999')).toBe(false)
+  })
+
+  it('空串拒绝', () => {
+    expect(platesMatch('', '皖A88888')).toBe(false)
   })
 })
 
