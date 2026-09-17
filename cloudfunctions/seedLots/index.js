@@ -67,11 +67,9 @@ exports.main = async () => {
       address: lot.address,
       location: lot.location,
       pricing: lot.pricing,
-      // 余位恒写 null 入库：只由车场端上报（Plan 3），种子不给初始值
+      // 余位恒写 null 入库：只由车场端上报（Plan 3），种子不给初始值。
+      // 2026-09-17：freeSpots 单数即可预约数（预约扣、取消/逾期还、核销不动），无 reservedCount
       availability: { freeSpots: null, totalSpots: lot.availability.totalSpots, source: lot.availability.source },
-      // 待入场预约数从 0 起：预约下单云函数用等值 CAS 抢余位（reservedCount 随预约 +1，
-      // 与 availability.freeSpots 比较判满，可约 = freeSpots − reservedCount）
-      reservedCount: 0,
       facilities: lot.facilities,
       ratingSummary: null,
       note: lot.note || '',

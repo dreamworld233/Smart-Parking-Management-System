@@ -108,18 +108,6 @@ export function formatSpots(free: number | null, total: number | null): string {
 }
 
 /**
- * 可约余位 = 物理余位 − 待入场预约数（2026-09-17 PM 口径：不设固定额度）。
- * 余位未上报（free 为 null）返回 null —— 「没数据」和「约满」是两句话；
- * 负数夹 0（车场上报的物理余位可能被 walk-in 车占走，比待入场预约数还低）。
- * 供详情/确认页/车场看板共用，避免三处各算一遍
- */
-export function bookableSpots(freeSpots: number | null, reservedCount: number): number | null {
-  if (freeSpots === null) return null
-  const n = freeSpots - reservedCount
-  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null
-}
-
-/**
  * 评分聚合展示。无评价（null / 条数为 0 / 分数无效）显示「暂无评分」，
  * **不显示 0 分** —— 冷启动没有评价与「被评了 0 分」对车场是两种命运
  */

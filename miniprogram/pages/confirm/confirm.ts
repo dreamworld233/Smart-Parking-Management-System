@@ -1,4 +1,4 @@
-import { bookableSpots, formatAmount, formatTimeRangeLabel, isValidPlate } from '../../domain/format'
+import { formatAmount, formatTimeRangeLabel, isValidPlate } from '../../domain/format'
 import { quoteTotal } from '../../domain/pricing'
 import type { Quote } from '../../domain/pricing'
 import { buildArrivalOptions, enterDeadline, isWithinWindow } from '../../domain/time'
@@ -14,7 +14,7 @@ interface LotBrief {
   name: string
   address: string
   firstHour: number
-  /** 可约余位 = freeSpots − reservedCount；null = 余位未上报 */
+  /** 可预约数 = 当前余位 freeSpots（2026-09-17 PM 口径：余位即可预约）；null = 未上报 */
   bookable: number | null
 }
 
@@ -105,8 +105,8 @@ Page({
           name: lot.name,
           address: lot.address,
           firstHour,
-          // 可约余位 = 物理余位 − 待入场预约数；freeSpots 未上报 → null（页面显示「待上报」）
-          bookable: lot.availability ? bookableSpots(lot.availability.freeSpots, lot.reservedCount) : null,
+          // 可预约数 = 当前余位 freeSpots；未上报 → null（页面显示「待上报」）
+          bookable: lot.availability?.freeSpots ?? null,
         },
         options,
         firstHourText: formatAmount(firstHour),

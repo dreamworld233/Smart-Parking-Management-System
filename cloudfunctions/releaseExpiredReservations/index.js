@@ -58,11 +58,11 @@ exports.main = async () => {
     }
     released++
 
-    // 2.1 回补车场额度（下单时 CAS 里 +1，这里还回去）
+    // 2.1 返还余位（下单时 availability.freeSpots -1，逾期释放还回去 +1）
     try {
-      await lots.doc(lotId).update({ data: { reservedCount: _.inc(-1) } })
+      await lots.doc(lotId).update({ data: { 'availability.freeSpots': _.inc(1) } })
     } catch (e) {
-      // 额度暂不准，每日对账按 reservations 重算兜底
+      // 余位暂不准，每日对账兜底
     }
 
     // 2.2 写违约记录 no_show。没有人取消、没有人退款 → penalty = 已付全额不退

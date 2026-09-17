@@ -1,4 +1,4 @@
-import { bookableSpots, formatAmount, formatTimeRangeLabel } from '../../../domain/format'
+import { formatAmount, formatTimeRangeLabel } from '../../../domain/format'
 import { fetchAdminDashboard, reportAvailability } from '../../../services/cloud'
 import type { AdminDashboardData } from '../../../services/cloud'
 import { clearRole } from '../../../services/storage'
@@ -9,17 +9,6 @@ interface StatVM {
   todayReservations: string
   pendingEntry: string
   todayIncome: string
-}
-
-interface QuotaVM {
-  /** 待入场预约数 */
-  reserved: number
-  /** 可约余位（freeSpots − reserved，负数钳 0）；null = 余位未上报 */
-  bookable: number | null
-  /** 展示串：「待上报」或数字 */
-  bookableText: string
-  /** 预约占用物理余位的比例（0–100），freeSpots 为 0/未上报时是 0 */
-  percent: number
 }
 
 interface PendingItemVM {
@@ -38,7 +27,6 @@ interface DashboardCache {
   lotName: string
   lotAddress: string
   stat: StatVM
-  quota: QuotaVM
   spotsText: string
   pendingList: PendingItemVM[]
 }
@@ -53,7 +41,6 @@ Page({
     lotName: '',
     lotAddress: '',
     stat: { todayReservations: '0', pendingEntry: '0', todayIncome: '¥0' } as StatVM,
-    quota: { reserved: 0, bookable: null, bookableText: '待上报', percent: 0 } as QuotaVM,
     spotsText: '待上报',
     /** 待核销列表（只显示车牌 + 到达 + 核销码） */
     pendingList: [] as PendingItemVM[],
@@ -132,14 +119,8 @@ Page({
     const d: AdminDashboardData = r.data
     // 上面 lot === null 已返回；这里类型系统收窄不了跨闭包的赋值，显式非空
     const lot = d.lot!
-    const reserved = typeof lot.reservedCount === 'number' ? Math.max(0, lot.reservedCount) : 0
     const avail = lot.availability
-    const freeSpots = avail && typeof avail.freeSpots === 'number' ? avail.freeSpots : null
-    // 可约余位 = 物理余位 − 待入场预约数；未上报 null（显示「待上报」）
-    const bookable = bookableSpots(freeSpots, reserved)
-    const percent =
-      freeSpots !== null && freeSpots > 0 ? Math.min(100, Math.round((reserved / freeSpots) * 100)) : 0
-
+    // 车场主端只显示当前空余车位数（2026-09-17 PM 口径：余位即可预约，无独立可预约数）
     const spotsText =
       avail && typeof avail.freeSpots === 'number' && typeof avail.totalSpots === 'number'
         ? `${avail.freeSpots} / ${avail.totalSpots}`
@@ -153,12 +134,6 @@ Page({
         todayReservations: String(d.todayReservations),
         pendingEntry: String(d.pendingEntry),
         todayIncome: formatAmount(d.todayIncome),
-      },
-      quota: {
-        reserved,
-        bookable,
-        bookableText: bookable === null ? '待上报' : String(bookable),
-        percent,
       },
       spotsText,
       pendingList: d.pendingList.map(x => ({
@@ -181,7 +156,6 @@ Page({
       lotName: c.lotName,
       lotAddress: c.lotAddress,
       stat: c.stat,
-      quota: c.quota,
       spotsText: c.spotsText,
       pendingList: c.pendingList,
     })

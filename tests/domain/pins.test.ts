@@ -14,7 +14,6 @@ function lot(id: string, distanceM: number, firstHour: number): ParkingLot {
     distanceSource: 'estimated',
     pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'ops' },
     availability: { freeSpots: 10, totalSpots: 500, source: 'ops' },
-    reservedCount: 0,
     ratingSummary: null,
     facilities: [],
   }
@@ -27,7 +26,6 @@ function unsignedLot(id: string, distanceM: number): ParkingLot {
     signed: false,
     pricing: null,
     availability: null,
-    reservedCount: 0,
   }
 }
 

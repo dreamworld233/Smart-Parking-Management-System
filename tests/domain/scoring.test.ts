@@ -27,7 +27,6 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     // 空闲率 0.4，明显高于饱和下限 0.15 —— 默认 fixture 必须是「不紧张」的，
     // 否则「空位充足为 good」与「高饱和为 bad」两条测试会落在同一区间里打架
     availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
-    reservedCount: 0,
     // 冷启动默认无评价：真实种子车场 ratingSummary 都是 null，这是主导路径
     ratingSummary: null,
     facilities: [],
@@ -42,7 +41,6 @@ function unsignedLot(id: string, distanceM: number): ParkingLot {
     poiId: id,
     pricing: null,
     availability: null,
-    reservedCount: 0,
   }
 }
 

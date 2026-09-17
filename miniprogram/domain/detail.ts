@@ -1,4 +1,4 @@
-import { bookableSpots, formatAmount, formatDistance, formatRatingSummary, formatSpots, sourceNotes } from './format'
+import { formatAmount, formatDistance, formatRatingSummary, formatSpots, sourceNotes } from './format'
 import { availabilityLevel, freeRate } from './scoring'
 import type { AvailabilityLevel } from './scoring'
 import type { ParkingLot, ReasonTone, Recommendation } from './types'
@@ -26,8 +26,6 @@ export interface LotDetailVM {
   capText: string
   /** 整串自带单位，如 `¥3.00/时`；缺夜间价时为 `--` */
   nightText: string
-  /** 可约余位：`freeSpots − reservedCount`，未上报显示「待上报」 */
-  bookableText: string
   /** 评分聚合展示，如 `★ 4.8（12 条）`；无评价时为「暂无评分」 */
   ratingText: string
   /** 数据来源标注；空数组则调用方不渲染标签区 */
@@ -58,7 +56,6 @@ export function toDetailVM(rec: Recommendation): LotDetailVM {
       stepText: UNKNOWN,
       capText: UNKNOWN,
       nightText: UNKNOWN,
-      bookableText: UNKNOWN,
       ratingText: formatRatingSummary(lot.ratingSummary),
       sourceNotes: sourceNotes(lot),
     }
@@ -84,11 +81,6 @@ export function toDetailVM(rec: Recommendation): LotDetailVM {
     // 这一格自带单位，与其他几个纯金额字段不同：夜间价可缺省，
     // 分成「¥{{nightText}}/时」渲染时缺值会出来「¥--/时」这种半句话
     nightText: typeof nightRate === 'number' ? `¥${formatAmount(nightRate)}/时` : UNKNOWN,
-    // 可约余位 = freeSpots − reservedCount；未上报显示「待上报」（不是 --：没数据 vs 约满是两句话）
-    bookableText: (() => {
-      const b = bookableSpots(availability.freeSpots, lot.reservedCount)
-      return b === null ? '待上报' : String(b)
-    })(),
     ratingText: formatRatingSummary(lot.ratingSummary),
     sourceNotes: sourceNotes(lot),
   }

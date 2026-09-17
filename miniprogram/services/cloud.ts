@@ -145,8 +145,6 @@ export interface AdminLot {
     source?: string
   } | null
   availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
-  /** 待入场预约数（可约余位 = freeSpots − reservedCount） */
-  reservedCount: number
   facilities: string[]
 }
 
@@ -170,7 +168,6 @@ export interface AdminDashboardData {
     name: string
     address: string
     availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
-    reservedCount: number
   } | null
   todayReservations: number
   pendingEntry: number

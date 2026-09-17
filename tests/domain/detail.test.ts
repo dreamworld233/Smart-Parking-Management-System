@@ -15,8 +15,6 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
     pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'ops' },
     // 空闲率 0.4：高于饱和下限 0.15，也高于 warn 的上界 0.3，落 ok 档
     availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
-    // 待入场 80 → 可约 = 200 − 80 = 120，与老用例的 120 同值
-    reservedCount: 80,
     ratingSummary: { score: 4.8, count: 12 },
     facilities: [],
     ...over,
@@ -26,7 +24,7 @@ function lot(over: Partial<ParkingLot> = {}): ParkingLot {
 /** 未签约车场：只有名称/位置/距离，收费余位额度全无 */
 function unsignedLot(over: Partial<ParkingLot> = {}): ParkingLot {
   return {
-    ...lot({ pricing: null, availability: null, reservedCount: 0, ratingSummary: null, signed: false }),
+    ...lot({ pricing: null, availability: null, ratingSummary: null, signed: false }),
     ...over,
   }
 }
@@ -53,7 +51,6 @@ describe('toDetailVM', () => {
     expect(vm.distanceText).toBe('320m')
     expect(vm.walkText).toBe('4 分钟')
     expect(vm.freeClass).toBe('ok')
-    expect(vm.bookableText).toBe('120')
   })
 
   it('空闲率落进饱和区间时降档到 bad，与 availabilityLevel 同一判定', () => {
@@ -69,15 +66,10 @@ describe('toDetailVM', () => {
     expect(toDetailVM(withNight).nightText).toBe('¥3.00/时')
   })
 
-  it('可约余位：余位未上报显示「待上报」；负数钳 0', () => {
-    expect(
-      toDetailVM(rec({ availability: { freeSpots: null, totalSpots: 500, source: 'ops' } })).bookableText,
-    ).toBe('待上报')
-    // 物理余位 10 但待入场 20（walk-in 占了位）→ 可约钳 0
-    expect(
-      toDetailVM(rec({ availability: { freeSpots: 10, totalSpots: 500, source: 'ops' }, reservedCount: 20 }))
-        .bookableText,
-    ).toBe('0')
+  it('余位未上报：spotsText 显示「待上报」，freeClass 落 unknown', () => {
+    const vm = toDetailVM(rec({ availability: { freeSpots: null, totalSpots: 500, source: 'ops' } }))
+    expect(vm.spotsText).toBe('待上报')
+    expect(vm.freeClass).toBe('unknown')
   })
 
   it('逐条标注数据来源，公示价与估算距离各按自己的来源标', () => {
@@ -102,7 +94,6 @@ describe('toDetailVM', () => {
     expect(vm.nextHourText).toBe('--')
     expect(vm.capText).toBe('--')
     expect(vm.spotsText).toBe('--')
-    expect(vm.bookableText).toBe('--')
     // 来源标注直接说清是什么，而不是逐条「无数据」
     expect(vm.sourceNotes).toEqual(['未签约，暂不开放预约，可导航前往', '距离为估算'])
   })

@@ -12,8 +12,7 @@
 // 改 entered，updated===1 才成功。并发双击只有一次能过，另一次拿 ALREADY_PROCESSED。
 // 与 cancelReservation / createReservation 同一套思路。
 //
-// 2026-09-17：reservedCount 只数「待入场」预约。入场成功后 lots.reservedCount -1
-// （best-effort，失败交每日对账兜底）—— 车已物理占位，物理余位由车场上报覆盖。
+// 2026-09-17：核销不动余位 —— 预约时已扣 availability.freeSpots，入场只改状态。
 //
 // 权限：OPENID 必须是该车场的 adminUserId。写 entry_logs 留痕（§4：
 // method 'code' 输码 / 'manual' 手动 / 'plate' 车牌识别，operatorId 是操作人）。
@@ -45,7 +44,6 @@ exports.main = async (event) => {
   const lots = db.collection('lots')
   const reservations = db.collection('reservations')
   const entryLogs = db.collection('entry_logs')
-  const _ = db.command
 
   // 1. 身份：车场管理员才允许核销
   let role = 'driver'
@@ -94,14 +92,9 @@ exports.main = async (event) => {
     return { code: 'ALREADY_PROCESSED', message: '该预约已被处理' }
   }
 
-  // 4.1 入场回补：reservedCount 只数「待入场」，入场后车已物理占位（车场上报余位覆盖），
-  //     不再虚拟占位 → 这里 -1。best-effort：失败交每日对账按 pending_entry 重算兜底
-  try {
-    await lots.doc(lotId).update({ data: { reservedCount: _.inc(-1) } })
-  } catch (e) {
-    // 计数暂不准，对账兜底
-  }
-
+  // 4.1 核销不动余位（2026-09-17 PM 口径）：预约时已扣 availability.freeSpots -1，
+  //     车进场后该位已计入，核销只改状态不返还不扣减
+  //
   // 5. 核销留痕。失败不撤销主档（核销已发生，日志缺一条由审计补）
   try {
     await entryLogs.add({

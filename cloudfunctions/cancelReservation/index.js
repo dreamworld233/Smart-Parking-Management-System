@@ -105,11 +105,11 @@ exports.main = async (event) => {
     // 主档已取消，退款已定；流水缺一条由每日对账按 reservations 补
   }
 
-  // 6. 回补车场额度。CAS 里已 +1（下单时），这里还回去
+  // 6. 返还余位。下单时 availability.freeSpots -1（预约扣位），取消还回去 +1
   try {
-    await lots.doc(data.lotId).update({ data: { reservedCount: _.inc(-1) } })
+    await lots.doc(data.lotId).update({ data: { 'availability.freeSpots': _.inc(1) } })
   } catch (e) {
-    // 额度暂不准，对账兜底
+    // 余位暂不准，对账兜底
   }
 
   // 7. 晚于到达时刻取消 = 违约：写 violations + 用户违约计数 +1

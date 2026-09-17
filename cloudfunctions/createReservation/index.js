@@ -1,12 +1,11 @@
 // 预约下单云函数（设计稿 §5.1）。
-// 核心是**读后等值 CAS** 抢余位：freeSpots 是车场端上报的物理余位，reservedCount 是
-// 待入场预约数，可约 = freeSpots − reservedCount。并发下用
-// 「where(_id + reservedCount) 等值匹配 + _.inc(1)」原子抢占 —— 字段间比较
-// （如 reservedCount < freeSpots）在云数据库里不可靠，已弃用。
-// 2026-09-17 PM 口径：不设固定可预约额度，有余位就能约（walk-in 车也能进空位）。
+// 核心是**读后等值 CAS** 抢余位：availability.freeSpots 是当前空余车位数，也是可预约数
+// （2026-09-17 PM 口径：预约直接扣余位 -1，取消/逾期返还 +1，核销不动）。
+// 并发下用「where(_id + 'availability.freeSpots' 等值) 匹配 + _.inc(-1)」原子抢占 ——
+// 字段间比较在云数据库里不可靠，已弃用。
 //
-// 写单失败一律回补：reservations 主档没写成 → 只回补 reservedCount；orders / payments
-// 任一失败 → 删掉已建 reservation + 回补 reservedCount。不留孤儿单、不吞余位。
+// 写单失败一律回补：reservations 主档没写成 → 只回补余位 +1；orders / payments
+// 任一失败 → 删掉已建 reservation + 回补余位 +1。不留孤儿单、不吞余位。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -58,38 +57,27 @@ exports.main = async (event) => {
   if (!Number.isFinite(pricing.firstHour)) {
     return { code: 'LOT_INVALID', message: '车场计费信息缺失' }
   }
-  // 可约余位 = 物理余位 − 已待入场数（reservedCount）。quota 用车场上报的 freeSpots，
-  // 不设固定额度（2026-09-17 PM 口径：有余位就能约，不预留）。未上报 → 不可约。
-  const freeSpots = data.availability && data.availability.freeSpots
+  // 可约 = 余位：单一 availability.freeSpots（2026-09-17 PM 口径——预约直接扣余位 -1，
+  // 取消/逾期返还 +1，核销不动；不设 reservedCount/固定额度）。未上报 → 不可约。
+  const avail = data.availability || {}
+  const freeSpots = avail.freeSpots
   if (!Number.isFinite(freeSpots)) {
     return { code: 'LOT_INVALID', message: '车场余位未上报，暂不可预约' }
   }
   const firstHourRate = pricing.firstHour
-  const quota = freeSpots
 
-  // 3. 读后等值 CAS 抢余位（并发安全，最多重试 3 次）
-  //
-  // 老文档可能没有 reservedCount 字段：CAS 的 where 里 `reservedCount: 0` 匹配不上
-  // undefined（Mongo 语义里缺失字段 ≠ 0），先建字段再抢。**必须用 _.inc(0)** 而不是
-  // 硬写 0 —— $inc 对缺失字段「建字段 = 0」，对已有字段保持不变，且整条 doc update 原子；
-  // 硬写 0 会踩掉并发写者刚 inc 上去的值（A 补 0 → A inc→1 → B 补 0 把 1 冲回 0 →
-  // B 也抢成功 → 两条 reservation 但 reservedCount=1，超卖）
-  if (typeof data.reservedCount !== 'number') {
-    try {
-      await lots.doc(lotId).update({ data: { reservedCount: _.inc(0) } })
-    } catch (e) {
-      return { code: 'INTERNAL', message: '车场数据初始化失败' }
-    }
-  }
+  // 3. 读后等值 CAS 抢余位：对 availability.freeSpots 等值 CAS 后 -1。
+  //    freeSpots 是嵌套字段，点路径 'availability.freeSpots' 在 where / update 里都可用；
+  //    并发下别人先 -1 则等值失配，重试读新值。cur > 0 才放行。
+  //    局限：车场端重新上报 freeSpots 会覆盖预约的扣减（上报的是当前空位），
+  //    上报时应报「当前空位」，预约扣减在下次上报前有效 —— 课程尺度可接受
   let acquired = false
   for (let i = 0; i < 3; i++) {
-    const cur = (await lots.doc(lotId).get()).data.reservedCount ?? 0
-    if (!(cur < quota)) return { code: 'LOT_FULL', message: '可预约车位已满' }
-    // 等值 CAS：where 里同时匹配 _id 与当前 reservedCount，update 用 _.inc(1)。
-    // 等值条件不满足（别人抢先改了 reservedCount）时 updated === 0，无歧义
+    const cur = (await lots.doc(lotId).get()).data.availability?.freeSpots
+    if (!Number.isFinite(cur) || cur <= 0) return { code: 'LOT_FULL', message: '可预约车位已满' }
     const res = await lots
-      .where({ _id: lotId, reservedCount: cur })
-      .update({ data: { reservedCount: _.inc(1) } })
+      .where({ _id: lotId, 'availability.freeSpots': cur })
+      .update({ data: { 'availability.freeSpots': _.inc(-1) } })
     if (res.stats.updated === 1) {
       acquired = true
       break
@@ -147,11 +135,11 @@ exports.main = async (event) => {
       data: { orderId: reservationId, channel: 'mock', amount: quote.totalAmount, status: 'paid', tradeNo: 'MOCK' + Date.now() },
     })
   } catch (e) {
-    // 回补额度（吞回补自身的错误，交给对账兜底，不吞主错误）
+    // 回补余位（吞回补自身的错误，交给对账兜底，不吞主错误）
     try {
-      await lots.doc(lotId).update({ data: { reservedCount: _.inc(-1) } })
+      await lots.doc(lotId).update({ data: { 'availability.freeSpots': _.inc(1) } })
     } catch (_e) {
-      // 额度暂时不准，Task 5+ 对账兜底
+      // 余位暂时不准，每日对账兜底
     }
     // 清孤儿单：删掉已建的所有 orders + reservation，不留半截数据
     for (const id of orderIds) {

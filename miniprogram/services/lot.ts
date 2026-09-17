@@ -29,9 +29,6 @@ function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | nu
   if (!availability || typeof availability.totalSpots !== 'number') return null
   const freeSpots = availability.freeSpots
   if (freeSpots !== null && typeof freeSpots !== 'number') return null
-  // reservedCount 宽松映射：老文档可能没有该字段（或为 null），一律按 0 ——
-  // 可约余位 = freeSpots − reservedCount，缺了不误伤整条车场
-  const reservedCount = typeof doc.reservedCount === 'number' ? doc.reservedCount : 0
   const pricingSource = pricing.source
   if (
     pricingSource !== 'public' &&
@@ -77,7 +74,6 @@ function toParkingLot(id: string, doc: Record<string, unknown>): ParkingLot | nu
       totalSpots: availability.totalSpots,
       source: spotsSource,
     },
-    reservedCount,
     ratingSummary:
       summary && typeof summary.score === 'number' && typeof summary.count === 'number'
         ? { score: summary.score, count: summary.count }
@@ -178,7 +174,6 @@ function poiToUnsignedLot(poi: PoiItem): ParkingLot {
     distanceSource: 'estimated',
     pricing: null,
     availability: null,
-    reservedCount: 0,
     ratingSummary: null,
     facilities: [],
   }

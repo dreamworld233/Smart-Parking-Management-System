@@ -9,8 +9,6 @@ let mockStore: Store
 let mockOpenid: string | null
 let mockCasConflictOnce: boolean
 let mockCasConflictUsed: boolean
-/** 模拟入场回补 lots.reservedCount 的 doc().update 抛错（best-effort 应吞掉） */
-let mockLotUpdateError: boolean
 
 jest.mock(
   'wx-server-sdk',
@@ -34,7 +32,6 @@ jest.mock(
         return { data: { ...doc } }
       },
       update: async ({ data }: { data: Record<string, unknown> }) => {
-        if (collName === 'lots' && mockLotUpdateError) throw new Error('lots.update failed')
         const doc = mockStore[collName].get(id)
         if (!doc) return { stats: { updated: 0 } }
         applyData(doc, data)
@@ -129,7 +126,6 @@ describe('verifyReservation', () => {
     mockOpenid = 'openid-test-1'
     mockCasConflictOnce = false
     mockCasConflictUsed = false
-    mockLotUpdateError = false
   })
 
   it('无微信身份 → NO_AUTH', async () => {
@@ -235,25 +231,14 @@ describe('verifyReservation', () => {
     expect(log.imageFileID).toBe('cloud://x/plate.png')
   })
 
-  it('入场核销后 lots.reservedCount -1（待入场预约数减少，车已物理占位）', async () => {
+  it('核销不动余位：入场只改状态，availability.freeSpots 不变（预约时已扣）', async () => {
     seedUser()
-    seedLot({ reservedCount: 1 })
+    seedLot({ availability: { freeSpots: 7, totalSpots: 50, source: 'reported' } })
     seedReservation('r1')
     const r = await main({ lotId: 'lot1', method: 'code', verifyCode: '123456' })
     expect(r.code).toBe(0)
     expect(mockStore.reservations.get('r1')!.status).toBe('entered')
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
-  })
-
-  it('入场回补失败（lots.update 抛错）不阻断核销主档，reservedCount 留给对账兜底', async () => {
-    seedUser()
-    seedLot({ reservedCount: 1 })
-    seedReservation('r1')
-    mockLotUpdateError = true
-    const r = await main({ lotId: 'lot1', method: 'code', verifyCode: '123456' })
-    expect(r.code).toBe(0)
-    expect(mockStore.reservations.get('r1')!.status).toBe('entered')
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(7)
   })
 
   it('plate 无匹配（OCR 识别出的车牌没预约）→ NO_MATCH，提示降级', async () => {

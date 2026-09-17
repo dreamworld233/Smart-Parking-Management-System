@@ -30,11 +30,17 @@ jest.mock(
       cur[segs[segs.length - 1]] = value
     }
 
+    const getPath = (doc: Record<string, unknown>, path: string): unknown =>
+      path.split('.').reduce<unknown>(
+        (o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined),
+        doc,
+      )
+
     const applyData = (doc: Record<string, unknown>, data: Record<string, unknown>): void => {
       for (const [k, v] of Object.entries(data)) {
         const op = v as { __op?: string; value?: number } | null
         if (op && typeof op === 'object' && op.__op === 'inc') {
-          const base = typeof doc[k] === 'number' ? (doc[k] as number) : 0
+          const base = typeof getPath(doc, k) === 'number' ? (getPath(doc, k) as number) : 0
           setPath(doc, k, base + (op.value ?? 0))
         } else {
           setPath(doc, k, v)
@@ -142,8 +148,8 @@ function seedLot(): void {
     _id: 'lot1',
     name: '万象城测试店',
     pricing: { firstHour: 6 },
-    reservableQuota: 10,
-    reservedCount: 1,
+    // 余位即可预约数：预约已扣 1，现余 1；取消返还 +1 → 2
+    availability: { freeSpots: 1, totalSpots: 50, source: 'reported' },
   })
 }
 
@@ -202,7 +208,7 @@ describe('cancelReservation 正常取消', () => {
     expect(typeof r.refundAt).toBe('number')
 
     // 额度回补
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(2)
     // 退款流水一条（amount 负）
     expect(mockStore.orders.size).toBe(1)
     const o = [...mockStore.orders.values()][0]
@@ -316,10 +322,10 @@ describe('cancelReservation 并发与兜底', () => {
     const res = await main({ reservationId: 'res1' })
     expect(res).toEqual({ code: 'ALREADY_CANCELLED', message: '该预约已被处理' })
 
-    // 预检通过但 CAS 失配：主档/额度/流水一概不动
+    // 预检通过但 CAS 失配：主档/余位/流水一概不动
     expect(mockStore.reservations.get('res1')!.status).toBe('pending_entry')
     expect(mockStore.orders.size).toBe(0)
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(1)
     expect(mockStore.violations.size).toBe(0)
   })
 

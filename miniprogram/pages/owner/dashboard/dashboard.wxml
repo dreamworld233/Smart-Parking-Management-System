@@ -59,19 +59,6 @@
         </view>
       </view>
 
-      <!-- 可预约卡：可约余位 = 实时余位 − 待入场预约数（2026-09-17 起不设固定额度） -->
-      <view class="card">
-        <view class="card__row">
-          <view>
-            <view class="card__title">可预约</view>
-            <view class="card__sub">已预约 {{quota.reserved}} · 可再预约 {{quota.bookableText}}</view>
-          </view>
-        </view>
-        <view class="bar">
-          <view class="bar__fill" style="width: {{quota.percent}}%" />
-        </view>
-      </view>
-
       <!-- 待核销列表 -->
       <view class="card">
         <view class="card__row card__row--head">

@@ -1,22 +1,17 @@
 // 每日对账定时云函数（数据模型 §5.5「要写的三个任务」之 3）。
 //
-// 每天凌晨 3 点（config.json 的 timer 触发器 `0 0 3 * * * *`）跑一次：按 reservations
-// 重算每个车场的 reservedCount，修掉 createReservation / cancelReservation /
-// releaseExpiredReservations 抢额度、回补时留下的漂移。
+// 2026-09-17 改职责：reservedCount 已退役（余位统一为 availability.freeSpots 单数：
+// 预约扣 -1、取消/逾期返还 +1、核销不动），原「按 reservations 重算 reservedCount」
+// 的对账口径随之失效 —— freeSpots 是「物理空位 − 预约扣减」的混合数，
+// 无法从 reservations 推出权威值。
 //
-// reservedCount 口径 = **待入场预约数**（2026-09-17 PM 口径：可约 = 余位 − 已待入场）：
-// - 下单成功 +1（createReservation 等值 CAS _.inc(1)）
-// - 取消 -1（cancelReservation _.inc(-1)）
-// - 超时释放 -1（releaseExpiredReservations _.inc(-1)）
-// - 核销入场 -1（verifyReservation：车已物理占位，余位由 availability.freeSpots 另管）
-// 所以理论值 = 该车场下 status = pending_entry 的预约单数。
-// entered / completed / cancelled / released 都已是「不占虚拟位」，不计。
+// 现职责：每日钳 availability.freeSpots 到合法区间 [0, totalSpots]，
+// 修掉下单回补失败 / 并发边界留下的负数或超总位漂移。未上报（null）不修。
 //
 // 定时触发时 OPENID 为空：本函数是系统任务，以管理端身份运行，不校验身份。
 // 兼容手动云端测试：带 OPENID 时也不拦（读一下但不用它做鉴权），直接执行。
 //
-// 只有不一致才写：避免每天无谓 update 触发时间戳/版本变化，也让对账日志能看出「确实修了」。
-// 单车场失败不中断整批（独立 try/catch），失败的缺口留给下一次对账兜底。
+// 只有不一致才写：避免每天无谓 update 触发时间戳/版本变化。单车场失败不中断整批。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -28,7 +23,6 @@ exports.main = async () => {
 
   const db = cloud.database()
   const lots = db.collection('lots')
-  const reservations = db.collection('reservations')
 
   // 1. 查所有车场（签约车场库，seed 的都是签约车场；单批 100，量大再加游标翻页）
   let lotDocs = []
@@ -45,21 +39,24 @@ exports.main = async () => {
   for (const lot of lotDocs) {
     const lotId = lot._id
     try {
-      // 2. 理论值：只数「待入场」预约（入场/取消/超时都已 -1，再数会多算）
-      const c = await reservations.where({ lotId, status: 'pending_entry' }).count()
-      const expected = c.total || 0
-
-      // 3. 当前值：老文档可能没有 reservedCount 字段 → 缺省 0
-      const cur = (await lots.doc(lotId).get()).data.reservedCount ?? 0
-
-      // 4. 只有不一致才写：避免每天无谓 update 触发时间戳/版本变化
-      if (cur !== expected) {
-        await lots.doc(lotId).update({ data: { reservedCount: expected } })
-        corrected++
-      }
+      const av = lot.availability || {}
+      const cur = av.freeSpots
+      // 未上报（null）/ 非数字：不修，等车场端上报真实值
+      if (typeof cur !== 'number' || !Number.isFinite(cur)) continue
       checked++
+
+      // 2. 钳合法区间：负数 → 0（回补/并发边界）；超总位 → 总位（上报/扣减漂移）
+      const total = typeof av.totalSpots === 'number' && av.totalSpots > 0 ? av.totalSpots : null
+      let expected = cur
+      if (cur < 0) expected = 0
+      else if (total !== null && cur > total) expected = total
+      if (expected === cur) continue
+
+      // 3. 只有不一致才写
+      await lots.doc(lotId).update({ data: { 'availability.freeSpots': expected } })
+      corrected++
     } catch (e) {
-      // 单车场失败不中断整批：计数/读/写任一步出错，跳过这家，下次对账兜底
+      // 单车场失败不中断整批：读/写任一步出错，跳过这家，下次对账兜底
     }
   }
 

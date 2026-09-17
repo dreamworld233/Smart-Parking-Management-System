@@ -174,8 +174,8 @@ function seedLot(id = 'lot1'): void {
     _id: id,
     name: '万象城测试店',
     pricing: { firstHour: 6 },
-    reservableQuota: 10,
-    reservedCount: 1,
+    // 余位即可预约数：预约已扣 1，现余 1；超时释放返还 +1 → 2
+    availability: { freeSpots: 1, totalSpots: 50, source: 'reported' },
   })
 }
 
@@ -224,7 +224,7 @@ describe('releaseExpiredReservations 正常释放', () => {
     expect(typeof r.releasedAt).toBe('number')
 
     // 额度回补
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(2)
 
     // 违约记录 no_show，penalty = 已付全额（没人退款）
     expect(mockStore.violations.size).toBe(1)
@@ -253,7 +253,7 @@ describe('releaseExpiredReservations 正常释放', () => {
     expect(res.data).toEqual({ scanned: 0, released: 0 })
 
     expect(mockStore.reservations.get('res1')!.status).toBe('pending_entry')
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(1)
     expect(mockStore.violations.size).toBe(0)
     const u = mockStore.users.get('openid-test-1')!.credit as { violationCount: number }
     expect(u.violationCount).toBe(0)
@@ -288,7 +288,7 @@ describe('releaseExpiredReservations 并发与兜底', () => {
 
     // CAS 失配：主档/额度/违约一概不动
     expect(mockStore.reservations.get('res1')!.status).toBe('pending_entry')
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(1)
     expect(mockStore.violations.size).toBe(0)
     const u = mockStore.users.get('openid-test-1')!.credit as { violationCount: number }
     expect(u.violationCount).toBe(0)
@@ -330,8 +330,8 @@ describe('releaseExpiredReservations 并发与兜底', () => {
     expect(mockStore.reservations.get('res2')!.status).toBe('released')
 
     // res1 的额度回补失败（reservedCount 仍 1）；res2 正常回补（1 → 0）
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
-    expect(mockStore.lots.get('lot2')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(1)
+    expect((mockStore.lots.get('lot2')!.availability as { freeSpots: number }).freeSpots).toBe(2)
 
     // 违约记录仍两条、计数仍 +2：失败只影响额度那一项
     expect(mockStore.violations.size).toBe(2)
@@ -351,7 +351,7 @@ describe('releaseExpiredReservations 并发与兜底', () => {
     expect(res.data).toEqual({ scanned: 1, released: 1 })
     expect(mockStore.violations.size).toBe(0)
     expect(mockStore.reservations.get('res1')!.status).toBe('released')
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(2)
     const u = mockStore.users.get('openid-test-1')!.credit as { violationCount: number }
     expect(u.violationCount).toBe(1)
   })

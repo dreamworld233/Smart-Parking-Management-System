@@ -64,10 +64,10 @@
       <view class="row"><text class="row__k">单日封顶</text><text>¥{{vm.capText}}</text></view>
       <view class="row"><text class="row__k">夜间 22:00–08:00</text><text>{{vm.nightText}}</text></view>
 
-      <view class="card__title quota__title">可预约余位</view>
-      <view class="quota">当前可预约 <text class="primary bold">{{vm.bookableText}}</text> 个</view>
+      <view class="card__title quota__title">预约</view>
+      <view class="quota">余位即可预约数：实时余位 <text class="primary bold">{{vm.spotsText}}</text>，下单即占一个</view>
       <view class="quota__note">直接导航前往不收费；预约锁位需支付预支停车费 + 平台服务费</view>
-      <view class="quota__note">余位由车场端上报，可约 = 余位 − 已预约</view>
+      <view class="quota__note">余位由车场端上报</view>
     </view>
 
     <view class="tail" />

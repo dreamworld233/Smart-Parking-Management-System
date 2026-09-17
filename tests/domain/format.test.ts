@@ -10,7 +10,6 @@ import {
   formatRatingSummary,
   isValidPlate,
   platesMatch,
-  bookableSpots,
   RESERVATION_STATUS_LABELS,
   sourceNotes,
 } from '../../miniprogram/domain/format'
@@ -192,24 +191,6 @@ describe('isValidPlate', () => {
   })
 })
 
-describe('bookableSpots', () => {
-  it('正常：可约 = freeSpots − reservedCount', () => {
-    expect(bookableSpots(10, 3)).toBe(7)
-  })
-
-  it('余位未上报（null）→ null，与「约满」区分', () => {
-    expect(bookableSpots(null, 3)).toBeNull()
-  })
-
-  it('负数夹 0：物理余位比待入场还少（walk-in 占了位）', () => {
-    expect(bookableSpots(3, 10)).toBe(0)
-  })
-
-  it('非有限入参 → null，不吐 NaN', () => {
-    expect(bookableSpots(Number.NaN, 1)).toBeNull()
-  })
-})
-
 describe('platesMatch', () => {
   it('完全一致', () => {
     expect(platesMatch('皖A88888', '皖A88888')).toBe(true)
@@ -257,7 +238,6 @@ describe('sourceNotes', () => {
       distanceSource: 'estimated',
       pricing: { firstHour: 6, perHourAfter: 5, stepMinutes: 15, capPerDay: 40, source: 'ops' },
       availability: { freeSpots: 200, totalSpots: 500, source: 'ops' },
-      reservedCount: 0,
       ratingSummary: { score: 4.8, count: 12 },
       facilities: [],
       ...over,
@@ -275,7 +255,7 @@ describe('sourceNotes', () => {
   })
 
   it('未签约车场一句话标清身份，不再逐条说无数据', () => {
-    const l = lot({ signed: false, poiId: 'poi-x', pricing: null, availability: null, reservedCount: 0 })
+    const l = lot({ signed: false, poiId: 'poi-x', pricing: null, availability: null })
     expect(sourceNotes(l)).toEqual(['未签约，暂不开放预约，可导航前往', '距离为估算'])
   })
 

@@ -27,23 +27,38 @@ let mockFailPaymentAdd: boolean
 let mockCasConflictOnce: boolean
 let mockCasConflictUsed: boolean
 let mockCasConflictAlways: boolean
-let mockInjectReservedCount: number | null
 
 jest.mock(
   'wx-server-sdk',
   () => {
+    /** 点路径读写（'availability.freeSpots' → 嵌套对象），CAS 对嵌套字段也按等值匹配 */
+    const getPath = (doc: Record<string, unknown>, key: string): unknown =>
+      key.split('.').reduce<unknown>(
+        (o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined),
+        doc,
+      )
+    const setPath = (doc: Record<string, unknown>, key: string, val: unknown): void => {
+      const parts = key.split('.')
+      let o = doc
+      for (let i = 0; i < parts.length - 1; i++) {
+        const cur = o[parts[i]]
+        if (!cur || typeof cur !== 'object') o[parts[i]] = {}
+        o = o[parts[i]] as Record<string, unknown>
+      }
+      o[parts[parts.length - 1]] = val
+    }
     const applyData = (doc: Record<string, unknown>, data: Record<string, unknown>): void => {
       for (const [k, v] of Object.entries(data)) {
         const op = v as { __op?: string; value?: number } | null
         if (op && typeof op === 'object' && op.__op === 'inc') {
-          const base = typeof doc[k] === 'number' ? (doc[k] as number) : 0
-          doc[k] = base + (op.value ?? 0)
+          const base = typeof getPath(doc, k) === 'number' ? (getPath(doc, k) as number) : 0
+          setPath(doc, k, base + (op.value ?? 0))
         } else {
-          doc[k] = v
+          setPath(doc, k, v)
         }
       }
     }
-  
+
     const mkDocApi = (collName: string, id: string) => ({
       get: async () => {
         const doc = mockStore[collName].get(id)
@@ -53,11 +68,6 @@ jest.mock(
       update: async ({ data }: { data: Record<string, unknown> }) => {
         const doc = mockStore[collName].get(id)
         if (!doc) return { stats: { updated: 0 } }
-        if (collName === 'lots' && mockInjectReservedCount !== null) {
-          // 模拟「并发写者刚把 reservedCount 改成别的值」，插在补字段的 doc().update 之前，
-          // 验证补字段用 _.inc(0) 不会把并发写者的值冲回 0
-          doc.reservedCount = mockInjectReservedCount
-        }
         applyData(doc, data)
         return { stats: { updated: 1 } }
       },
@@ -84,18 +94,20 @@ jest.mock(
             return { stats: { updated: 0 } }
           }
           if (collName === 'lots' && mockCasConflictOnce && !mockCasConflictUsed) {
-            // 模拟并发写者抢走了额度：值已变，本次 CAS 必然失配（updated 0），
+            // 模拟并发写者抢先扣了一个位：freeSpots 已变，本次 CAS 必然失配（updated 0），
             // 触发云函数的「重读 + 重试」路径
             mockCasConflictUsed = true
             const doc = mockStore[collName].get(query._id as string)
             if (doc) {
-              const base = typeof doc.reservedCount === 'number' ? (doc.reservedCount as number) : 0
-              doc.reservedCount = base + 1
+              const base = typeof getPath(doc, 'availability.freeSpots') === 'number'
+                ? (getPath(doc, 'availability.freeSpots') as number)
+                : 0
+              setPath(doc, 'availability.freeSpots', base - 1)
             }
             return { stats: { updated: 0 } }
           }
           for (const [id, doc] of mockStore[collName]) {
-            const matches = Object.entries(query).every(([k, v]) => doc[k] === v)
+            const matches = Object.entries(query).every(([k, v]) => getPath(doc, k) === v)
             if (matches) {
               applyData(doc, data)
               return { stats: { updated: 1 } }
@@ -139,9 +151,8 @@ function seedLot(overrides: Record<string, unknown> = {}): Record<string, unknow
     location: { lat: 1, lng: 2 },
     pricing: { firstHour: 6, perHourAfter: 4, capPerDay: 40, stepMinutes: 60, source: 'public' },
     contract: { status: 'signed', signedAt: Date.now() },
-    // 可约余位 = freeSpots − reservedCount（2026-09-17 起不设固定 quota）
+    // 余位即可预约数（2026-09-17 PM 口径：预约扣 -1、取消/逾期还 +1、核销不动）
     availability: { freeSpots: 10, totalSpots: 50, source: 'reported' },
-    reservedCount: 0,
     ...overrides,
   }
   mockStore.lots.set('lot1', doc)
@@ -169,7 +180,6 @@ beforeEach(() => {
   mockCasConflictOnce = false
   mockCasConflictUsed = false
   mockCasConflictAlways = false
-  mockInjectReservedCount = null
 })
 
 describe('createReservation 正常下单', () => {
@@ -190,8 +200,8 @@ describe('createReservation 正常下单', () => {
     expect(d.serviceFee).toBe(PLATFORM_SERVICE_FEE)
     expect(d.totalAmount).toBe(8)
 
-    // 额度已扣
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    // 余位已扣：10 → 9
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(9)
 
     // 主档内容
     expect(mockStore.reservations.size).toBe(1)
@@ -223,12 +233,11 @@ describe('createReservation 正常下单', () => {
     expect(String(pay.tradeNo)).toMatch(/^MOCK\d+$/)
   })
 
-  it('老文档没有 reservedCount 字段时按 0 兜底，仍可预约', async () => {
-    const doc = seedLot()
-    delete doc.reservedCount
-    const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
-    expect(res.code).toBe(0)
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+  it('连续下单余位递减：10 → 9 → 8', async () => {
+    seedLot()
+    expect((await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A11111' })).code).toBe(0)
+    expect((await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A22222' })).code).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(8)
   })
 
   it('无 OPENID → NO_AUTH', async () => {
@@ -239,11 +248,11 @@ describe('createReservation 正常下单', () => {
 })
 
 describe('createReservation 余位 CAS', () => {
-  it('已满（cur >= freeSpots）→ LOT_FULL，余位与各集合不动', async () => {
-    seedLot({ availability: { freeSpots: 1, totalSpots: 50, source: 'reported' }, reservedCount: 1 })
+  it('已满（freeSpots = 0）→ LOT_FULL，余位与各集合不动', async () => {
+    seedLot({ availability: { freeSpots: 0, totalSpots: 50, source: 'reported' } })
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'LOT_FULL', message: '可预约车位已满' })
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(0)
     expect(mockStore.reservations.size).toBe(0)
     expect(mockStore.orders.size).toBe(0)
     expect(mockStore.payments.size).toBe(0)
@@ -254,8 +263,8 @@ describe('createReservation 余位 CAS', () => {
     mockCasConflictOnce = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res.code).toBe(0)
-    // 冲突写者 +1，本请求重试成功再 +1
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(2)
+    // 冲突写者抢先 -1（10→9），本请求重试成功再 -1 → 8
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(8)
     expect(mockStore.reservations.size).toBe(1)
   })
 
@@ -264,20 +273,15 @@ describe('createReservation 余位 CAS', () => {
     mockCasConflictAlways = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'LOT_FULL', message: '可预约车位已满' })
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(10)
     expect(mockStore.reservations.size).toBe(0)
   })
 
-  it('老文档补字段用 _.inc(0)：并发写者的值不被冲回 0，不超卖', async () => {
-    const doc = seedLot({})
-    delete doc.reservedCount
-    // 模拟并发写者抢到 1 后才轮到本请求补字段
-    mockInjectReservedCount = 1
-    const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
-    expect(res.code).toBe(0)
-    // 补字段 inc(0) 保持 1 不变，随后 CAS inc → 2；若补字段硬写 0 则会被冲回后 CAS → 1
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(2)
-    expect(mockStore.reservations.size).toBe(1)
+  it('freeSpots 恰为 1 时最后一位被抢 → 成功（余位归 0），下一单再约 → LOT_FULL', async () => {
+    seedLot({ availability: { freeSpots: 1, totalSpots: 50, source: 'reported' } })
+    expect((await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A11111' })).code).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(0)
+    expect((await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A22222' })).code).toBe('LOT_FULL')
   })
 })
 
@@ -345,7 +349,7 @@ describe('createReservation 写单失败回补', () => {
     mockFailReservationAdd = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'INTERNAL', message: '下单失败，请重试' })
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0) // 已回补
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(10) // 已回补
     expect(mockStore.reservations.size).toBe(0)
     expect(mockStore.orders.size).toBe(0)
     expect(mockStore.payments.size).toBe(0)
@@ -356,7 +360,7 @@ describe('createReservation 写单失败回补', () => {
     mockFailOrderAdd = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'INTERNAL', message: '下单失败，请重试' })
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(10)
     expect(mockStore.reservations.size).toBe(0) // 孤儿单已清
     expect(mockStore.orders.size).toBe(0)
     expect(mockStore.payments.size).toBe(0)
@@ -367,7 +371,7 @@ describe('createReservation 写单失败回补', () => {
     mockFailPaymentAdd = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'INTERNAL', message: '下单失败，请重试' })
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+    expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(10)
     expect(mockStore.reservations.size).toBe(0)
     expect(mockStore.orders.size).toBe(0)
     expect(mockStore.payments.size).toBe(0)
