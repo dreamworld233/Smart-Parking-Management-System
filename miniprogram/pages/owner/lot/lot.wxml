@@ -67,13 +67,6 @@
       </view>
 
       <!-- 可预约额度 -->
-      <view class="card">
-        <view class="card__title">可预约额度</view>
-        <view class="row" bindtap="onEditQuota">
-          <text class="row__k">可预约车位数</text>
-          <text class="row__v">{{quotaText}} 个</text>
-        </view>
-      </view>
 
       <!-- 设施 -->
       <view class="card">

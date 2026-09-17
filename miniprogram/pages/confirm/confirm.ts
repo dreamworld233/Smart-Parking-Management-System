@@ -1,4 +1,4 @@
-import { formatAmount, formatTimeRangeLabel, isValidPlate } from '../../domain/format'
+import { bookableSpots, formatAmount, formatTimeRangeLabel, isValidPlate } from '../../domain/format'
 import { quoteTotal } from '../../domain/pricing'
 import type { Quote } from '../../domain/pricing'
 import { buildArrivalOptions, enterDeadline, isWithinWindow } from '../../domain/time'
@@ -14,7 +14,8 @@ interface LotBrief {
   name: string
   address: string
   firstHour: number
-  quota: string
+  /** 可约余位 = freeSpots − reservedCount；null = 余位未上报 */
+  bookable: number | null
 }
 
 /**
@@ -104,10 +105,8 @@ Page({
           name: lot.name,
           address: lot.address,
           firstHour,
-          quota:
-            typeof lot.reservableQuota === 'number' && Number.isFinite(lot.reservableQuota)
-              ? String(Math.max(0, lot.reservableQuota))
-              : '--',
+          // 可约余位 = 物理余位 − 待入场预约数；freeSpots 未上报 → null（页面显示「待上报」）
+          bookable: lot.availability ? bookableSpots(lot.availability.freeSpots, lot.reservedCount) : null,
         },
         options,
         firstHourText: formatAmount(firstHour),
@@ -178,6 +177,14 @@ Page({
     const { lot, plate } = this.data
     const opt = this.data.options[selectedIdx]
     if (!lot || !opt) return
+    // 客户端预判可约余位：未上报 / 已约满直接拦下，不发单（服务端 LOT_FULL 仍兜底并发窗口）
+    if (lot.bookable === null || lot.bookable <= 0) {
+      wx.showToast({
+        title: lot.bookable === null ? '车场余位未上报，暂不可预约' : '可预约车位已满，请换一家或稍后再试',
+        icon: 'none',
+      })
+      return
+    }
     this.setData({ submitting: true })
     const r = await createReservation({
       lotId: lot.id,

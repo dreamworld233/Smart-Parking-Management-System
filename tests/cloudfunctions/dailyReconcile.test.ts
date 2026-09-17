@@ -3,8 +3,7 @@
 // 复用 releaseExpiredReservations.test.ts 的 stub 手法：jest.mock('wx-server-sdk') 返回内存
 // store，where().count() 真按 query 过滤。差异只在：
 // - 主查询是 lots.limit(BATCH).get()（无 where），所以 stub 的 collection 要直接支持 limit()
-// - 子查询是 reservations.where({ lotId, status: _.in([...]) }).count()，所以 command 补一个
-//   in：{ __op: 'in', value: [...] }，matchQuery 对 __op==='in' 走数组 includes
+// - 子查询是 reservations.where({ lotId, status: 'pending_entry' }).count()（等值匹配）
 // - 记录每次 doc().update 的调用次数 mockUpdateCount：验证「只有不一致才写」与二次跑幂等
 // - 单车场失败注入：mockFailCountLotId（该车场的 count 抛错）不中断整批
 
@@ -17,15 +16,8 @@ let mockUpdateCount: number
 jest.mock(
   'wx-server-sdk',
   () => {
-    const isOp = (v: unknown, op: string): v is { __op: string; value: unknown } =>
-      !!v && typeof v === 'object' && (v as { __op?: string }).__op === op
-
     const matchQuery = (query: Record<string, unknown>) => (doc: Record<string, unknown>): boolean =>
-      Object.entries(query).every(([k, v]) => {
-        // _.in([...]) 在 query 里是 { __op: 'in', value: [...] }：doc[k] 落在数组里才算匹配
-        if (isOp(v, 'in')) return (v as { value: unknown[] }).value.includes(doc[k])
-        return doc[k] === v
-      })
+      Object.entries(query).every(([k, v]) => doc[k] === v)
 
     const mkDocApi = (collName: string, id: string) => ({
       get: async () => {
@@ -66,7 +58,6 @@ jest.mock(
       init: jest.fn(),
       getWXContext: () => ({ OPENID: mockOpenid }),
       database: () => ({
-        command: { in: (arr: unknown[]) => ({ __op: 'in', value: arr }) },
         collection: (name: string) => mkCollection(name),
       }),
     }
@@ -126,18 +117,18 @@ describe('dailyReconcile 一致与漂移修正', () => {
     expect(mockStore.lots.get('lot1')!.reservedCount).toBe(2)
   })
 
-  it('漂移：current 2 但生效单 3 张 → 修正成 expected 3', async () => {
+  it('漂移：current 2 但待入场只有 1 张（entered/completed 入场已 -1 不计）→ 修正成 1', async () => {
     seedLot('lot1', { reservedCount: 2 })
     seedReservation('r1') // pending_entry 计
-    seedReservation('r2', { status: 'entered' }) // entered 计（核销不减额度，仍占车位）
-    seedReservation('r3', { status: 'completed' }) // completed 计
+    seedReservation('r2', { status: 'entered' }) // 入场已 -1，不计
+    seedReservation('r3', { status: 'completed' }) // 完成已 -1，不计
 
     const res = await main()
 
     expect(res.code).toBe(0)
     expect(res.data).toEqual({ lots: 1, corrected: 1, checked: 1 })
     expect(mockUpdateCount).toBe(1)
-    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(3)
+    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
   })
 
   it('修正后二次跑幂等：不再写', async () => {

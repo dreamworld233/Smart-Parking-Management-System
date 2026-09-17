@@ -14,7 +14,7 @@ function rec(id: string, score: number, distanceM: number, firstHour: number, fr
     distanceSource: 'estimated',
     pricing: { firstHour, perHourAfter: firstHour, stepMinutes: 15, capPerDay: 40, source: 'ops' },
     availability: { freeSpots, totalSpots: 500, source: 'ops' },
-    reservableQuota: 10,
+    reservedCount: 0,
     ratingSummary: null,
     facilities: [],
   }
@@ -41,7 +41,7 @@ function unsignedRec(id: string, distanceM: number): Recommendation {
     distanceSource: 'estimated',
     pricing: null,
     availability: null,
-    reservableQuota: null,
+    reservedCount: 0,
     ratingSummary: null,
     facilities: [],
   }

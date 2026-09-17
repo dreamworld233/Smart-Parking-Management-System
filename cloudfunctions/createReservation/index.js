@@ -1,10 +1,12 @@
 // 预约下单云函数（设计稿 §5.1）。
-// 核心是**读后等值 CAS** 抢车场可预约额度：reservableQuota 是运营配置的总可预约数，
-// reservedCount 是已预约数，并发下用「where(_id + reservedCount) 等值匹配 + _.inc(1)」
-// 原子抢占 —— 字段间比较（如 reservedCount < reservableQuota）在云数据库里不可靠，已弃用。
+// 核心是**读后等值 CAS** 抢余位：freeSpots 是车场端上报的物理余位，reservedCount 是
+// 待入场预约数，可约 = freeSpots − reservedCount。并发下用
+// 「where(_id + reservedCount) 等值匹配 + _.inc(1)」原子抢占 —— 字段间比较
+// （如 reservedCount < freeSpots）在云数据库里不可靠，已弃用。
+// 2026-09-17 PM 口径：不设固定可预约额度，有余位就能约（walk-in 车也能进空位）。
 //
-// 写单失败一律回补：reservations 主档没写成 → 只回补额度；orders / payments 任一失败 →
-// 删掉已建 reservation + 回补额度。不留孤儿单、不吞额度。
+// 写单失败一律回补：reservations 主档没写成 → 只回补 reservedCount；orders / payments
+// 任一失败 → 删掉已建 reservation + 回补 reservedCount。不留孤儿单、不吞余位。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -56,13 +58,16 @@ exports.main = async (event) => {
   if (!Number.isFinite(pricing.firstHour)) {
     return { code: 'LOT_INVALID', message: '车场计费信息缺失' }
   }
-  if (!Number.isFinite(data.reservableQuota)) {
-    return { code: 'LOT_INVALID', message: '车场可预约额度未配置' }
+  // 可约余位 = 物理余位 − 已待入场数（reservedCount）。quota 用车场上报的 freeSpots，
+  // 不设固定额度（2026-09-17 PM 口径：有余位就能约，不预留）。未上报 → 不可约。
+  const freeSpots = data.availability && data.availability.freeSpots
+  if (!Number.isFinite(freeSpots)) {
+    return { code: 'LOT_INVALID', message: '车场余位未上报，暂不可预约' }
   }
   const firstHourRate = pricing.firstHour
-  const quota = data.reservableQuota
+  const quota = freeSpots
 
-  // 3. 读后等值 CAS 抢额度（并发安全，最多重试 3 次）
+  // 3. 读后等值 CAS 抢余位（并发安全，最多重试 3 次）
   //
   // 老文档可能没有 reservedCount 字段：CAS 的 where 里 `reservedCount: 0` 匹配不上
   // undefined（Mongo 语义里缺失字段 ≠ 0），先建字段再抢。**必须用 _.inc(0)** 而不是

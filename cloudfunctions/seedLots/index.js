@@ -43,7 +43,6 @@ function missingFields(lot) {
   if (!isSource(pricing.source)) out.push('pricing.source')
   if (!isFiniteNum(availability.totalSpots)) out.push('availability.totalSpots')
   if (!isSource(availability.source)) out.push('availability.source')
-  if (!isFiniteNum(lot.reservableQuota)) out.push('reservableQuota')
   if (!Array.isArray(lot.facilities)) out.push('facilities')
   return out
 }
@@ -70,9 +69,8 @@ exports.main = async () => {
       pricing: lot.pricing,
       // 余位恒写 null 入库：只由车场端上报（Plan 3），种子不给初始值
       availability: { freeSpots: null, totalSpots: lot.availability.totalSpots, source: lot.availability.source },
-      reservableQuota: lot.reservableQuota,
-      // 已预约数从 0 起：预约下单云函数用等值 CAS 抢额度（reservedCount 随预约 +1，
-      // 与 reservableQuota 比较判满）
+      // 待入场预约数从 0 起：预约下单云函数用等值 CAS 抢余位（reservedCount 随预约 +1，
+      // 与 availability.freeSpots 比较判满，可约 = freeSpots − reservedCount）
       reservedCount: 0,
       facilities: lot.facilities,
       ratingSummary: null,

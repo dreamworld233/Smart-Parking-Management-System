@@ -24,8 +24,9 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const ROLE_WHITELIST = ['driver', 'lot_admin', 'ops_admin']
 
 const PRICING_KEYS = ['firstHour', 'perHourAfter', 'stepMinutes', 'capPerDay', 'nightRate']
-// patch 白名单：pricing 是子对象，其余是扁平字段
-const FLAT_KEYS = ['reservableQuota', 'facilities', 'name', 'address', 'openHours']
+// patch 白名单：pricing 是子对象，其余是扁平字段。
+// reservableQuota 已于 2026-09-17 退役（可约 = 余位 − 待入场，不设固定额度）—— 不给 patch
+const FLAT_KEYS = ['facilities', 'name', 'address', 'openHours']
 
 function isFiniteNum(v) {
   return typeof v === 'number' && Number.isFinite(v)
@@ -71,9 +72,7 @@ function sanitizePatch(raw) {
 
   for (const k of FLAT_KEYS) {
     if (raw[k] !== undefined) {
-      if (k === 'reservableQuota') {
-        if (!isFiniteNum(raw[k]) || raw[k] < 0) return null
-      } else if (k === 'facilities') {
+      if (k === 'facilities') {
         if (!Array.isArray(raw[k]) || raw[k].some(f => typeof f !== 'string')) return null
       } else if (k === 'name' || k === 'address') {
         if (typeof raw[k] !== 'string' || raw[k] === '') return null

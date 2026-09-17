@@ -9,10 +9,24 @@ let mockStore: Store
 let mockOpenid: string | null
 let mockCasConflictOnce: boolean
 let mockCasConflictUsed: boolean
+/** 模拟入场回补 lots.reservedCount 的 doc().update 抛错（best-effort 应吞掉） */
+let mockLotUpdateError: boolean
 
 jest.mock(
   'wx-server-sdk',
   () => {
+    const applyData = (doc: Record<string, unknown>, data: Record<string, unknown>): void => {
+      for (const [k, v] of Object.entries(data)) {
+        const op = v as { __op?: string; value?: number } | null
+        if (op && typeof op === 'object' && op.__op === 'inc') {
+          const base = typeof doc[k] === 'number' ? (doc[k] as number) : 0
+          doc[k] = base + (op.value ?? 0)
+        } else {
+          doc[k] = v
+        }
+      }
+    }
+
     const mkDocApi = (collName: string, id: string) => ({
       get: async () => {
         const doc = mockStore[collName].get(id)
@@ -20,9 +34,10 @@ jest.mock(
         return { data: { ...doc } }
       },
       update: async ({ data }: { data: Record<string, unknown> }) => {
+        if (collName === 'lots' && mockLotUpdateError) throw new Error('lots.update failed')
         const doc = mockStore[collName].get(id)
         if (!doc) return { stats: { updated: 0 } }
-        Object.assign(doc, data)
+        applyData(doc, data)
         return { stats: { updated: 1 } }
       },
     })
@@ -66,6 +81,7 @@ jest.mock(
       init: jest.fn(),
       getWXContext: () => ({ OPENID: mockOpenid }),
       database: () => ({
+        command: { inc: (n: number) => ({ __op: 'inc', value: n }) },
         collection: (name: string) => mkCollection(name),
       }),
     }
@@ -113,6 +129,7 @@ describe('verifyReservation', () => {
     mockOpenid = 'openid-test-1'
     mockCasConflictOnce = false
     mockCasConflictUsed = false
+    mockLotUpdateError = false
   })
 
   it('无微信身份 → NO_AUTH', async () => {
@@ -216,6 +233,27 @@ describe('verifyReservation', () => {
     expect(log.method).toBe('plate')
     expect(log.confidence).toBe(98)
     expect(log.imageFileID).toBe('cloud://x/plate.png')
+  })
+
+  it('入场核销后 lots.reservedCount -1（待入场预约数减少，车已物理占位）', async () => {
+    seedUser()
+    seedLot({ reservedCount: 1 })
+    seedReservation('r1')
+    const r = await main({ lotId: 'lot1', method: 'code', verifyCode: '123456' })
+    expect(r.code).toBe(0)
+    expect(mockStore.reservations.get('r1')!.status).toBe('entered')
+    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(0)
+  })
+
+  it('入场回补失败（lots.update 抛错）不阻断核销主档，reservedCount 留给对账兜底', async () => {
+    seedUser()
+    seedLot({ reservedCount: 1 })
+    seedReservation('r1')
+    mockLotUpdateError = true
+    const r = await main({ lotId: 'lot1', method: 'code', verifyCode: '123456' })
+    expect(r.code).toBe(0)
+    expect(mockStore.reservations.get('r1')!.status).toBe('entered')
+    expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
   })
 
   it('plate 无匹配（OCR 识别出的车牌没预约）→ NO_MATCH，提示降级', async () => {

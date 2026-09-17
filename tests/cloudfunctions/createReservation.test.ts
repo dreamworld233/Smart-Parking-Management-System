@@ -139,7 +139,8 @@ function seedLot(overrides: Record<string, unknown> = {}): Record<string, unknow
     location: { lat: 1, lng: 2 },
     pricing: { firstHour: 6, perHourAfter: 4, capPerDay: 40, stepMinutes: 60, source: 'public' },
     contract: { status: 'signed', signedAt: Date.now() },
-    reservableQuota: 10,
+    // 可约余位 = freeSpots − reservedCount（2026-09-17 起不设固定 quota）
+    availability: { freeSpots: 10, totalSpots: 50, source: 'reported' },
     reservedCount: 0,
     ...overrides,
   }
@@ -237,9 +238,9 @@ describe('createReservation 正常下单', () => {
   })
 })
 
-describe('createReservation 额度 CAS', () => {
-  it('已满（cur >= quota）→ LOT_FULL，额度与各集合不动', async () => {
-    seedLot({ reservableQuota: 1, reservedCount: 1 })
+describe('createReservation 余位 CAS', () => {
+  it('已满（cur >= freeSpots）→ LOT_FULL，余位与各集合不动', async () => {
+    seedLot({ availability: { freeSpots: 1, totalSpots: 50, source: 'reported' }, reservedCount: 1 })
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'LOT_FULL', message: '可预约车位已满' })
     expect(mockStore.lots.get('lot1')!.reservedCount).toBe(1)
@@ -249,7 +250,7 @@ describe('createReservation 额度 CAS', () => {
   })
 
   it('CAS 冲突重试：第一次失配（updated 0）第二次成功，最终建单', async () => {
-    seedLot({ reservableQuota: 10, reservedCount: 0 })
+    seedLot({})
     mockCasConflictOnce = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res.code).toBe(0)
@@ -258,8 +259,8 @@ describe('createReservation 额度 CAS', () => {
     expect(mockStore.reservations.size).toBe(1)
   })
 
-  it('CAS 重试 3 次耗尽仍失配 → LOT_FULL，不建单、额度不动', async () => {
-    seedLot({ reservableQuota: 10, reservedCount: 0 })
+  it('CAS 重试 3 次耗尽仍失配 → LOT_FULL，不建单、余位不动', async () => {
+    seedLot({})
     mockCasConflictAlways = true
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res).toEqual({ code: 'LOT_FULL', message: '可预约车位已满' })
@@ -268,7 +269,7 @@ describe('createReservation 额度 CAS', () => {
   })
 
   it('老文档补字段用 _.inc(0)：并发写者的值不被冲回 0，不超卖', async () => {
-    const doc = seedLot({ reservableQuota: 10 })
+    const doc = seedLot({})
     delete doc.reservedCount
     // 模拟并发写者抢到 1 后才轮到本请求补字段
     mockInjectReservedCount = 1
@@ -331,9 +332,8 @@ describe('createReservation 车场校验', () => {
     expect(res.code).toBe('LOT_INVALID')
   })
 
-  it('reservableQuota 缺失 → LOT_INVALID', async () => {
-    const doc = seedLot()
-    delete doc.reservableQuota
+  it('余位未上报（availability.freeSpots 缺失）→ LOT_INVALID', async () => {
+    seedLot({ availability: { totalSpots: 50, source: 'reported' } })
     const res = await main({ lotId: 'lot1', arriveAt: validArrive(), plateNo: '京A12345' })
     expect(res.code).toBe('LOT_INVALID')
   })

@@ -62,10 +62,13 @@ export interface LotRatingSummary {
  * 一个展示车场。分两类，用 `signed` 判别（不是子类：WXML 分支靠运行时字段，
  * 判别联合会让所有消费方都套一层收窄，收益不抵复杂度）：
  * - **签约**（`signed: true`）：数据来自云 `lots` 集合，可预约。`pricing` /
- *   `availability` / `reservableQuota` 都有值
+ *   `availability` 有值，`reservedCount` 是待入场预约数
  * - **未签约**（`signed: false`）：来自腾讯 POI 检索，只提供名称/位置/距离与导航，
- *   不可预约。`pricing` / `availability` / `reservableQuota` 为 `null` —— 没有数据
+ *   不可预约。`pricing` / `availability` 为 `null`，`reservedCount` 0 —— 没有数据
  *   就如实说没有，不编
+ *
+ * 可约余位 = `availability.freeSpots − reservedCount`（2026-09-17 PM 口径：
+ * 不设固定可预约额度，有余位就能约）
  */
 export interface ParkingLot {
   id: string
@@ -82,8 +85,8 @@ export interface ParkingLot {
   distanceSource: DistanceSource
   pricing: LotPricing | null
   availability: LotAvailability | null
-  /** 车场开放的可预约车位数（运营配置；实时剩余随预约扣减，云函数维护）。未签约无此数据 */
-  reservableQuota: number | null
+  /** 待入场预约数（云函数维护：下单 +1，入场/取消/超时 -1）。未签约恒 0 */
+  reservedCount: number
   /** 平台评价聚合。null = 暂无评价，界面显示「暂无评分」 */
   ratingSummary: LotRatingSummary | null
   /** 设施标签，签约时由运营录入（来源 ops），如 `['充电桩']` */

@@ -59,14 +59,13 @@
         </view>
       </view>
 
-      <!-- 可预约额度条 -->
+      <!-- 可预约卡：可约余位 = 实时余位 − 待入场预约数（2026-09-17 起不设固定额度） -->
       <view class="card">
         <view class="card__row">
           <view>
-            <view class="card__title">可预约额度</view>
-            <view class="card__sub">已预约 {{quota.reserved}} · 可预约 {{quota.total}} · 剩余 {{quota.left}}</view>
+            <view class="card__title">可预约</view>
+            <view class="card__sub">已预约 {{quota.reserved}} · 可再预约 {{quota.bookableText}}</view>
           </view>
-          <view class="btn" bindtap="onOpenQuota">调整</view>
         </view>
         <view class="bar">
           <view class="bar__fill" style="width: {{quota.percent}}%" />
@@ -95,24 +94,6 @@
         <view wx:else class="card__empty">暂无待核销预约</view>
       </view>
     </scroll-view>
-
-    <!-- 额度调整弹窗 -->
-    <view class="mask" wx:if="{{quotaDialog}}" bindtap="onCloseQuota">
-      <view class="dialog" catchtap="noop">
-        <view class="dialog__title">调整可预约额度</view>
-        <input
-          class="dialog__input {{inputInvalid ? 'dialog__input--invalid' : ''}}"
-          type="number"
-          value="{{quotaInput}}"
-          bindinput="onQuotaInput"
-        />
-        <view class="dialog__hint" wx:if="{{inputInvalid}}">请输入非负整数</view>
-        <view class="dialog__btns">
-          <view class="dialog__btn" bindtap="onCloseQuota">取消</view>
-          <view class="dialog__btn primary" bindtap="onConfirmQuota">{{submitting ? '保存中…' : '保存'}}</view>
-        </view>
-      </view>
-    </view>
 
     <!-- 余位上报弹窗 -->
     <view class="mask" wx:if="{{reportDialog}}" bindtap="onCloseReport">

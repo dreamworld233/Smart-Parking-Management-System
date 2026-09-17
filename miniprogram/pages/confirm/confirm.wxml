@@ -20,7 +20,7 @@
     <view class="card">
       <view class="card__name">{{lot.name}}</view>
       <view class="card__addr">{{lot.address}}</view>
-      <view class="card__quota">可预约额度 {{lot.quota}} 个 · 首小时 ¥{{firstHourText}}</view>
+      <view class="card__quota">可预约 {{lot.bookable === null ? '待上报' : lot.bookable}} 个 · 首小时 ¥{{firstHourText}}</view>
     </view>
 
     <!-- 到达时刻 chips -->

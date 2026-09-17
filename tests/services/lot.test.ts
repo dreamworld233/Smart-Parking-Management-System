@@ -94,7 +94,7 @@ function doc(overrides: Record<string, unknown>): Record<string, unknown> {
     location: { lat: 31.7527, lng: 117.2541 },
     pricing: { firstHour: 5, perHourAfter: 4, stepMinutes: 60, capPerDay: 40, source: 'public' },
     availability: { freeSpots: null, totalSpots: 300, source: 'ops' },
-    reservableQuota: 20,
+    reservedCount: 0,
     ratingSummary: null,
     facilities: ['充电桩'],
     contract: { status: 'signed' },
@@ -186,6 +186,21 @@ describe('fetchSignedLots', () => {
     expect(lots[0].availability?.source).toBe('reported')
     expect(lots[0].availability?.freeSpots).toBe(42)
     expect(lots[0].signed).toBe(true)
+  })
+
+  it('reservedCount 原样透传（可约余位 = freeSpots − reservedCount 的原料）', async () => {
+    docs = [doc({ reservedCount: 7 })]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots[0].reservedCount).toBe(7)
+  })
+
+  it('老文档缺 reservedCount：按 0 透传，不误判坏文档', async () => {
+    const d = doc({})
+    delete d.reservedCount
+    docs = [d]
+    const lots = await fetchSignedLots(CENTER)
+    expect(lots).toHaveLength(1)
+    expect(lots[0].reservedCount).toBe(0)
   })
 
   it('形状坏的文档整条丢弃，不炸整批', async () => {
@@ -295,7 +310,7 @@ describe('fetchLotsAround', () => {
     expect(lots[1].signed).toBe(false)
     expect(lots[1].pricing).toBeNull()
     expect(lots[1].availability).toBeNull()
-    expect(lots[1].reservableQuota).toBeNull()
+    expect(lots[1].reservedCount).toBe(0)
     expect(lots[1].distanceM).toBeGreaterThan(0)
   })
 

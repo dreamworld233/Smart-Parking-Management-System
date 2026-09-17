@@ -18,11 +18,10 @@ interface LotVM {
   lotName: string
   lotAddress: string
   pricing: PricingVM
-  quotaText: string
   facilitiesText: string
 }
 
-type Field = 'firstHour' | 'perHourAfter' | 'stepMinutes' | 'capPerDay' | 'nightRate' | 'name' | 'address' | 'reservableQuota'
+type Field = 'firstHour' | 'perHourAfter' | 'stepMinutes' | 'capPerDay' | 'nightRate' | 'name' | 'address'
 
 interface EditVM {
   field: Field
@@ -52,7 +51,6 @@ Page({
     lotName: '',
     lotAddress: '',
     pricing: null as PricingVM | null,
-    quotaText: '',
     facilitiesText: '',
     // 编辑弹窗
     editDialog: false,
@@ -142,7 +140,6 @@ Page({
       lotName: c.vm.lotName,
       lotAddress: c.vm.lotAddress,
       pricing: c.vm.pricing,
-      quotaText: c.vm.quotaText,
       facilitiesText: c.vm.facilitiesText,
     })
   },
@@ -191,10 +188,6 @@ Page({
     this.openEdit('nightRate', '夜间费率（元/次，留空为无）', this.data.pricing?.nightRate || '', true)
   },
 
-  onEditQuota() {
-    this.openEdit('reservableQuota', '可预约额度（个）', this.data.quotaText, true)
-  },
-
   openEdit(field: Field, label: string, value: string, numeric: boolean) {
     this.setData({
       editDialog: true,
@@ -229,8 +222,8 @@ Page({
 
     this.setData({ submitting: true })
     const patch: Record<string, unknown> = {}
-    if (field === 'name' || field === 'address' || field === 'reservableQuota') {
-      patch[field] = field === 'reservableQuota' ? Number(val) : val
+    if (field === 'name' || field === 'address') {
+      patch[field] = val
     } else {
       // pricing 子对象
       patch.pricing = { [field]: field === 'nightRate' && val === '' ? null : Number(val) }
@@ -267,7 +260,6 @@ function toVM(lot: AdminLot): LotVM {
       nightRate: p.nightRate === null || p.nightRate === undefined ? '无' : fmtNum(p.nightRate),
       sourceLabel,
     },
-    quotaText: typeof lot.reservableQuota === 'number' ? String(lot.reservableQuota) : '--',
     facilitiesText: lot.facilities && lot.facilities.length ? lot.facilities.join('、') : '暂无设施',
   }
 }

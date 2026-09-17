@@ -128,21 +128,18 @@ describe('adminUpdateLot', () => {
     expect(r.code).toBe('BAD_REQUEST')
   })
 
-  it('类型不合法（reservableQuota 为负 / firstHour 非数字）→ BAD_REQUEST', async () => {
+  it('类型不合法（firstHour 非数字）→ BAD_REQUEST', async () => {
     seedUser()
     seedLot()
-    expect((await main({ lotId: 'lot1', patch: { reservableQuota: -1 } })).code).toBe('BAD_REQUEST')
     expect((await main({ lotId: 'lot1', patch: { pricing: { firstHour: 'x' } } })).code).toBe('BAD_REQUEST')
   })
 
-  it('改额度：更新 reservableQuota，不留价格痕', async () => {
+  it('reservableQuota 已退役（2026-09-17）：不在 patch 白名单，整单拒绝、值不动', async () => {
     seedUser()
     seedLot()
     const r = await main({ lotId: 'lot1', patch: { reservableQuota: 20 } })
-    expect(r.code).toBe(0)
-    expect(r.data.priceChanged).toBe(false)
-    expect(mockStore.lots.get('lot1')!.reservableQuota).toBe(20)
-    expect(mockStore.lot_price_changes.size).toBe(0)
+    expect(r.code).toBe('BAD_REQUEST')
+    expect(mockStore.lots.get('lot1')!.reservableQuota).toBe(10)
   })
 
   it('改价：更新 pricing + 保留 source + 落 lot_price_changes（只记变更字段）', async () => {

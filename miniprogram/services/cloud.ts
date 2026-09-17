@@ -145,7 +145,7 @@ export interface AdminLot {
     source?: string
   } | null
   availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
-  reservableQuota: number | null
+  /** 待入场预约数（可约余位 = freeSpots − reservedCount） */
   reservedCount: number
   facilities: string[]
 }
@@ -170,7 +170,6 @@ export interface AdminDashboardData {
     name: string
     address: string
     availability: { freeSpots?: number | null; totalSpots?: number; reportedAt?: number; source?: string } | null
-    reservableQuota: number | null
     reservedCount: number
   } | null
   todayReservations: number
@@ -215,7 +214,7 @@ export interface UpdateLotData {
  */
 export function updateLot(
   lotId: string,
-  patch: { pricing?: Record<string, unknown>; reservableQuota?: number; facilities?: string[]; name?: string; address?: string; openHours?: string | null },
+  patch: { pricing?: Record<string, unknown>; facilities?: string[]; name?: string; address?: string; openHours?: string | null },
 ): Promise<CloudResult<UpdateLotData>> {
   return callFunction<UpdateLotData>('adminUpdateLot', { lotId, patch })
 }
