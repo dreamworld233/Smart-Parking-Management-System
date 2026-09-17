@@ -2,9 +2,11 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminListLots, adminUpsertLot, adminDeleteLot, adminPriceChange } from '../api'
-import { SOURCE_LABELS, SOURCE_TAGS, formatSpots } from '../utils/format'
 import type { Lot, LotSource } from '../types'
 import PageHeader from '../components/PageHeader.vue'
+import OccupancyBar from '../components/OccupancyBar.vue'
+import SourceBadge from '../components/SourceBadge.vue'
+import EmptyArt from '../components/EmptyArt.vue'
 
 const keyword = ref('')
 const page = ref(1)
@@ -39,15 +41,6 @@ const sourceOptions = [
   { value: 'ops', label: 'ops · 运营声明' },
   { value: 'placeholder', label: 'placeholder · 示例数据待核实' },
 ] as { value: LotSource; label: string }[]
-
-// 模板里 el-table 的 row 是 any，直接下标索引类型化 Record 会被 TS 拦；
-// 用函数收窄，调用处传 row.pricing?.source 即可
-function sourceLabel(s: LotSource | undefined): string {
-  return s ? SOURCE_LABELS[s] : '--'
-}
-function sourceTag(s: LotSource | undefined): 'success' | 'primary' | 'warning' {
-  return s ? SOURCE_TAGS[s] : 'warning'
-}
 
 // —— 新增 / 编辑 ——
 // 收费规则只在「新增」时录入（首版价格，来源字段即出处）；改价必须走「改价」按钮 → adminPriceChange 留痕。
@@ -259,73 +252,136 @@ async function submitPrice() {
       </template>
     </PageHeader>
 
-    <el-card>
+    <el-card shadow="never">
       <div class="toolbar">
-        <el-input v-model="keyword" placeholder="按名称 / 地址搜索" clearable style="width: 260px" @keyup.enter="search">
+        <el-input v-model="keyword" placeholder="按名称 / 地址搜索" clearable style="width: 280px" @keyup.enter="search">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-button @click="search">查询</el-button>
+        <el-button type="primary" plain @click="search">
+          <el-icon><Search /></el-icon><span style="margin-left: 4px">查询</span>
+        </el-button>
+        <span class="toolbar__count">共 <b class="num">{{ total }}</b> 家签约车场</span>
       </div>
 
-    <el-table v-loading="loading" :data="list" empty-text="还没有签约车场，点击右上角「新增车场」录入">
-      <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="address" label="地址" min-width="200" show-overflow-tooltip />
-      <el-table-column label="坐标" width="160">
-        <template #default="{ row }">{{ row.location?.lat?.toFixed(5) }}, {{ row.location?.lng?.toFixed(5) }}</template>
-      </el-table-column>
-      <el-table-column label="收费" width="130">
-        <template #default="{ row }">首{{ row.pricing?.firstHour }} / 续{{ row.pricing?.perHourAfter }} / 封顶{{ row.pricing?.capPerDay }}</template>
-      </el-table-column>
-      <el-table-column label="收费来源" width="130">
-        <template #default="{ row }">
-          <el-tag :type="sourceTag(row.pricing?.source)" size="small">{{ sourceLabel(row.pricing?.source) }}</el-tag>
+      <el-table v-loading="loading" :data="list" class="lot-table">
+        <template #empty>
+          <EmptyArt
+            title="还没有签约车场"
+            description="点击右上角「新增车场」录入第一家签约车场；示例数据请如实标注来源。"
+          >
+            <el-button type="primary" @click="openCreate">
+              <el-icon><Plus /></el-icon><span style="margin-left: 4px">新增车场</span>
+            </el-button>
+          </EmptyArt>
         </template>
-      </el-table-column>
-      <el-table-column label="总车位" width="90">
-        <template #default="{ row }">{{ row.availability?.totalSpots ?? '--' }}</template>
-      </el-table-column>
-      <el-table-column label="余位" width="90">
-        <template #default="{ row }">{{ formatSpots(row.availability?.freeSpots ?? null, row.availability?.totalSpots ?? null) }}</template>
-      </el-table-column>
-      <el-table-column label="额度" width="80">
-        <template #default="{ row }">{{ row.reservedCount ?? 0 }}/{{ row.reservableQuota }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="80">
-        <template #default="{ row }">
-          <el-tag :type="row.contract?.status === 'disabled' ? 'info' : 'success'" size="small">
-            {{ row.contract?.status === 'disabled' ? '停用' : '签约' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="230" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="warning" @click="openPrice(row)">改价</el-button>
-          <el-button link :type="row.contract?.status === 'disabled' ? 'success' : 'danger'" @click="toggle(row)">
-            {{ row.contract?.status === 'disabled' ? '启用' : '停用' }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
 
-    <el-pagination
-      v-model:current-page="page"
-      :page-size="pageSize"
-      :total="total"
-      layout="total, prev, pager, next"
-      style="margin-top: 16px; justify-content: flex-end"
-      @current-change="load"
-    />
+        <el-table-column label="车场" min-width="172">
+          <template #default="{ row }">
+            <div class="lot-cell">
+              <span class="lot-avatar" :class="{ 'is-disabled': row.contract?.status === 'disabled' }">
+                <el-icon><OfficeBuilding /></el-icon>
+              </span>
+              <div class="lot-cell__main">
+                <span class="lot-name">{{ row.name }}</span>
+                <div v-if="row.facilities && row.facilities.length" class="facilities">
+                  <span v-for="f in row.facilities" :key="f" class="fac-chip">
+                    <el-icon><Check /></el-icon>{{ f }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="位置" min-width="172">
+          <template #default="{ row }">
+            <div class="loc">
+              <span class="loc__addr"><el-icon><LocationInformation /></el-icon>{{ row.address }}</span>
+              <span class="num loc__coord">{{ row.location?.lat?.toFixed(5) }}, {{ row.location?.lng?.toFixed(5) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="收费（元）" width="138">
+          <template #default="{ row }">
+            <div class="fee">
+              <div class="fee__line">
+                <span>首小时</span><b class="num">¥{{ row.pricing?.firstHour }}</b>
+              </div>
+              <div class="fee__line fee__line--sub">
+                <span>续时/时</span><b class="num">¥{{ row.pricing?.perHourAfter }}</b>
+              </div>
+              <div class="fee__line fee__line--sub">
+                <span>封顶/日</span><b class="num">¥{{ row.pricing?.capPerDay }}</b>
+                <el-icon v-if="row.pricing?.nightRate" class="fee__moon" title="设有夜间费率"><Moon /></el-icon>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="余位" width="144">
+          <template #default="{ row }">
+            <OccupancyBar :free="row.availability?.freeSpots ?? null" :total="row.availability?.totalSpots ?? null" />
+          </template>
+        </el-table-column>
+
+        <el-table-column label="收费来源" width="132">
+          <template #default="{ row }">
+            <SourceBadge :source="row.pricing?.source" />
+          </template>
+        </el-table-column>
+
+        <el-table-column label="预约额度" width="82" align="center">
+          <template #default="{ row }">
+            <span class="num quota"><b>{{ row.reservedCount ?? 0 }}</b>/{{ row.reservableQuota }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="状态" width="92">
+          <template #default="{ row }">
+            <span v-if="row.contract?.status === 'disabled'" class="sp-tag sp-tag--info">
+              <span class="sp-tag__dot" />已停用
+            </span>
+            <span v-else class="sp-tag sp-tag--success">
+              <span class="sp-tag__dot" />签约中
+            </span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="164">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openEdit(row)">
+              <el-icon><EditPen /></el-icon>编辑
+            </el-button>
+            <el-button link type="warning" @click="openPrice(row)">
+              <el-icon><PriceTag /></el-icon>改价
+            </el-button>
+            <el-button link :type="row.contract?.status === 'disabled' ? 'success' : 'danger'" @click="toggle(row)">
+              <el-icon><component :is="row.contract?.status === 'disabled' ? 'Open' : 'TurnOff'" /></el-icon>
+              {{ row.contract?.status === 'disabled' ? '启用' : '停用' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next"
+        class="pager"
+        @current-change="load"
+      />
     </el-card>
 
     <!-- 新增 / 编辑 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑车场' : '新增车场'" width="640px">
       <el-form label-width="110px">
         <el-form-item label="名称" required>
-          <el-input v-model="form.name" />
+          <el-input v-model="form.name" placeholder="如：万象城地下停车场" />
         </el-form-item>
         <el-form-item label="地址" required>
-          <el-input v-model="form.address" />
+          <el-input v-model="form.address" placeholder="详细地址" />
         </el-form-item>
         <el-form-item label="坐标" required>
           <div class="coords">
@@ -354,10 +410,10 @@ async function submitPrice() {
         </el-form-item>
         <el-form-item label="夜间费率">
           <el-input-number v-model="form.nightRate" :min="0" :precision="1" :disabled="isEdit" style="width: 180px" />
-          <span class="hint">可空（无夜间费则留空）</span>
+          <span class="hint" style="margin-left: 8px">可空（无夜间费则留空）</span>
         </el-form-item>
         <el-form-item label="收费来源" required>
-          <el-select v-model="form.pricingSource" :disabled="isEdit" style="width: 260px">
+          <el-select v-model="form.pricingSource" :disabled="isEdit" style="width: 280px">
             <el-option v-for="o in sourceOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
         </el-form-item>
@@ -367,7 +423,7 @@ async function submitPrice() {
           <el-input-number v-model="form.totalSpots" :min="0" style="width: 180px" />
         </el-form-item>
         <el-form-item label="车位来源" required>
-          <el-select v-model="form.spotsSource" style="width: 260px">
+          <el-select v-model="form.spotsSource" style="width: 280px">
             <el-option v-for="o in sourceOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
         </el-form-item>
@@ -416,7 +472,7 @@ async function submitPrice() {
           <el-input-number v-model="priceForm.nightRate" :min="0" :precision="1" style="width: 180px" />
         </el-form-item>
         <el-form-item label="收费来源" required>
-          <el-select v-model="priceForm.source" style="width: 260px">
+          <el-select v-model="priceForm.source" style="width: 280px">
             <el-option v-for="o in sourceOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
         </el-form-item>
@@ -436,16 +492,144 @@ async function submitPrice() {
 .toolbar {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  align-items: center;
 }
+.toolbar__count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--sp-text-3);
+}
+.toolbar__count b {
+  color: var(--sp-text);
+  font-weight: 700;
+}
+.pager {
+  margin-top: 14px;
+}
+
+/* 车场单元格 */
+.lot-cell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.lot-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+.lot-avatar.is-disabled {
+  background: var(--el-color-info-light-9);
+  color: var(--sp-text-3);
+}
+.lot-name {
+  font-weight: 600;
+  color: var(--sp-text);
+  font-size: 13.5px;
+}
+.facilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.fac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #0b7268;
+  background: var(--sp-teal-soft);
+  border-radius: 5px;
+  padding: 1px 6px;
+  line-height: 1.5;
+}
+.fac-chip .el-icon {
+  font-size: 10px;
+}
+
+/* 位置 */
+.loc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.loc__addr {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  color: var(--sp-text);
+  font-size: 13px;
+}
+.loc__addr .el-icon {
+  margin-top: 3px;
+  color: var(--sp-text-3);
+  flex-shrink: 0;
+}
+.loc__coord {
+  color: var(--sp-text-3);
+  font-size: 11.5px;
+  padding-left: 18px;
+}
+
+/* 收费 */
+.fee {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fee__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--sp-text-2);
+}
+.fee__line b {
+  color: var(--sp-text);
+  font-weight: 700;
+}
+.fee__line--sub {
+  color: var(--sp-text-3);
+  font-size: 12px;
+}
+.fee__line--sub b {
+  color: var(--sp-text-2);
+  font-weight: 600;
+}
+.fee__moon {
+  font-size: 12px;
+  color: #64748b;
+  margin-left: 2px;
+}
+
+.quota {
+  white-space: nowrap;
+}
+.quota b {
+  color: var(--sp-text);
+  font-weight: 700;
+}
+
 .coords {
   display: flex;
   gap: 8px;
   width: 100%;
 }
-.hint {
-  color: #909399;
-  font-size: 12px;
-  margin-left: 8px;
+
+@media (max-width: 640px) {
+  .toolbar__count {
+    display: none;
+  }
 }
 </style>

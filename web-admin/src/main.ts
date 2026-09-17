@@ -15,3 +15,12 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 app.use(router)
 app.mount('#app')
+
+// 动效安全闸：双 rAF 确认渲染时钟在跑之后才允许入场动画；
+// 若时钟被冻结（后台标签 / 某些无头渲染），类名不加，CSS 会让所有内容保持可见终态。
+const rootEl = document.documentElement
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  rootEl.classList.add('motion-ready')
+} else {
+  requestAnimationFrame(() => requestAnimationFrame(() => rootEl.classList.add('motion-ready')))
+}

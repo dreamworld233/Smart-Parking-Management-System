@@ -6,6 +6,8 @@ import { adminVerifyPlate } from '../api'
 import { uploadImage } from '../api/cloudbase'
 import { formatPlate } from '../utils/format'
 import PageHeader from '../components/PageHeader.vue'
+import PlateChip from '../components/PlateChip.vue'
+import ocrImg from '../assets/img/ocr-scan.png'
 
 interface VerifyResult {
   matched?: boolean
@@ -20,10 +22,13 @@ interface VerifyResult {
 // —— OCR 模式 ——
 const ocrLoading = ref(false)
 const ocrFile = ref<File | null>(null)
+const previewUrl = ref('')
 const ocrResult = ref<VerifyResult | null>(null)
 
 function onFileChange(uploadFile: UploadFile) {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   ocrFile.value = (uploadFile.raw as File) || null
+  previewUrl.value = ocrFile.value ? URL.createObjectURL(ocrFile.value) : ''
   ocrResult.value = null
 }
 
@@ -103,53 +108,122 @@ async function verifyManual() {
       title="OCR 是核销的增强，不是单点依赖：识别失败 / 无预约 / 未配置密钥时，转到右侧手动核销（输码 / 预约单）即可。"
       type="info"
       :closable="false"
-      style="margin-bottom: 16px"
+      class="page-alert"
     />
 
     <el-row :gutter="16" class="verify-row">
-      <el-col :xs="24" :lg="12">
-        <el-card>
-          <template #header>车牌识别（OCR）</template>
-          <el-upload drag :auto-upload="false" :show-file-list="false" :on-change="onFileChange" accept="image/*">
-            <el-icon class="upload-icon"><UploadFilled /></el-icon>
-            <div class="el-upload__text">拖入停车照片，或 <em>点击选择</em></div>
-            <template #tip>
-              <div class="el-upload__tip">支持 JPG / PNG，车牌清晰为佳</div>
-            </template>
-          </el-upload>
-          <div v-if="ocrFile" class="filename">已选：{{ ocrFile.name }}</div>
-          <el-button type="primary" :loading="ocrLoading" style="margin-top: 12px" @click="runOcr">识别并核销</el-button>
+      <!-- OCR -->
+      <el-col :xs="24" :lg="13">
+        <el-card shadow="never" class="verify-card">
+          <template #header>
+            <div class="card-head">
+              <span class="card-head__icon card-head__icon--blue"><el-icon><Camera /></el-icon></span>
+              <div>
+                <div class="card-head__title">车牌识别（OCR）</div>
+                <div class="card-head__sub">腾讯云 LicensePlateOCR · 命中后自动核销并留痕</div>
+              </div>
+            </div>
+          </template>
 
-          <el-result v-if="ocrResult && ocrResult.matched" icon="success" title="识别成功，已核销" style="margin-top: 12px">
-            <template #sub-title>
-              <p>车牌：{{ formatPlate(ocrResult.plate || '') }}（置信度 {{ ocrResult.confidence ?? '--' }}）</p>
-              <p>匹配预约：{{ ocrResult.orderNo }} · {{ ocrResult.lotName }}</p>
-            </template>
-          </el-result>
+          <div class="ocr-body">
+            <el-upload drag :auto-upload="false" :show-file-list="false" :on-change="onFileChange" accept="image/*" class="ocr-upload">
+              <img v-if="previewUrl" :src="previewUrl" alt="停车照片预览" class="ocr-preview" />
+              <template v-else>
+                <el-icon class="upload-icon"><UploadFilled /></el-icon>
+                <div class="el-upload__text">拖入停车照片，或 <em>点击选择</em></div>
+                <div class="el-upload__tip">支持 JPG / PNG，车牌清晰为佳</div>
+              </template>
+            </el-upload>
 
-          <el-alert
-            v-else-if="ocrResult && !ocrResult.matched"
-            :title="`识别到车牌 ${formatPlate(ocrResult.plate || '')}，但无待入场预约，可转手动核销`"
-            type="warning"
-            :closable="false"
-            style="margin-top: 12px"
-          />
+            <div class="ocr-side">
+              <img :src="ocrImg" alt="车牌识别示意" class="ocr-illu" />
+              <ol class="ocr-steps">
+                <li><b>1</b><span>上传入场停车照片</span></li>
+                <li><b>2</b><span>OCR 自动识别车牌</span></li>
+                <li><b>3</b><span>命中预约即核销入场</span></li>
+              </ol>
+            </div>
+          </div>
+
+          <div v-if="ocrFile" class="filename">
+            <el-icon><Document /></el-icon>
+            <span class="filename__txt">已选：{{ ocrFile.name }}</span>
+          </div>
+          <el-button type="primary" :loading="ocrLoading" class="ocr-submit" @click="runOcr">
+            <el-icon><MagicStick /></el-icon><span style="margin-left: 4px">识别并核销</span>
+          </el-button>
+
+          <div v-if="ocrResult && ocrResult.matched" class="result result--ok">
+            <span class="result__icon result__icon--ok"><el-icon><CircleCheckFilled /></el-icon></span>
+            <div class="result__main">
+              <div class="result__title">识别成功，已核销入场</div>
+              <div class="result__rows">
+                <PlateChip :plate="ocrResult.plate || ''" />
+                <span v-if="ocrResult.confidence !== null && ocrResult.confidence !== undefined" class="conf">
+                  <span class="conf__label">置信度</span>
+                  <span class="conf__track"><span class="conf__fill" :style="{ width: (ocrResult.confidence || 0) + '%' }" /></span>
+                  <span class="num conf__val">{{ ocrResult.confidence }}%</span>
+                </span>
+              </div>
+              <div class="result__sub">
+                匹配预约：<b class="num">{{ ocrResult.orderNo }}</b> · {{ ocrResult.lotName }}
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="ocrResult && !ocrResult.matched" class="result result--warn">
+            <span class="result__icon result__icon--warn"><el-icon><WarningFilled /></el-icon></span>
+            <div class="result__main">
+              <div class="result__title">未匹配到待入场预约</div>
+              <div class="result__sub">
+                识别到车牌 <b>{{ formatPlate(ocrResult.plate || '') }}</b>，请改用右侧手动核销（输码 / 预约单）。
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :lg="12">
-        <el-card>
-          <template #header>手动核销</template>
-          <el-form label-width="100px">
-            <el-form-item label="核销码">
-              <el-input v-model="code" maxlength="6" placeholder="6 位核销码" style="width: 200px" />
-              <el-button type="primary" :loading="codeLoading" style="margin-left: 8px" @click="verifyByCode">核销</el-button>
-            </el-form-item>
-            <el-form-item label="预约单 id">
-              <el-input v-model="reservationId" placeholder="reservationId" style="width: 260px" />
-              <el-button type="primary" :loading="manualLoading" style="margin-left: 8px" @click="verifyManual">核销</el-button>
-            </el-form-item>
-          </el-form>
+      <!-- 手动核销 -->
+      <el-col :xs="24" :lg="11">
+        <el-card shadow="never" class="verify-card">
+          <template #header>
+            <div class="card-head">
+              <span class="card-head__icon card-head__icon--cyan"><el-icon><EditPen /></el-icon></span>
+              <div>
+                <div class="card-head__title">手动核销</div>
+                <div class="card-head__sub">OCR 不可用时的兜底通道，同样写入 entry_logs</div>
+              </div>
+            </div>
+          </template>
+
+          <div class="manual">
+            <div class="manual__item">
+              <div class="manual__label">
+                <el-icon><Postcard /></el-icon> 6 位核销码
+              </div>
+              <div class="manual__row">
+                <el-input v-model="code" maxlength="6" placeholder="如 102438" class="manual__input code-input" />
+                <el-button type="primary" :loading="codeLoading" @click="verifyByCode">核销</el-button>
+              </div>
+            </div>
+
+            <div class="manual__divider"><span>或</span></div>
+
+            <div class="manual__item">
+              <div class="manual__label">
+                <el-icon><Tickets /></el-icon> 预约单 ID
+              </div>
+              <div class="manual__row">
+                <el-input v-model="reservationId" placeholder="reservationId" class="manual__input" />
+                <el-button type="primary" :loading="manualLoading" @click="verifyManual">核销</el-button>
+              </div>
+            </div>
+          </div>
+
+          <div class="manual-note">
+            <el-icon><InfoFilled /></el-icon>
+            <span>一次入场可能先识别失败再输码成功，所有尝试都会按顺序留痕，可追溯完整尝试链。</span>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -157,17 +231,267 @@ async function verifyManual() {
 </template>
 
 <style scoped>
+.page-alert {
+  margin-bottom: 16px;
+}
 .verify-row {
   row-gap: 16px;
 }
-.upload-icon {
-  font-size: 40px;
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.card-head__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+.card-head__icon--blue {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+.card-head__icon--cyan {
+  background: #e5f8fc;
+  color: #0891b2;
+}
+.card-head__title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--sp-text);
+}
+.card-head__sub {
+  font-size: 12px;
   color: var(--sp-text-3);
-  margin-bottom: 8px;
+  margin-top: 2px;
+}
+
+/* OCR */
+.ocr-body {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+.ocr-upload :deep(.el-upload-dragger) {
+  height: 100%;
+  min-height: 218px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.upload-icon {
+  font-size: 42px;
+  color: var(--el-color-primary);
+  margin-bottom: 10px;
+}
+.ocr-preview {
+  max-width: 100%;
+  max-height: 210px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.ocr-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--sp-surface-2);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  padding: 14px;
+}
+.ocr-illu {
+  width: 100%;
+  max-width: 168px;
+  object-fit: contain;
+}
+.ocr-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ocr-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--sp-text-2);
+}
+.ocr-steps b {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .filename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--sp-text-2);
-  font-size: 12px;
+  font-size: 12.5px;
   margin-top: 12px;
+}
+.filename__txt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocr-submit {
+  margin-top: 12px;
+}
+
+/* 结果 */
+.result {
+  display: flex;
+  gap: 13px;
+  margin-top: 16px;
+  padding: 15px 16px;
+  border-radius: var(--sp-radius);
+  border: 1px solid;
+  animation: sp-fade-up 0.35s ease both;
+}
+.result--ok {
+  background: var(--el-color-success-light-9);
+  border-color: var(--el-color-success-light-7);
+}
+.result--warn {
+  background: var(--el-color-warning-light-9);
+  border-color: var(--el-color-warning-light-7);
+}
+.result__icon {
+  font-size: 26px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.result__icon--ok { color: #059669; }
+.result__icon--warn { color: #d98600; }
+.result__title {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--sp-text);
+}
+.result__rows {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 10px 0 6px;
+  flex-wrap: wrap;
+}
+.conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--sp-text-2);
+}
+.conf__track {
+  width: 90px;
+  height: 6px;
+  border-radius: 999px;
+  background: #d7e4dd;
+  overflow: hidden;
+  display: inline-block;
+}
+.conf__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+.conf__val {
+  font-weight: 700;
+  color: #059669;
+}
+.result__sub {
+  font-size: 12.5px;
+  color: var(--sp-text-2);
+  line-height: 1.6;
+}
+
+/* 手动核销 */
+.manual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.manual__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text);
+  margin-bottom: 8px;
+}
+.manual__label .el-icon {
+  color: #0891b2;
+}
+.manual__row {
+  display: flex;
+  gap: 10px;
+}
+.manual__input {
+  flex: 1;
+}
+.code-input :deep(input) {
+  font-family: var(--sp-font-num);
+  letter-spacing: 4px;
+  font-weight: 700;
+}
+.manual__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--sp-text-3);
+  font-size: 12px;
+  margin: 8px 0;
+}
+.manual__divider::before,
+.manual__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sp-border);
+}
+.manual-note {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 11px 13px;
+  border-radius: var(--sp-radius);
+  background: var(--sp-surface-2);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--sp-text-2);
+}
+.manual-note .el-icon {
+  color: #0891b2;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .ocr-body {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

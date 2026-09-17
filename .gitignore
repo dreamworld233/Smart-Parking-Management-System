@@ -45,3 +45,8 @@ miniprogram/config.local.ts
 
 # 个人工单素材（提交历史的逐条总结草稿，不是项目交付物）
 工单素材/
+
+# AI 设计工具链（impeccable skill，非课程项目交付物）
+.agents/
+.claude/
+skills-lock.json

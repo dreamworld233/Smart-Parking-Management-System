@@ -1,67 +1,108 @@
 /* =====================================================================
- * 全局设计系统 —— 深色侧栏 + 浅色画布的现代运营后台
- * 品牌主色蓝紫渐变，克制地用在 logo / 主按钮 / 激活态。
+ * 智慧停车 · 平台运营后台 —— 全局设计系统
+ * 视觉世界：城市停车调度中枢
+ * 深海军蓝导航脊 + 浅色冷调工作区；蓝青信号色 + 导视灯语状态色。
  * ===================================================================== */
 
 :root {
-  /* —— 品牌蓝（主强调）—— */
-  --el-color-primary: #3b6cff;
-  --el-color-primary-light-3: #6a8eff;
-  --el-color-primary-light-5: #97b1ff;
-  --el-color-primary-light-7: #c0d0ff;
-  --el-color-primary-light-8: #d6e0ff;
-  --el-color-primary-light-9: #edf2ff;
-  --el-color-primary-dark-2: #2a56e6;
+  /* —— 品牌信号：蓝 → 青（替代旧版蓝→紫）—— */
+  --el-color-primary: #2563ff;
+  --el-color-primary-light-3: #5b88ff;
+  --el-color-primary-light-5: #92b0ff;
+  --el-color-primary-light-7: #c3d4ff;
+  --el-color-primary-light-8: #d8e4ff;
+  --el-color-primary-light-9: #edf3ff;
+  --el-color-primary-dark-2: #1a52e6;
 
-  /* 品牌渐变（蓝 → 紫），用于 logo / 主按钮 / 激活态 */
-  --grad-brand: linear-gradient(135deg, #3b6cff 0%, #7c5cff 100%);
-  --grad-brand-deep: linear-gradient(135deg, #2a56e6 0%, #6a4bf0 100%);
+  --sp-cyan: #06b6d4;
+  --sp-cyan-soft: #cffafe;
+  --grad-brand: linear-gradient(132deg, #111827 0%, #374151 56%, #4b5563 100%);
+  --grad-brand-deep: linear-gradient(132deg, #000000 0%, #1f2937 100%);
 
-  /* 语义色（成功/警告/危险/信息，标签与图表共用） */
-  --sp-success: #16a34a;
-  --sp-warning: #f59e0b;
-  --sp-danger: #e5484d;
-  --sp-info: #0d9488;
-  --sp-muted: #64748b;
+  /* —— 语义 / 导视灯语 —— */
+  --el-color-success: #10b981;
+  --el-color-success-light-3: #44bd95;
+  --el-color-success-light-5: #7fd0b1;
+  --el-color-success-light-7: #bde8d8;
+  --el-color-success-light-8: #d4f2e6;
+  --el-color-success-light-9: #eafaf3;
+  --el-color-success-dark-2: #0c8a6d;
 
-  /* 浅色画布（内容区） */
-  --sp-bg: #f4f6fb;
+  --el-color-warning: #f59e0b;
+  --el-color-warning-light-3: #f7b23a;
+  --el-color-warning-light-5: #f9c366;
+  --el-color-warning-light-7: #fbdca8;
+  --el-color-warning-light-8: #fde9c8;
+  --el-color-warning-light-9: #fef5e7;
+  --el-color-warning-dark-2: #d98600;
+
+  --el-color-danger: #f43f5e;
+  --el-color-danger-light-3: #f66585;
+  --el-color-danger-light-5: #f793a8;
+  --el-color-danger-light-7: #fbc4d1;
+  --el-color-danger-light-8: #fddce4;
+  --el-color-danger-light-9: #feeef2;
+  --el-color-danger-dark-2: #d62d4b;
+
+  --el-color-info: #64748b;
+  --el-color-info-light-3: #8592a7;
+  --el-color-info-light-5: #aab5c6;
+  --el-color-info-light-7: #d7dde7;
+  --el-color-info-light-8: #e7ebf1;
+  --el-color-info-light-9: #f1f4f8;
+  --el-color-info-dark-2: #4f5b70;
+
+  --sp-teal: #0d9488;
+  --sp-teal-soft: #e6f6f4;
+
+  /* —— 浅色工作区 —— */
+  --sp-bg: #f1f4f9;
   --sp-surface: #ffffff;
-  --sp-border: #eceef4;
-  --sp-border-strong: #e2e6ee;
-  --sp-text: #0f172a;
-  --sp-text-2: #5b6472;
-  --sp-text-3: #9aa3b2;
+  --sp-surface-2: #f8fafd;
+  --sp-border: #e6ebf3;
+  --sp-border-strong: #d8e0ec;
+  --sp-text: #0f1b33;
+  --sp-text-2: #55617a;
+  --sp-text-3: #93a0b5;
 
-  /* 深色侧栏（画框） */
-  --side-bg: #0e1526;
-  --side-bg-2: #141d33;
-  --side-text: #c6cfe0;
-  --side-text-2: #7c88a3;
-  --side-hover: rgba(255, 255, 255, 0.06);
+  /* —— 浅色导航脊（浅色模式：白色导航面 + 发丝分隔）—— */
+  --side-bg: #ffffff;
+  --side-bg-2: #f4f7fd;
+  --side-line: #e6ebf3;
+  --side-text: #55617a;
+  --side-text-strong: #0f1b33;
+  --side-text-2: #6b789c;
+  --side-hover: #edf3ff;
 
-  /* 半径 */
+  /* —— 字体 —— */
+  --sp-font-sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI',
+    system-ui, -apple-system, Arial, sans-serif;
+  --sp-font-num: 'Bahnschrift', 'DIN Alternate', 'Roboto Condensed', 'Segoe UI',
+    var(--sp-font-sans);
+
+  /* —— 半径 —— */
   --sp-radius-sm: 8px;
   --sp-radius: 12px;
   --sp-radius-lg: 16px;
+  --sp-radius-xl: 20px;
 
-  /* 阴影：带偏移 + 柔和模糊 */
-  --sp-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --sp-shadow-md: 0 6px 20px rgba(15, 23, 42, 0.08);
-  --sp-shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.14);
+  /* —— 阴影：偏移 + 柔模糊 —— */
+  --sp-shadow-sm: 0 1px 2px rgba(16, 33, 67, 0.05);
+  --sp-shadow-md: 0 8px 24px rgba(16, 33, 67, 0.08);
+  --sp-shadow-lg: 0 20px 48px rgba(16, 33, 62, 0.16);
+  --sp-shadow-brand: 0 8px 20px rgba(15, 23, 42, 0.18);
 
-  /* 字号阶梯 */
+  /* —— 字号 —— */
   --sp-fs-xs: 12px;
   --sp-fs-sm: 13px;
   --sp-fs-base: 14px;
   --sp-fs-md: 15px;
-  --sp-fs-lg: 18px;
-  --sp-fs-xl: 24px;
-  --sp-fs-2xl: 32px;
-  --sp-fs-hero: 44px;
+  --sp-fs-lg: 17px;
+  --sp-fs-xl: 22px;
+  --sp-fs-2xl: 28px;
 
   --el-border-radius-base: 8px;
-  --el-font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --el-font-family: var(--sp-font-sans);
 }
 
 html,
@@ -71,16 +112,26 @@ body,
   margin: 0;
   background: var(--sp-bg);
   color: var(--sp-text);
-  font-family: var(--el-font-family);
+  font-family: var(--sp-font-sans);
   font-size: var(--sp-fs-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
+/* 数字 / 金额 / 编号：DIN 风格等宽数字 */
+.num,
+.el-table .num,
+.el-descriptions .num {
+  font-family: var(--sp-font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
 ::selection {
-  background: var(--el-color-primary-light-8);
-  color: var(--sp-text);
+  background: #cfe5ff;
+  color: #0a1530;
 }
 :focus-visible {
   outline: 2px solid var(--el-color-primary);
@@ -88,29 +139,29 @@ body,
   border-radius: 4px;
 }
 
-/* 细滚动条 */
+/* —— 细滚动条 —— */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c6cdd8 transparent;
+  scrollbar-color: #c3ccda transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #c6cdd8;
+  background: #c3ccda;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #aab3c2;
+  background: #a6b1c4;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 
 /* =====================================================================
- * 卡片：更明显的层次 + 悬停轻抬
+ * 卡片
  * ===================================================================== */
 .el-card {
   border-radius: var(--sp-radius-lg);
@@ -121,119 +172,305 @@ body,
 }
 .el-card__header {
   font-weight: 600;
+  font-size: var(--sp-fs-lg);
   color: var(--sp-text);
   border-bottom: 1px solid var(--sp-border);
   padding: 16px 20px;
 }
 
-/* 主内容区 */
 .el-main {
-  padding: 24px;
+  padding: 22px 26px 28px;
 }
 
 /* =====================================================================
- * 表格：浅表头、细行线、克制的 hover
+ * 表格：浅表头、宽行、克制 hover、数字对齐
  * ===================================================================== */
 .el-table {
   --el-table-border-color: var(--sp-border);
   --el-table-header-bg-color: transparent;
-  --el-table-row-hover-bg-color: #f7f9fd;
+  --el-table-header-text-color: var(--sp-text-3);
+  --el-table-row-hover-bg-color: #f5f9ff;
+  --el-table-text-color: var(--sp-text);
   color: var(--sp-text);
   font-variant-numeric: tabular-nums;
 }
 .el-table th.el-table__cell {
-  color: var(--sp-text-3);
   font-weight: 600;
-  font-size: var(--sp-fs-sm);
-  letter-spacing: 0.01em;
+  font-size: var(--sp-fs-xs);
+  letter-spacing: 0.04em;
+  color: var(--sp-text-3);
+  background: var(--sp-surface-2);
   border-bottom: 1px solid var(--sp-border-strong);
+  padding: 10px 0;
 }
 .el-table td.el-table__cell {
   border-bottom: 1px solid var(--sp-border);
-  padding: 13px 0;
+  padding: 12px 0;
 }
 .el-table .el-table__cell {
-  padding: 13px 0;
+  padding: 12px 0;
 }
 .el-table__empty-block {
-  padding: 40px 0;
+  padding: 46px 0;
 }
 .el-table__empty-text {
   color: var(--sp-text-3);
+  line-height: 1.8;
+}
+/* 小表格（弹窗内） */
+.el-table--small td.el-table__cell,
+.el-table--small .el-table__cell {
+  padding: 8px 0;
 }
 
 /* =====================================================================
- * 按钮：主按钮用品牌渐变
+ * 按钮：主按钮黑白色系（近黑 + 白字，hover 深灰）
  * ===================================================================== */
 .el-button {
   border-radius: var(--sp-radius-sm);
   font-weight: 500;
 }
+.el-button--large {
+  border-radius: 10px;
+}
 .el-button--primary {
   border: 1px solid transparent;
-  background-image: var(--grad-brand);
-  box-shadow: 0 2px 8px rgba(59, 108, 255, 0.32);
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.22);
 }
 .el-button--primary:hover,
 .el-button--primary:focus {
-  background-image: var(--grad-brand-deep);
-  box-shadow: 0 6px 16px rgba(59, 108, 255, 0.4);
+  background: #374151;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.28);
+  transform: translateY(-1px);
 }
-.el-button--primary.is-disabled {
-  background-image: none;
+.el-button--primary:active {
+  background: #000000;
+  transform: translateY(0);
 }
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:hover {
+  background: #e5e7eb;
+  color: #9ca3af;
+  box-shadow: none;
+}
+.el-button.is-link {
+  font-weight: 600;
+}
+
+/* =====================================================================
+ * 表单控件
+ * ===================================================================== */
 .el-input__wrapper,
-.el-textarea__inner {
+.el-textarea__inner,
+.el-select__wrapper {
   border-radius: var(--sp-radius-sm);
+  box-shadow: 0 0 0 1px var(--sp-border-strong) inset;
+  transition: box-shadow 0.18s ease;
 }
-.el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 3px rgba(59, 108, 255, 0.12);
+.el-input__wrapper:hover,
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--el-color-primary-light-5) inset;
 }
-.el-dialog {
-  border-radius: var(--sp-radius-lg);
-  box-shadow: var(--sp-shadow-lg);
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 3px rgba(37, 99, 255, 0.12) !important;
 }
-.el-dialog__header {
-  padding-bottom: 12px;
+.el-input-number .el-input__wrapper {
+  padding-left: 8px;
+  padding-right: 8px;
 }
+.el-form-item__label {
+  color: var(--sp-text-2);
+  font-weight: 500;
+}
+
+/* =====================================================================
+ * 标签：软底药丸
+ * ===================================================================== */
 .el-tag {
   border-radius: 6px;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
+  height: 23px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+}
+.el-tag--small {
+  height: 21px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.el-tag.el-tag--info {
+  background: var(--el-color-info-light-9);
+  color: #5a667c;
+}
+
+/* 自定义软底药丸（状态统一用语义色） */
+.sp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 23px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1;
+}
+.sp-tag .sp-tag__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sp-tag--success { background: var(--el-color-success-light-9); color: #0b8a6c; }
+.sp-tag--warning { background: var(--el-color-warning-light-9); color: #c07e00; }
+.sp-tag--danger  { background: var(--el-color-danger-light-9);  color: #d92d4d; }
+.sp-tag--info    { background: var(--el-color-info-light-9);    color: #5a667c; }
+.sp-tag--primary { background: var(--el-color-primary-light-9); color: #1a52e6; }
+.sp-tag--teal    { background: var(--sp-teal-soft);             color: #0b7268; }
+.sp-tag--outline {
+  background: transparent;
+  border: 1px dashed var(--sp-border-strong);
+  color: var(--sp-text-2);
+}
+
+/* =====================================================================
+ * 车牌芯片（蓝牌样式）
+ * ===================================================================== */
+.plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #2f73ff 0%, #1553d6 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 6px rgba(21, 83, 214, 0.28);
+  font-family: var(--sp-font-num);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.plate--sm {
+  min-width: 72px;
+  padding: 2px 8px;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  border-radius: 5px;
+}
+
+/* =====================================================================
+ * 弹窗 / 抽屉 / 提示
+ * ===================================================================== */
+.el-dialog {
+  border-radius: var(--sp-radius-xl);
+  box-shadow: var(--sp-shadow-lg);
+  overflow: hidden;
+}
+.el-dialog__header {
+  padding: 18px 22px 14px;
+  margin-right: 0;
+  border-bottom: 1px solid var(--sp-border);
+}
+.el-dialog__title {
+  font-size: var(--sp-fs-lg);
+  font-weight: 700;
+}
+.el-dialog__body {
+  padding: 20px 22px;
+}
+.el-dialog__footer {
+  padding: 14px 22px 18px;
+}
+.el-divider__text {
+  background: var(--sp-surface);
+  font-weight: 600;
+  color: var(--sp-text-2);
+  font-size: 13px;
+}
+.el-descriptions__label.el-descriptions__cell.is-bordered-label {
+  background: var(--sp-surface-2);
+  color: var(--sp-text-2);
+  font-weight: 600;
 }
 .el-pagination {
   --el-pagination-button-bg-color: var(--sp-surface);
   font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
 }
 
-/* 通用微交互（150–250ms，只传达状态） */
-.el-button,
-.el-card,
-.el-menu-item,
-.el-tag {
-  transition: all 0.18s ease;
+/* 提示条：轻底色、圆角 */
+.el-alert {
+  border-radius: var(--sp-radius);
+  border: none;
+  padding: 11px 14px;
+  align-items: center;
+}
+/* 页面顶部提示条统一间距 */
+.page-alert,
+.dash-alert {
+  margin-bottom: 16px;
+}
+.el-alert--info.is-light { background: #eef6ff; }
+.el-alert--info.is-light .el-alert__title { color: #2b5585; }
+.el-alert--warning.is-light { background: var(--el-color-warning-light-9); }
+.el-alert--warning.is-light .el-alert__title { color: #9a6a00; }
+.el-alert--success.is-light { background: var(--el-color-success-light-9); }
+.el-alert--success.is-light .el-alert__title { color: #0b7a5f; }
+.el-alert--error.is-light { background: var(--el-color-danger-light-9); }
+.el-alert__title { font-size: 13px; line-height: 1.6; }
+
+.el-result {
+  padding: 24px 0 8px;
+}
+.el-message {
+  border-radius: 10px;
+  box-shadow: var(--sp-shadow-md);
 }
 
 /* =====================================================================
- * 页面结构：统一「页头 + 内容卡」骨架
+ * 上传区
+ * ===================================================================== */
+.el-upload-dragger {
+  border-radius: var(--sp-radius-lg);
+  border: 1.5px dashed var(--sp-border-strong);
+  background: var(--sp-surface-2);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.el-upload-dragger:hover {
+  border-color: var(--el-color-primary-light-5);
+  background: var(--el-color-primary-light-9);
+}
+
+/* =====================================================================
+ * 页面骨架：页头 + 工具条
  * ===================================================================== */
 .page-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .page-head__text h1 {
   margin: 0;
-  font-size: var(--sp-fs-xl);
+  font-size: var(--sp-fs-2xl);
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
   color: var(--sp-text);
   line-height: 1.2;
 }
 .page-head__text p {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   font-size: var(--sp-fs-sm);
   color: var(--sp-text-3);
 }
@@ -248,4 +485,83 @@ body,
   gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* 小型辅助文字 */
+.hint {
+  color: var(--sp-text-3);
+  font-size: 12px;
+}
+.hint--danger { color: var(--el-color-danger-dark-2); }
+
+/* =====================================================================
+ * 动效
+ * ===================================================================== */
+/* 安全闸：motion-ready 由 main.ts 在双 rAF 确认渲染时钟正常后添加。
+ * 未就绪（渲染时钟被冻结的后台标签 / 无头截图等）一律不播入场动画，
+ * 避免 fill-mode 把内容永久停在 opacity:0 / scale:0 的首帧。 */
+:root:not(.motion-ready) *,
+:root:not(.motion-ready) *::before,
+:root:not(.motion-ready) *::after {
+  animation: none !important;
+}
+
+@keyframes sp-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sp-pop {
+  0% { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sp-grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes sp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 路由切换 */
+.page-enter-active { transition: opacity 0.22s ease, transform 0.22s ease; }
+.page-enter-from { opacity: 0; transform: translateY(8px); }
+.page-leave-active { transition: opacity 0.12s ease; }
+.page-leave-to { opacity: 0; }
+
+/* 弹窗 */
+.dialog-fade-enter-active .el-dialog { animation: sp-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* 通用微交互 */
+.el-button,
+.el-card,
+.el-menu-item,
+.el-tag {
+  transition-duration: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =====================================================================
+ * 窄屏适配
+ * ===================================================================== */
+@media (max-width: 680px) {
+  .el-dialog {
+    width: 92vw !important;
+  }
+  .el-main {
+    padding: 16px 14px 22px;
+  }
 }
