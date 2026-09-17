@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { adminListLots, adminUpsertLot, adminDeleteLot, adminPriceChange } from '../api'
 import { SOURCE_LABELS, SOURCE_TAGS, formatSpots } from '../utils/format'
 import type { Lot, LotSource } from '../types'
+import PageHeader from '../components/PageHeader.vue'
 
 const keyword = ref('')
 const page = ref(1)
@@ -249,14 +250,24 @@ async function submitPrice() {
 
 <template>
   <div>
-    <el-card class="page-card">
-      <div class="toolbar">
-      <el-input v-model="keyword" placeholder="按名称 / 地址搜索" clearable style="width: 260px" @keyup.enter="search" />
-      <el-button type="primary" @click="search">查询</el-button>
-      <el-button type="success" @click="openCreate">新增车场</el-button>
-    </div>
+    <PageHeader title="车场管理" subtitle="管理签约车场与公示价；改价会写入 lot_price_changes 留痕">
+      <template #actions>
+        <el-button type="primary" @click="openCreate">
+          <el-icon><Plus /></el-icon>
+          <span style="margin-left: 4px">新增车场</span>
+        </el-button>
+      </template>
+    </PageHeader>
 
-    <el-table v-loading="loading" :data="list" border stripe>
+    <el-card>
+      <div class="toolbar">
+        <el-input v-model="keyword" placeholder="按名称 / 地址搜索" clearable style="width: 260px" @keyup.enter="search">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button @click="search">查询</el-button>
+      </div>
+
+    <el-table v-loading="loading" :data="list" empty-text="还没有签约车场，点击右上角「新增车场」录入">
       <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
       <el-table-column prop="address" label="地址" min-width="200" show-overflow-tooltip />
       <el-table-column label="坐标" width="160">

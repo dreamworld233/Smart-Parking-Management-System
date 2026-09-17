@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { adminLookup } from '../api'
 import { STATUS_LABELS, formatAmount, formatTime, formatPlate } from '../utils/format'
 import type { Reservation, ReservationStatus } from '../types'
+import PageHeader from '../components/PageHeader.vue'
 
 const query = reactive({ plateNo: '', orderNo: '' })
 const list = ref<Reservation[]>([])
@@ -42,21 +43,23 @@ function doPrint() {
 
 <template>
   <div>
-    <el-card class="page-card">
+    <PageHeader title="打印管理" subtitle="按预约单打印凭证；固定车主 = 已绑定车牌，临时车主 = 单次预约" />
+
+    <el-card>
       <el-alert
-      title="打印预约凭证。固定车主 = 在车主端绑定了车牌的用户；临时车主 = 单次预约时填写车牌。本页按预约单打印凭证与金额。"
-      type="info"
-      :closable="false"
-      style="margin-bottom: 16px"
-    />
+        title="打印预约凭证。固定车主 = 在车主端绑定了车牌的用户；临时车主 = 单次预约时填写车牌。本页按预约单打印凭证与金额。"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
 
-    <div class="toolbar">
-      <el-input v-model="query.plateNo" placeholder="车牌号" clearable style="width: 200px" @keyup.enter="search" />
-      <el-input v-model="query.orderNo" placeholder="订单号" clearable style="width: 220px" @keyup.enter="search" />
-      <el-button type="primary" @click="search">查询</el-button>
-    </div>
+      <div class="toolbar">
+        <el-input v-model="query.plateNo" placeholder="车牌号" clearable style="width: 200px" @keyup.enter="search" />
+        <el-input v-model="query.orderNo" placeholder="订单号" clearable style="width: 220px" @keyup.enter="search" />
+        <el-button type="primary" @click="search">查询</el-button>
+      </div>
 
-    <el-table v-loading="loading" :data="list" border stripe>
+    <el-table v-loading="loading" :data="list" empty-text="请先按车牌号或订单号查询预约单">
       <el-table-column prop="orderNo" label="订单号" width="200" />
       <el-table-column label="车牌" width="110">
         <template #default="{ row }">{{ formatPlate(row.plateNo) }}</template>

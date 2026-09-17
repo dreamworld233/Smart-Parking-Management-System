@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { adminLookup } from '../api'
 import { STATUS_LABELS, STATUS_TAGS, ORDER_TYPE_LABELS, formatAmount, formatTime, formatPlate } from '../utils/format'
 import type { Reservation, ReservationStatus } from '../types'
+import PageHeader from '../components/PageHeader.vue'
 
 const query = reactive({ plateNo: '', orderNo: '', status: '' })
 const page = ref(1)
@@ -65,17 +66,19 @@ function orderAmount(row: Reservation, type: string): string {
 
 <template>
   <div>
-    <el-card class="page-card">
-      <div class="toolbar">
-      <el-input v-model="query.plateNo" placeholder="车牌号，如 皖A12345" clearable style="width: 200px" @keyup.enter="search" />
-      <el-input v-model="query.orderNo" placeholder="订单号" clearable style="width: 200px" @keyup.enter="search" />
-      <el-select v-model="query.status" placeholder="状态" style="width: 140px">
-        <el-option v-for="o in statusOptions" :key="o.value" :value="o.value" :label="o.label" />
-      </el-select>
-      <el-button type="primary" @click="search">查询</el-button>
-    </div>
+    <PageHeader title="订单流水" subtitle="按车牌 / 订单号 / 状态查询预约单与流水" />
 
-    <el-table v-loading="loading" :data="list" border stripe>
+    <el-card>
+      <div class="toolbar">
+        <el-input v-model="query.plateNo" placeholder="车牌号，如 皖A12345" clearable style="width: 200px" @keyup.enter="search" />
+        <el-input v-model="query.orderNo" placeholder="订单号" clearable style="width: 200px" @keyup.enter="search" />
+        <el-select v-model="query.status" placeholder="状态" style="width: 140px">
+          <el-option v-for="o in statusOptions" :key="o.value" :value="o.value" :label="o.label" />
+        </el-select>
+        <el-button type="primary" @click="search">查询</el-button>
+      </div>
+
+    <el-table v-loading="loading" :data="list" empty-text="没有匹配的预约单，试试放宽筛选条件">
       <el-table-column prop="orderNo" label="订单号" width="200" show-overflow-tooltip />
       <el-table-column label="车牌" width="110">
         <template #default="{ row }">{{ formatPlate(row.plateNo) }}</template>

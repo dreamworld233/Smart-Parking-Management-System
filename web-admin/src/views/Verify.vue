@@ -5,6 +5,7 @@ import type { UploadFile } from 'element-plus'
 import { adminVerifyPlate } from '../api'
 import { uploadImage } from '../api/cloudbase'
 import { formatPlate } from '../utils/format'
+import PageHeader from '../components/PageHeader.vue'
 
 interface VerifyResult {
   matched?: boolean
@@ -96,6 +97,8 @@ async function verifyManual() {
 
 <template>
   <div>
+    <PageHeader title="车牌识别" subtitle="上传停车照片 OCR 识别并核销；识别失败可转手动核销" />
+
     <el-alert
       title="OCR 是核销的增强，不是单点依赖：识别失败 / 无预约 / 未配置密钥时，转到右侧手动核销（输码 / 预约单）即可。"
       type="info"
@@ -103,12 +106,16 @@ async function verifyManual() {
       style="margin-bottom: 16px"
     />
 
-    <el-row :gutter="16">
-      <el-col :span="12">
+    <el-row :gutter="16" class="verify-row">
+      <el-col :xs="24" :lg="12">
         <el-card>
           <template #header>车牌识别（OCR）</template>
-          <el-upload :auto-upload="false" :show-file-list="false" :on-change="onFileChange" accept="image/*">
-            <el-button>选择停车照片</el-button>
+          <el-upload drag :auto-upload="false" :show-file-list="false" :on-change="onFileChange" accept="image/*">
+            <el-icon class="upload-icon"><UploadFilled /></el-icon>
+            <div class="el-upload__text">拖入停车照片，或 <em>点击选择</em></div>
+            <template #tip>
+              <div class="el-upload__tip">支持 JPG / PNG，车牌清晰为佳</div>
+            </template>
           </el-upload>
           <div v-if="ocrFile" class="filename">已选：{{ ocrFile.name }}</div>
           <el-button type="primary" :loading="ocrLoading" style="margin-top: 12px" @click="runOcr">识别并核销</el-button>
@@ -130,7 +137,7 @@ async function verifyManual() {
         </el-card>
       </el-col>
 
-      <el-col :span="12">
+      <el-col :xs="24" :lg="12">
         <el-card>
           <template #header>手动核销</template>
           <el-form label-width="100px">
@@ -150,9 +157,17 @@ async function verifyManual() {
 </template>
 
 <style scoped>
+.verify-row {
+  row-gap: 16px;
+}
+.upload-icon {
+  font-size: 40px;
+  color: var(--sp-text-3);
+  margin-bottom: 8px;
+}
 .filename {
-  color: #909399;
+  color: var(--sp-text-2);
   font-size: 12px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 </style>

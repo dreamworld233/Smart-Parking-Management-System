@@ -8,6 +8,7 @@ const router = useRouter()
 const session = computed(() => getSession())
 const ops = computed(() => isOpsAdmin())
 
+// 菜单：前五项为通用功能，账号管理仅 ops_admin 可见
 const menu = [
   { path: '/lots', title: '车场管理', icon: 'OfficeBuilding' },
   { path: '/orders', title: '订单流水', icon: 'Tickets' },
@@ -33,7 +34,7 @@ function logout() {
 
 <template>
   <el-container class="layout">
-    <el-aside width="232px" class="aside">
+    <el-aside width="236px" class="aside">
       <div class="brand">
         <div class="logo">P</div>
         <div class="brand-text">
@@ -47,11 +48,19 @@ function logout() {
           <span>{{ m.title }}</span>
         </el-menu-item>
       </el-menu>
+      <div class="aside-foot">
+        <span class="dot" aria-hidden="true" />
+        <span>云开发托管 · v1.0</span>
+      </div>
     </el-aside>
 
-    <el-container>
+    <el-container class="body">
       <el-header class="header">
-        <div class="page-title">{{ route.meta.title }}</div>
+        <div class="crumb">
+          <span class="crumb-root">运营后台</span>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-cur">{{ route.meta.title }}</span>
+        </div>
         <div class="user">
           <el-tag size="small" effect="plain">{{ roleLabel }}</el-tag>
           <div class="avatar">{{ initial }}</div>
@@ -71,60 +80,93 @@ function logout() {
   height: 100vh;
 }
 .aside {
-  background: var(--sp-bg);
-  border-right: 1px solid var(--sp-border);
+  background: linear-gradient(180deg, var(--side-bg) 0%, var(--side-bg-2) 100%);
   display: flex;
   flex-direction: column;
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 20px 20px 16px;
+  gap: 11px;
+  padding: 22px 20px 16px;
 }
 .logo {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #2f6bff, #6a5cff);
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--grad-brand);
   color: #fff;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(59, 108, 255, 0.4);
 }
 .brand-text .name {
-  color: var(--sp-text);
-  font-size: 15px;
+  color: #fff;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 .brand-text .tag {
-  color: var(--sp-text-3);
+  color: var(--side-text-2);
   font-size: 11px;
 }
+
+/* 侧栏菜单：深色底 + 渐变激活态 */
 .side-menu {
   border-right: none;
-  padding: 8px 12px;
+  padding: 6px 12px;
   flex: 1;
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: var(--side-text);
+  --el-menu-hover-text-color: #fff;
+  --el-menu-active-color: #fff;
+  --el-menu-hover-bg-color: var(--side-hover);
+  --el-menu-border-color: transparent;
 }
 .side-menu :deep(.el-menu-item) {
-  height: 40px;
-  line-height: 40px;
-  margin: 2px 0;
-  border-radius: 8px;
-  color: var(--sp-text-2);
+  height: 42px;
+  line-height: 42px;
+  margin: 3px 0;
+  border-radius: 10px;
+  color: var(--side-text);
+  font-weight: 500;
+}
+.side-menu :deep(.el-menu-item .el-icon) {
+  font-size: 17px;
 }
 .side-menu :deep(.el-menu-item:hover) {
-  background: #f1f3f6;
-  color: var(--sp-text);
+  background: var(--side-hover);
+  color: #fff;
 }
 .side-menu :deep(.el-menu-item.is-active) {
-  background: #eef4ff;
-  color: #2f6bff;
+  background: var(--grad-brand);
+  color: #fff;
   font-weight: 600;
+  box-shadow: 0 4px 12px rgba(59, 108, 255, 0.36);
+}
+.aside-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 20px;
+  font-size: 11px;
+  color: var(--side-text-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.aside-foot .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+}
+
+.body {
+  min-width: 0;
 }
 .header {
   display: flex;
@@ -133,10 +175,21 @@ function logout() {
   background: #fff;
   border-bottom: 1px solid var(--sp-border);
 }
-.page-title {
-  font-size: 16px;
-  font-weight: 600;
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.crumb-root {
+  color: var(--sp-text-3);
+}
+.crumb-sep {
+  color: var(--sp-text-3);
+}
+.crumb-cur {
   color: var(--sp-text);
+  font-weight: 600;
 }
 .user {
   display: flex;
@@ -144,10 +197,10 @@ function logout() {
   gap: 12px;
 }
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #2f6bff, #6a5cff);
+  background: var(--grad-brand);
   color: #fff;
   font-size: 14px;
   font-weight: 600;

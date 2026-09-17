@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { adminCreateUser } from '../api'
+import PageHeader from '../components/PageHeader.vue'
 
 const form = reactive({ username: '', password: '', role: 'lot_admin', nickname: '' })
 const saving = ref(false)
@@ -39,6 +40,8 @@ async function submit() {
 
 <template>
   <div>
+    <PageHeader title="账号管理" subtitle="创建运营或车场管理员账号" />
+
     <el-alert
       title="首次部署后，库中还没有任何「平台运营（ops_admin）」时，本页处于引导模式：可直接创建第一个运营账号；创建后引导自动关闭，之后只有 ops_admin 能建号。"
       type="warning"
