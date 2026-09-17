@@ -108,17 +108,29 @@ exports.main = async (event) => {
     return { code: 'OCR_FAILED', message: `识别失败：${e.message || e}` }
   }
 
-  // 3. 取结果。LicensePlateOCR 返回 Plates: [{ Plate, Color, PlateConfidence }]
-  const plate = ocrRes && ocrRes.Plates && ocrRes.Plates[0]
-  if (!plate || !plate.Plate) {
+  // 3. 取结果。SDK 4.x 模型：多车牌在 LicensePlateInfos[]，每项 { Number, Confidence }；
+  //    单车牌时顶层直接给 Number/Confidence。旧代码读 Plates[0].Plate，字段名全错，
+  //    Plates 恒 undefined → 恒 OCR_NO_PLATE（2026-09-17 真根因，图片本身没问题）
+  const infos = ocrRes && ocrRes.LicensePlateInfos
+  const first = infos && infos[0]
+  let plateNo = ''
+  let confidence = null
+  if (first && first.Number) {
+    plateNo = first.Number
+    confidence = typeof first.Confidence === 'number' ? first.Confidence : null
+  } else if (ocrRes && ocrRes.Number) {
+    plateNo = ocrRes.Number
+    confidence = typeof ocrRes.Confidence === 'number' ? ocrRes.Confidence : null
+  }
+  if (!plateNo) {
     return { code: 'OCR_NO_PLATE', message: '未识别到车牌' }
   }
 
   return {
     code: 0,
     data: {
-      plate: plate.Plate,
-      confidence: plate.PlateConfidence ?? null,
+      plate: plateNo,
+      confidence,
       fileID,
     },
   }

@@ -10,8 +10,10 @@ let mockOpenid: string | null
 /** mock downloadFile 的返回内容（buffer 或抛错） */
 let mockFileContent: Buffer | null
 let mockDownloadError: boolean
-/** mock OCR 结果：{ plates } 或抛错 */
-let mockOcrResult: { plates: { Plate: string; PlateConfidence: number }[] } | null
+/** mock OCR 响应（SDK 4.x 结构：LicensePlateInfos[]，单车牌时顶层直接给 Number/Confidence）或抛错 */
+let mockOcrResult:
+  | { LicensePlateInfos?: { Number: string; Confidence: number }[]; Number?: string; Confidence?: number }
+  | null
 let mockOcrError: Error | null
 /** 记录 OCR 调用时拿到的 base64，验证图片确实传过去了 */
 let capturedBase64: string | null
@@ -54,7 +56,7 @@ jest.mock('tencentcloud-sdk-nodejs', () => ({
           capturedBase64 = ImageBase64
           if (mockOcrError) throw mockOcrError
           if (!mockOcrResult) throw new Error('no ocr result')
-          return { Plates: mockOcrResult.plates }
+          return mockOcrResult
         }
       },
     },
@@ -115,9 +117,9 @@ describe('recognizePlate', () => {
     expect(r.code).toBe('NO_CREDENTIAL')
   })
 
-  it('识别成功：返回 plate + confidence，图片 base64 传给了 SDK', async () => {
+  it('识别成功：LicensePlateInfos[0] 取 Number/Confidence，图片 base64 传给了 SDK', async () => {
     seedUser()
-    mockOcrResult = { plates: [{ Plate: '皖A88888', PlateConfidence: 98 }] }
+    mockOcrResult = { LicensePlateInfos: [{ Number: '皖A88888', Confidence: 98 }] }
     const r = await main({ fileID: 'cloud://x/1.png' })
     expect(r.code).toBe(0)
     expect(r.data.plate).toBe('皖A88888')
@@ -125,6 +127,15 @@ describe('recognizePlate', () => {
     expect(r.data.fileID).toBe('cloud://x/1.png')
     // 图片确实传过去了：base64 解码回来等于原 buffer
     expect(Buffer.from(capturedBase64!, 'base64').equals(mockFileContent!)).toBe(true)
+  })
+
+  it('单车牌：顶层直接给 Number/Confidence（无 LicensePlateInfos）也能取到', async () => {
+    seedUser()
+    mockOcrResult = { Number: '皖A88888', Confidence: 95 }
+    const r = await main({ fileID: 'cloud://x/1.png' })
+    expect(r.code).toBe(0)
+    expect(r.data.plate).toBe('皖A88888')
+    expect(r.data.confidence).toBe(95)
   })
 
   it('OCR 抛错（如密钥未授权 UnauthorizedOperation）→ OCR_FAILED', async () => {
@@ -135,15 +146,21 @@ describe('recognizePlate', () => {
     expect(r.message).toContain('UnauthorizedOperation')
   })
 
-  it('OCR 返回无车牌 → OCR_NO_PLATE', async () => {
+  it('OCR 返回无车牌（空 LicensePlateInfos）→ OCR_NO_PLATE', async () => {
     seedUser()
-    mockOcrResult = { plates: [] }
+    mockOcrResult = { LicensePlateInfos: [] }
+    expect((await main({ fileID: 'cloud://x/1.png' })).code).toBe('OCR_NO_PLATE')
+  })
+
+  it('OCR 返回空对象 → OCR_NO_PLATE', async () => {
+    seedUser()
+    mockOcrResult = {}
     expect((await main({ fileID: 'cloud://x/1.png' })).code).toBe('OCR_NO_PLATE')
   })
 
   it('低置信度：原样返回 confidence，由前端决定是否降级（不做「猜」）', async () => {
     seedUser()
-    mockOcrResult = { plates: [{ Plate: '皖A88888', PlateConfidence: 40 }] }
+    mockOcrResult = { LicensePlateInfos: [{ Number: '皖A88888', Confidence: 40 }] }
     const r = await main({ fileID: 'cloud://x/1.png' })
     expect(r.code).toBe(0)
     expect(r.data.confidence).toBe(40)
