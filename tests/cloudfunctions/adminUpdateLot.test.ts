@@ -214,4 +214,26 @@ describe('adminUpdateLot', () => {
     const r = await main({ lotId: 'lot1', patch: { pricing: { firstHour: 200, capPerDay: 1000, stepMinutes: 60 } } })
     expect(r.code).toBe(0)
   })
+
+  it('边界值 201/1001 拒绝（严格大于上限）', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot1', patch: { pricing: { firstHour: 201 } } })).code).toBe('BAD_REQUEST')
+    expect((await main({ lotId: 'lot1', patch: { pricing: { capPerDay: 1001 } } })).code).toBe('BAD_REQUEST')
+  })
+
+  it('负值拒绝（旧代码放行，本次新行为）', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot1', patch: { pricing: { firstHour: -5 } } })).code).toBe('BAD_REQUEST')
+    expect((await main({ lotId: 'lot1', patch: { pricing: { nightRate: -1 } } })).code).toBe('BAD_REQUEST')
+    expect((await main({ lotId: 'lot1', patch: { pricing: { nightRate: 201 } } })).code).toBe('BAD_REQUEST')
+  })
+
+  it('nightRate null 合法（无夜间费率）', async () => {
+    seedUser()
+    seedLot()
+    const r = await main({ lotId: 'lot1', patch: { pricing: { nightRate: null } } })
+    expect(r.code).toBe(0)
+  })
 })
