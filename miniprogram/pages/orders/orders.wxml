@@ -1,5 +1,5 @@
 <view class="wrap">
-  <!-- 顶栏：tab 页，无返回键，只有标题 -->
+  <!-- 顶栏：列表态只有标题；详情态显示返回键 -->
   <view class="bar" style="top: {{navTop}}px">
     <view class="bar__back" wx:if="{{detail}}" bindtap="onBack">‹</view>
     <view class="bar__title">我的订单</view>
