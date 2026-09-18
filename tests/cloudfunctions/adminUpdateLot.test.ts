@@ -187,4 +187,31 @@ describe('adminUpdateLot', () => {
     expect(r.code).toBe(0)
     expect(mockStore.lots.get('lot1')!.facilities).toEqual(['充电桩'])
   })
+
+  it('收费价格超上限 → 拒绝（云端权威，客户端可被绕过）', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot1', patch: { pricing: { firstHour: 500 } } })).code).toBe('BAD_REQUEST')
+  })
+
+  it('单日封顶超上限 → 拒绝', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot1', patch: { pricing: { capPerDay: 9999 } } })).code).toBe('BAD_REQUEST')
+  })
+
+  it('步长超出 5~120 → 拒绝；步长非整数 → 拒绝', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot1', patch: { pricing: { stepMinutes: 2 } } })).code).toBe('BAD_REQUEST')
+    expect((await main({ lotId: 'lot1', patch: { pricing: { stepMinutes: 300 } } })).code).toBe('BAD_REQUEST')
+    expect((await main({ lotId: 'lot1', patch: { pricing: { stepMinutes: 10.5 } } })).code).toBe('BAD_REQUEST')
+  })
+
+  it('上限内合法值通过', async () => {
+    seedUser()
+    seedLot()
+    const r = await main({ lotId: 'lot1', patch: { pricing: { firstHour: 200, capPerDay: 1000, stepMinutes: 60 } } })
+    expect(r.code).toBe(0)
+  })
 })

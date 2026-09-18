@@ -28,6 +28,12 @@ const PRICING_KEYS = ['firstHour', 'perHourAfter', 'stepMinutes', 'capPerDay', '
 // reservableQuota 已于 2026-09-17 退役（可约 = 余位 − 待入场，不设固定额度）—— 不给 patch
 const FLAT_KEYS = ['facilities', 'name', 'address', 'openHours']
 
+// 与前端 owner/lot.ts 同口径的上限（云端是权威，客户端可被绕过）
+const PRICE_MAX = 200
+const CAP_MAX = 1000
+const STEP_MIN = 5
+const STEP_MAX = 120
+
 function isFiniteNum(v) {
   return typeof v === 'number' && Number.isFinite(v)
 }
@@ -56,10 +62,22 @@ function sanitizePatch(raw) {
     if (pKeys.some(k => !PRICING_KEYS.includes(k))) return null
     for (const k of pKeys) {
       if (k === 'nightRate') {
-        // 夜间费率：null 合法（没有夜间计费），数字必须非负
-        if (raw.pricing[k] !== null && !isFiniteNum(raw.pricing[k])) return null
+        // 夜间费率：null 合法（没有夜间计费），数字必须非负且不超单价上限
+        if (raw.pricing[k] !== null) {
+          if (!isFiniteNum(raw.pricing[k]) || raw.pricing[k] < 0 || raw.pricing[k] > PRICE_MAX) return null
+        }
         pricing[k] = raw.pricing[k]
-      } else if (!isFiniteNum(raw.pricing[k])) {
+      } else if (!isFiniteNum(raw.pricing[k]) || raw.pricing[k] < 0) {
+        return null
+      } else if (k === 'stepMinutes') {
+        // 计费步长：整数且在 5~120 之间
+        const s = raw.pricing[k]
+        if (!Number.isInteger(s) || s < STEP_MIN || s > STEP_MAX) return null
+        pricing[k] = s
+      } else if (k === 'capPerDay') {
+        if (raw.pricing[k] > CAP_MAX) return null
+        pricing[k] = raw.pricing[k]
+      } else if (raw.pricing[k] > PRICE_MAX) {
         return null
       } else {
         pricing[k] = raw.pricing[k]
