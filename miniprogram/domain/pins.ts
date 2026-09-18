@@ -11,6 +11,10 @@ const PIN_BG_ON = '#2563eb'
 const PIN_BG_OFF = '#ffffff'
 const PIN_FG_ON = '#ffffff'
 const PIN_FG_OFF = '#0f172a'
+/** 命中区尺寸：须盖住选中态（14px + padding 8）下最长 label（约 100px 宽）并留余量。
+ *   label 字号/格式若变，这个尺寸要一起重估 */
+export const PIN_HIT_W = 100
+export const PIN_HIT_H = 48
 
 /** 一个地图图钉。首页与搜索页共用同一套结构，避免两页各写一份又慢慢漂移 */
 export interface MapPin {
@@ -115,8 +119,8 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     // 命中区要盖住气泡：以前 width/height 是 1×1，气泡点不到（2026-09-17 组员反馈）。
     // 透明图标只负责「点得到」，label 仍是唯一视觉
     iconPath: '/assets/transparent.png',
-    width: 100,
-    height: 48,
+    width: PIN_HIT_W,
+    height: PIN_HIT_H,
     anchor: { x: 0.5, y: 0.5 },
     label: {
       content: p.label,

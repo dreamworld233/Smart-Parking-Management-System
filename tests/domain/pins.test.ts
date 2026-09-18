@@ -1,4 +1,4 @@
-import { pickPins, pinLabel, pinOf, toMarkers } from '../../miniprogram/domain/pins'
+import { pickPins, pinLabel, pinOf, PIN_HIT_H, PIN_HIT_W, toMarkers } from '../../miniprogram/domain/pins'
 import type { ParkingLot, Recommendation } from '../../miniprogram/domain/types'
 
 function lot(id: string, distanceM: number, firstHour: number): ParkingLot {
@@ -155,8 +155,8 @@ describe('toMarkers', () => {
   it('命中区放大：透明 iconPath + width/height 盖住气泡（气泡可点）', () => {
     const m = toMarkers(pins)[0]
     expect(m.iconPath).toBe('/assets/transparent.png')
-    expect(m.width).toBe(100)
-    expect(m.height).toBe(48)
+    expect(m.width).toBe(PIN_HIT_W)
+    expect(m.height).toBe(PIN_HIT_H)
     expect(m.anchor).toEqual({ x: 0.5, y: 0.5 })
   })
 
