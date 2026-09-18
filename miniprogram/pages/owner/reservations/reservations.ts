@@ -1,8 +1,8 @@
 import { formatPlate, formatTimeRangeLabel, platesMatch, RESERVATION_STATUS_LABELS } from '../../../domain/format'
-import { fetchAdminReservations, recognizePlate, verifyReservation } from '../../../services/cloud'
+import { fetchAdminReservations, recognizePlate, resolveCurrentLotId, verifyReservation } from '../../../services/cloud'
 import type { AdminReservationItem, RecognizePlateData } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
-import { clearRole } from '../../../services/storage'
+import { clearRole, setCurrentLotId } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -112,7 +112,28 @@ Page({
    * silent=false：走原 loading 的错误 / no_role / no_lot 分支
    */
   async refresh(silent: boolean) {
-    const r = await fetchAdminReservations()
+    let cur = await resolveCurrentLotId()
+    if (!cur.ok) {
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
+      this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+      return
+    }
+    let r = await fetchAdminReservations(cur.lotId)
+    if (!r.ok && (r.code === 'FORBIDDEN' || r.code === 'NOT_FOUND')) {
+      // storage 里的车场被解绑/删除：清掉重解析再试一次
+      setCurrentLotId('')
+      cur = await resolveCurrentLotId()
+      if (!cur.ok) {
+        if (silent) return
+        this.lastData = null
+        this.lastLoadedAt = 0
+        this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+        return
+      }
+      r = await fetchAdminReservations(cur.lotId)
+    }
     if (!r.ok) {
       if (silent) return
       if (r.code === 'NO_AUTH') {
@@ -125,6 +146,7 @@ Page({
       return
     }
     if (r.data.lot === null) {
+      // 兜底：云端不该返回 null，保留防御
       if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
@@ -133,7 +155,7 @@ Page({
     }
     const now = new Date()
     const cache: ReservationCache = {
-      lotId: r.data.lot._id,
+      lotId: cur.lotId,
       cards: r.data.list.map((x: AdminReservationItem) => ({
         id: x._id,
         plateText: formatPlate(x.plateNo),

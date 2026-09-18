@@ -1,6 +1,6 @@
 import { fetchAdminLot, updateLot } from '../../../services/cloud'
 import type { AdminLot } from '../../../services/cloud'
-import { clearRole } from '../../../services/storage'
+import { clearRole, getCurrentLotId, setCurrentLotId } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -126,14 +126,18 @@ Page({
       this.setData({ state: 'no_role' })
       return
     }
-    if (!r.data.lot) {
+    const lots = r.data.lots
+    if (!lots.length) {
       if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
       this.setData({ state: 'no_lot' })
       return
     }
-    const lot = r.data.lot
+    // 1:N：按 storage 的当前车场取，storage 失效回退首条并写回
+    const stored = getCurrentLotId()
+    const lot = lots.find(l => l._id === stored) ?? lots[0]
+    if (lot._id !== stored) setCurrentLotId(lot._id)
     const cache: LotCache = { lot, vm: toVM(lot) }
     this.lastData = cache
     this.lastLoadedAt = Date.now()

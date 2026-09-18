@@ -1,7 +1,7 @@
 import { formatAmount, formatTimeRangeLabel } from '../../../domain/format'
-import { fetchAdminDashboard, reportAvailability } from '../../../services/cloud'
+import { fetchAdminDashboard, reportAvailability, resolveCurrentLotId } from '../../../services/cloud'
 import type { AdminDashboardData } from '../../../services/cloud'
-import { clearRole } from '../../../services/storage'
+import { clearRole, setCurrentLotId } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -94,11 +94,30 @@ Page({
    * silent=false：走原 loading 的错误 / no_role / no_lot 分支
    */
   async refresh(silent: boolean) {
-    const r = await fetchAdminDashboard()
+    let cur = await resolveCurrentLotId()
+    if (!cur.ok) {
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
+      this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+      return
+    }
+    let r = await fetchAdminDashboard(cur.lotId)
+    if (!r.ok && (r.code === 'FORBIDDEN' || r.code === 'NOT_FOUND')) {
+      // storage 里的车场被解绑/删除：清掉重解析再试一次
+      setCurrentLotId('')
+      cur = await resolveCurrentLotId()
+      if (!cur.ok) {
+        if (silent) return
+        this.lastData = null
+        this.lastLoadedAt = 0
+        this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+        return
+      }
+      r = await fetchAdminDashboard(cur.lotId)
+    }
     if (!r.ok) {
       if (silent) return
-      // NO_AUTH = 当前身份不是 lot_admin（DB 里 role 还没标，或本就是个普通车主）：
-      // 归 no_role 态给「选择身份」入口，别归 error —— error 态切不回角色页
       if (r.code === 'NO_AUTH') {
         this.lastData = null
         this.lastLoadedAt = 0
@@ -109,7 +128,7 @@ Page({
       return
     }
     if (r.data.lot === null) {
-      // adminDashboard 里未绑定车场返回 lot: null（与 adminGetLot 的 no_lot 同一语义）
+      // 兜底：云端不该返回 null（lotId 缺失已 BAD_REQUEST），保留防御
       if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
@@ -117,10 +136,8 @@ Page({
       return
     }
     const d: AdminDashboardData = r.data
-    // 上面 lot === null 已返回；这里类型系统收窄不了跨闭包的赋值，显式非空
     const lot = d.lot!
     const avail = lot.availability
-    // 车场主端只显示当前空余车位数（2026-09-17 PM 口径：余位即可预约，无独立可预约数）
     const spotsText =
       avail && typeof avail.freeSpots === 'number' && typeof avail.totalSpots === 'number'
         ? `${avail.freeSpots} / ${avail.totalSpots}`
