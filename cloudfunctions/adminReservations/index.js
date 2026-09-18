@@ -9,9 +9,15 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const ROLE_WHITELIST = ['driver', 'lot_admin', 'ops_admin']
 
-exports.main = async () => {
+exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
+
+  // 车场主多车场：前端解析当前车场后显式传 lotId（2026-09-18 设计 C1）
+  const { lotId } = event || {}
+  if (typeof lotId !== 'string' || lotId === '') {
+    return { code: 'BAD_REQUEST', message: '缺少车场' }
+  }
 
   const db = cloud.database()
   const users = db.collection('users')
@@ -29,16 +35,18 @@ exports.main = async () => {
 
   let lot
   try {
-    lot = (await lots.where({ adminUserId: OPENID }).limit(1).get()).data[0] ?? null
-  } catch (e) { /* 未绑定按 null */ }
-  if (!lot) {
-    return { code: 0, data: { lot: null, list: [] } }
+    lot = (await lots.doc(lotId).get()).data
+  } catch (e) {
+    return { code: 'NOT_FOUND', message: '车场不存在' }
+  }
+  if (!lot || lot.adminUserId !== OPENID) {
+    return { code: 'FORBIDDEN', message: '只能查看自己管理的车场' }
   }
 
   let list = []
   try {
     const r = await reservations
-      .where({ lotId: lot._id })
+      .where({ lotId })
       .orderBy('arriveTime', 'asc')
       .limit(100)
       .get()

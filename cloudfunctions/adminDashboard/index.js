@@ -18,9 +18,15 @@ function startOfToday(now) {
   return d.getTime()
 }
 
-exports.main = async () => {
+exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) return { code: 'NO_AUTH', message: '缺少微信身份' }
+
+  // 车场主多车场：前端解析当前车场后显式传 lotId（2026-09-18 设计 C1）
+  const { lotId } = event || {}
+  if (typeof lotId !== 'string' || lotId === '') {
+    return { code: 'BAD_REQUEST', message: '缺少车场' }
+  }
 
   const db = cloud.database()
   const users = db.collection('users')
@@ -29,7 +35,7 @@ exports.main = async () => {
   const orders = db.collection('orders')
   const _ = db.command
 
-  // 身份 + 车场：复用 adminGetLot 的口径（一个管理员一个车场）
+  // 身份 + 车场：前端显式传 lotId，读回车场后校验归属（多车场，2026-09-18 设计 C1）
   let role = 'driver'
   try {
     const u = (await users.where({ _openid: OPENID }).limit(1).get()).data[0]
@@ -41,13 +47,14 @@ exports.main = async () => {
 
   let lot
   try {
-    lot = (await lots.where({ adminUserId: OPENID }).limit(1).get()).data[0] ?? null
-  } catch (e) { /* 读失败按未绑定处理 */ }
-  if (!lot) {
-    return { code: 0, data: { lot: null, todayReservations: 0, pendingEntry: 0, todayIncome: 0, pendingList: [] } }
+    lot = (await lots.doc(lotId).get()).data
+  } catch (e) {
+    return { code: 'NOT_FOUND', message: '车场不存在' }
+  }
+  if (!lot || lot.adminUserId !== OPENID) {
+    return { code: 'FORBIDDEN', message: '只能查看自己管理的车场' }
   }
 
-  const lotId = lot._id
   const today = startOfToday(Date.now())
 
   // 三个 count：今日预约 / 待核销。用 where 命令，云数据库支持 _ 命令

@@ -22,6 +22,9 @@ jest.mock(
       })
 
     const mkCollection = (collName: string) => ({
+      doc: (id: string) => ({
+        get: async () => ({ data: mockStore[collName].get(id) ?? null }),
+      }),
       where: (query: Record<string, unknown>) => ({
         count: async () => ({
           total: [...mockStore[collName].values()].filter(matchQuery(query)).length,
@@ -63,7 +66,7 @@ jest.mock(
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const adminDashboard = require('../../cloudfunctions/adminDashboard/index.js')
-const main: () => Promise<any> = adminDashboard.main
+const main: (event?: any) => Promise<any> = adminDashboard.main
 
 function seedUser(overrides: Record<string, unknown> = {}): void {
   mockStore.users.set('openid-test-1', {
@@ -120,21 +123,33 @@ describe('adminDashboard', () => {
 
   it('无微信身份 → NO_AUTH', async () => {
     mockOpenid = null
-    expect((await main()).code).toBe('NO_AUTH')
+    expect((await main({ lotId: 'lot1' })).code).toBe('NO_AUTH')
   })
 
   it('非 lot_admin → NO_AUTH', async () => {
     seedUser({ role: 'driver' })
     seedLot()
-    expect((await main()).code).toBe('NO_AUTH')
+    expect((await main({ lotId: 'lot1' })).code).toBe('NO_AUTH')
   })
 
-  it('未绑定车场 → lot null + 全 0', async () => {
+  it('缺少 lotId → BAD_REQUEST', async () => {
     seedUser()
-    const r = await main()
-    expect(r.code).toBe(0)
-    expect(r.data.lot).toBeNull()
-    expect(r.data.todayReservations).toBe(0)
+    seedLot()
+    expect((await main({})).code).toBe('BAD_REQUEST')
+  })
+
+  it('查看非本人车场 → FORBIDDEN', async () => {
+    seedUser()
+    seedLot()
+    mockStore.lots.set('lot2', {
+      _id: 'lot2',
+      name: '别人家的',
+      address: 'x',
+      adminUserId: 'openid-other',
+      availability: { freeSpots: 1, totalSpots: 2, source: 'reported' },
+    })
+    const r = await main({ lotId: 'lot2' })
+    expect(r.code).toBe('FORBIDDEN')
   })
 
   it('统计：今日预约 / 待核销 / 今日收入（refund 负值相抵）', async () => {
@@ -150,7 +165,7 @@ describe('adminDashboard', () => {
     seedOrder({ amount: -4, type: 'refund', paidAt: NOW })
     seedOrder({ amount: 99, type: 'prepaid', paidAt: NOW - DAY }) // 昨天不算
 
-    const r = await main()
+    const r = await main({ lotId: 'lot1' })
     expect(r.code).toBe(0)
     expect(r.data.todayReservations).toBe(2) // r1+r2（r3 是昨天）
     // pendingEntry 是全量 status 计数，不看 createdAt → r1 + r3 = 2
@@ -164,7 +179,7 @@ describe('adminDashboard', () => {
     for (let i = 0; i < 7; i++) {
       seedReservation('r' + i, { arriveTime: NOW + i * 60 * 60 * 1000 })
     }
-    const r = await main()
+    const r = await main({ lotId: 'lot1' })
     expect(r.data.pendingList.length).toBe(5)
     // 升序：第一条 arriveTime 最早
     expect(r.data.pendingList[0]._id).toBe('r0')

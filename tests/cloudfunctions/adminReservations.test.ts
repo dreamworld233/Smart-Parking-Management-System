@@ -14,6 +14,9 @@ jest.mock(
       Object.entries(query).every(([k, v]) => doc[k] === v)
 
     const mkCollection = (collName: string) => ({
+      doc: (id: string) => ({
+        get: async () => ({ data: mockStore[collName].get(id) ?? null }),
+      }),
       where: (query: Record<string, unknown>) => ({
         orderBy: () => ({
           limit: (n: number) => ({
@@ -48,7 +51,7 @@ jest.mock(
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const adminReservations = require('../../cloudfunctions/adminReservations/index.js')
-const main: () => Promise<any> = adminReservations.main
+const main: (event?: any) => Promise<any> = adminReservations.main
 
 function seedUser(overrides: Record<string, unknown> = {}): void {
   mockStore.users.set('openid-test-1', {
@@ -88,21 +91,31 @@ describe('adminReservations', () => {
 
   it('无微信身份 → NO_AUTH', async () => {
     mockOpenid = null
-    expect((await main()).code).toBe('NO_AUTH')
+    expect((await main({ lotId: 'lot1' })).code).toBe('NO_AUTH')
   })
 
   it('非 lot_admin → NO_AUTH', async () => {
     seedUser({ role: 'driver' })
     seedLot()
-    expect((await main()).code).toBe('NO_AUTH')
+    expect((await main({ lotId: 'lot1' })).code).toBe('NO_AUTH')
   })
 
-  it('未绑定车场 → lot null + 空列表', async () => {
+  it('缺少 lotId → BAD_REQUEST', async () => {
     seedUser()
-    const r = await main()
-    expect(r.code).toBe(0)
-    expect(r.data.lot).toBeNull()
-    expect(r.data.list).toEqual([])
+    seedLot()
+    expect((await main({})).code).toBe('BAD_REQUEST')
+  })
+
+  it('查看非本人车场 → FORBIDDEN', async () => {
+    seedUser()
+    seedLot()
+    mockStore.lots.set('lot2', {
+      _id: 'lot2',
+      name: '别人家的',
+      adminUserId: 'openid-other',
+    })
+    const r = await main({ lotId: 'lot2' })
+    expect(r.code).toBe('FORBIDDEN')
   })
 
   it('列表按 arriveTime 升序 + 精简字段（不带订单内部字段）', async () => {
@@ -112,7 +125,7 @@ describe('adminReservations', () => {
     seedReservation('r2', { arriveTime: Date.now() + 1 * 60 * 60 * 1000 })
     seedReservation('r3', { arriveTime: Date.now(), status: 'entered' })
 
-    const r = (await main()) as any
+    const r = (await main({ lotId: 'lot1' })) as any
     expect(r.code).toBe(0)
     expect(r.data.lot._id).toBe('lot1')
     expect(r.data.list.map((x: { _id: string }) => x._id)).toEqual(['r3', 'r2', 'r1'])
