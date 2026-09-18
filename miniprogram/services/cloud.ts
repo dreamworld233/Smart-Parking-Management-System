@@ -24,6 +24,8 @@ export interface CloudApi {
   database(): CloudDb
 }
 
+import { getCurrentLotId, setCurrentLotId } from './storage'
+
 /**
  * 懒取 wx.cloud，而不是模块加载时快照成常量：
  * 测试在 beforeEach 里才 stub 全局 wx，加载时就固化会让 stub 永远不生效；
@@ -150,12 +152,13 @@ export interface AdminLot {
 
 export interface AdminGetLotData {
   role: 'driver' | 'lot_admin' | 'ops_admin'
-  lot: AdminLot | null
+  /** 车场主名下全部车场（1:N，2026-09-18）。空数组 = 未绑定 */
+  lots: AdminLot[]
 }
 
 /**
- * 车场端身份：取当前用户管理的车场（云函数 adminGetLot）。
- * lot 为 null 表示是车场管理员但未绑定车场，前端显示空态
+ * 车场端身份：取当前用户管理的全部车场（云函数 adminGetLot）。
+ * lots 为空数组表示是车场管理员但未绑定车场，前端显示空态
  */
 export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
   return callFunction<AdminGetLotData>('adminGetLot')
@@ -181,9 +184,9 @@ export interface AdminDashboardData {
   }[]
 }
 
-/** 车场端看板：统计 + 待核销列表（云函数 adminDashboard，规避安全规则缺口） */
-export function fetchAdminDashboard(): Promise<CloudResult<AdminDashboardData>> {
-  return callFunction<AdminDashboardData>('adminDashboard')
+/** 车场端看板：统计 + 待核销列表（云函数 adminDashboard）。lotId 由调用方传入当前车场 */
+export function fetchAdminDashboard(lotId: string): Promise<CloudResult<AdminDashboardData>> {
+  return callFunction<AdminDashboardData>('adminDashboard', { lotId })
 }
 
 export interface ReportAvailabilityData {
@@ -269,9 +272,9 @@ export interface AdminReservationsData {
   list: AdminReservationItem[]
 }
 
-/** 车场端预约核销列表（云函数 adminReservations） */
-export function fetchAdminReservations(): Promise<CloudResult<AdminReservationsData>> {
-  return callFunction<AdminReservationsData>('adminReservations')
+/** 车场端预约核销列表（云函数 adminReservations）。lotId 由调用方传入当前车场 */
+export function fetchAdminReservations(lotId: string): Promise<CloudResult<AdminReservationsData>> {
+  return callFunction<AdminReservationsData>('adminReservations', { lotId })
 }
 
 export interface SwitchRoleData {
@@ -307,4 +310,25 @@ export interface BindLotData {
 /** 车场主绑定车场（云函数 bindLot）：写 lots.adminUserId + users.role = lot_admin */
 export function bindLot(lotId: string): Promise<CloudResult<BindLotData>> {
   return callFunction<BindLotData>('bindLot', { lotId })
+}
+
+export type ResolveCurrentLotResult =
+  | { ok: true; lotId: string }
+  | { ok: false; code: 'no_auth' | 'no_lot' | 'error' }
+
+/**
+ * 车场端解析当前管理的车场 id（1:N）：
+ * 先信 storage（「车场我的」切换时写入）；storage 为空再拉 adminGetLot，
+ * 默认取名下第一个并写回 storage。storage 里的车场若已解绑/删除，
+ * 数据函数会返回 FORBIDDEN/NOT_FOUND，调用方清掉 storage 后重解析（见各页 refresh）
+ */
+export async function resolveCurrentLotId(): Promise<ResolveCurrentLotResult> {
+  const stored = getCurrentLotId()
+  if (stored) return { ok: true, lotId: stored }
+  const r = await fetchAdminLot()
+  if (!r.ok) return { ok: false, code: r.code === 'NO_AUTH' ? 'no_auth' : 'error' }
+  if (!r.data.lots.length) return { ok: false, code: 'no_lot' }
+  const first = r.data.lots[0]._id
+  setCurrentLotId(first)
+  return { ok: true, lotId: first }
 }

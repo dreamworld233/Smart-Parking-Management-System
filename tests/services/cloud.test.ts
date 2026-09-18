@@ -3,6 +3,7 @@ import {
   cancelReservation,
   createReservation,
   ensureLogin,
+  resolveCurrentLotId,
   type CloudApi,
 } from '../../miniprogram/services/cloud'
 
@@ -147,5 +148,49 @@ describe('cancelReservation', () => {
     respond = () => ({ result: { code: 'ALREADY_CANCELLED', message: '该预约已被处理' } })
     const r = await cancelReservation('r1')
     expect(r).toEqual({ ok: false, code: 'ALREADY_CANCELLED', message: '该预约已被处理' })
+  })
+})
+
+describe('resolveCurrentLotId', () => {
+  let store: Record<string, unknown>
+  beforeEach(() => {
+    stubCloud()
+    lastCall = null
+    store = {}
+    const g = globalThis as unknown as {
+      wx: { getStorageSync: (k: string) => unknown; setStorageSync: (k: string, v: unknown) => void }
+    }
+    g.wx = Object.assign(g.wx, {
+      getStorageSync: (k: string) => store[k],
+      setStorageSync: (k: string, v: unknown) => {
+        store[k] = v
+      },
+    })
+  })
+
+  it('storage 有当前车场 → 直接用，不调云函数', async () => {
+    store['qnt.currentLotId'] = 'lotA'
+    respond = () => {
+      throw new Error('不该调用云函数')
+    }
+    await expect(resolveCurrentLotId()).resolves.toEqual({ ok: true, lotId: 'lotA' })
+  })
+
+  it('storage 空 → 拉 adminGetLot 取首条并写回', async () => {
+    respond = () => ({
+      result: { code: 0, data: { role: 'lot_admin', lots: [{ _id: 'lotA' }, { _id: 'lotB' }] } },
+    })
+    await expect(resolveCurrentLotId()).resolves.toEqual({ ok: true, lotId: 'lotA' })
+    expect(store['qnt.currentLotId']).toBe('lotA')
+  })
+
+  it('NO_AUTH → no_auth', async () => {
+    respond = () => ({ result: { code: 'NO_AUTH', message: '非车场管理员' } })
+    await expect(resolveCurrentLotId()).resolves.toEqual({ ok: false, code: 'no_auth' })
+  })
+
+  it('lots 空 → no_lot', async () => {
+    respond = () => ({ result: { code: 0, data: { role: 'lot_admin', lots: [] } } })
+    await expect(resolveCurrentLotId()).resolves.toEqual({ ok: false, code: 'no_lot' })
   })
 })
