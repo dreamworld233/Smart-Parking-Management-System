@@ -3,6 +3,10 @@
 // 复用 adminGetLot 的 stub 手法，加 count() / orderBy().limit().get() / _.gte()。
 // 测试重点是：权限、未绑定车场、三统计（今日/待核销/收入）、待核销列表排序截断。
 
+// 标记为模块：顶层声明（Store/mockStore/main 等）不落入全局作用域，避免与其它
+// stub 式测试文件在同一 jest worker 里被 ts-jest 合并编译时撞名（全局脚本无 import/export）。
+export {}
+
 type Store = Record<string, Map<string, Record<string, unknown>>>
 let mockStore: Store
 let mockOpenid: string | null
@@ -23,7 +27,11 @@ jest.mock(
 
     const mkCollection = (collName: string) => ({
       doc: (id: string) => ({
-        get: async () => ({ data: mockStore[collName].get(id) ?? null }),
+        get: async () => {
+          const doc = mockStore[collName].get(id)
+          if (!doc) throw new Error('document not found') // 真实 SDK doc.get 缺失即抛错
+          return { data: doc }
+        },
       }),
       where: (query: Record<string, unknown>) => ({
         count: async () => ({
@@ -150,6 +158,12 @@ describe('adminDashboard', () => {
     })
     const r = await main({ lotId: 'lot2' })
     expect(r.code).toBe('FORBIDDEN')
+  })
+
+  it('车场不存在 → NOT_FOUND', async () => {
+    seedUser()
+    seedLot()
+    expect((await main({ lotId: 'lot_no_such' })).code).toBe('NOT_FOUND')
   })
 
   it('统计：今日预约 / 待核销 / 今日收入（refund 负值相抵）', async () => {
