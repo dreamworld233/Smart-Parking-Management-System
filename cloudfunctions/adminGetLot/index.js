@@ -1,8 +1,8 @@
 // 车场端身份：按当前登录用户（OPENID）取他管理的车场。
 //
 // 车场管理员 = users.role === 'lot_admin' 且 lots.adminUserId === OPENID。
-// 本轮一个管理员一个车场（limit(1) 取第一条）。没有关联车场不是错误，
-// 返回 data.lot === null，前端显示「尚未绑定车场」空态。
+// 一个管理员可管理多个车场（1:N）：返回名下全部车场（data.lots 数组）。
+// 没有关联车场不是错误，返回 data.lots === []，前端显示「尚未绑定车场」空态。
 //
 // 角色判定在云函数入口（数据模型 §5.6：写操作一律走云函数，角色不押安全规则）。
 // 前端不直读 lots：adminUserId 匹配的安全规则要单独配，走云函数少一个规则缺口。
@@ -34,7 +34,7 @@ exports.main = async () => {
 
   const db = cloud.database()
   const users = db.collection('users')
-  const lots = db.collection('lots')
+  const lotColl = db.collection('lots')
 
   // 读 role：users._id = openid（2a 钉死的约定），但用 where(_openid) 更稳
   // （_id 是 openid 的文档与 _openid 字段同时存在，双条件任一命中即可）
@@ -50,12 +50,14 @@ exports.main = async () => {
     return { code: 'NO_AUTH', message: '非车场管理员' }
   }
 
-  let lot = null
+  // 车场主可管理多个车场（1:N）：返回全部名下车场，不再 limit(1) 取第一条
+  let list = []
   try {
-    lot = (await lots.where({ adminUserId: OPENID }).limit(1).get()).data[0] ?? null
+    const r = await lotColl.where({ adminUserId: OPENID }).limit(20).get()
+    list = r.data.map(pickLot)
   } catch (e) {
-    // lots 读失败：返回空车场不阻塞，前端按未绑定处理；真错误会在后续写操作暴露
+    // lots 读失败：返回空列表不阻塞，前端按未绑定处理；真错误会在后续写操作暴露
   }
 
-  return { code: 0, data: { role, lot: pickLot(lot) } }
+  return { code: 0, data: { role, lots: list } }
 }

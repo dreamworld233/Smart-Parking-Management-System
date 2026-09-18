@@ -105,22 +105,22 @@ describe('adminGetLot', () => {
     const r = await main({})
     expect(r.code).toBe(0)
     expect(r.data.role).toBe('lot_admin')
-    expect(r.data.lot).not.toBeNull()
-    expect(r.data.lot._id).toBe('lot1')
-    expect(r.data.lot.name).toBe('合肥大学(南艳湖校区)停车场')
-    expect(r.data.lot.reservedCount).toBe(3)
+    expect(r.data.lots).toHaveLength(1)
+    expect(r.data.lots[0]._id).toBe('lot1')
+    expect(r.data.lots[0].name).toBe('合肥大学(南艳湖校区)停车场')
+    expect(r.data.lots[0].reservedCount).toBe(3)
     // 只返回精简字段，不把 note 等无关字段带出去（pickLot 白名单）
-    expect(r.data.lot.note).toBeUndefined()
+    expect(r.data.lots[0].note).toBeUndefined()
   })
 
-  it('lot_admin 但没绑定车场 → lot 为 null（不是错误）', async () => {
+  it('lot_admin 但没绑定车场 → lots 为空数组（不是错误）', async () => {
     seedUser()
     const r = await main({})
     expect(r.code).toBe(0)
-    expect(r.data.lot).toBeNull()
+    expect(r.data.lots).toEqual([])
   })
 
-  it('多个绑定车场 → 取第一条（本轮一个管理员一个车场）', async () => {
+  it('多个绑定车场 → 全量返回', async () => {
     seedUser()
     seedLot()
     mockStore.lots.set('lot2', {
@@ -131,6 +131,6 @@ describe('adminGetLot', () => {
     })
     const r = await main({})
     expect(r.code).toBe(0)
-    expect(r.data.lot._id).toBe('lot1')
+    expect(r.data.lots.map((l: { _id: string }) => l._id)).toEqual(['lot1', 'lot2'])
   })
 })
