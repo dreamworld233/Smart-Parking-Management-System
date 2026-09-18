@@ -5,7 +5,7 @@ import { buildArrivalOptions, enterDeadline, isWithinWindow } from '../../domain
 import type { ArrivalOption } from '../../domain/time'
 import { createReservation } from '../../services/cloud'
 import { fetchLotById } from '../../services/lot'
-import { getDefaultPlate, markLotDataDirty, setDefaultPlate } from '../../services/storage'
+import { addVehicle, getDefaultPlate, getVehicles, markLotDataDirty, setDefaultPlate } from '../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error'
 
@@ -33,6 +33,7 @@ Page({
     selectedIdx: 0,
     plate: '',
     plateValid: false,
+    vehicles: [] as string[],
     quote: null as Quote | null,
     /** 入场截止时刻的展示文案（含日期，跨天不写错） */
     deadlineText: '',
@@ -113,6 +114,7 @@ Page({
         // 预填最近一次车牌：记住功能是既有设计（storage 早就有），新用户留空
         plate: getDefaultPlate(),
         plateValid: isValidPlate(getDefaultPlate()),
+        vehicles: getVehicles(),
       })
       this.recompute(0)
     } catch {
@@ -149,6 +151,11 @@ Page({
   onPlateInput(e: WechatMiniprogram.Input) {
     // 输入时实时校验；提交时再验一次（校验是纯函数，两端都有）
     const plate = e.detail.value
+    this.setData({ plate, plateValid: isValidPlate(plate) })
+  },
+
+  onVehicleTap(e: WechatMiniprogram.TouchEvent) {
+    const plate = String(e.currentTarget.dataset.plate)
     this.setData({ plate, plateValid: isValidPlate(plate) })
   },
 
@@ -192,8 +199,9 @@ Page({
       plateNo: plate,
     })
     if (r.ok) {
-      // 记住这次车牌，下次预约预填
+      // 记住这次车牌：进车辆列表（若合法），并保留旧 defaultPlate 键兼容
       setDefaultPlate(plate)
+      if (isValidPlate(plate)) addVehicle(plate)
       // 余位已在云端 -1：置脏，让首页/搜索页下次 onShow 强制重拉，别显示旧余位
       markLotDataDirty()
       wx.showToast({ title: '支付成功（模拟）', icon: 'success' })

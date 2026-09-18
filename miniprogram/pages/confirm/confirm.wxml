@@ -44,6 +44,15 @@
     <!-- 车牌 -->
     <view class="card">
       <view class="card__title">车牌号</view>
+      <view class="plates" wx:if="{{vehicles.length}}">
+        <view
+          wx:for="{{vehicles}}"
+          wx:key="*this"
+          class="plate-chip {{plate === item ? 'plate-chip--on' : ''}}"
+          data-plate="{{item}}"
+          bindtap="onVehicleTap"
+        >{{item}}</view>
+      </view>
       <input
         class="plate {{plate && !plateValid ? 'plate--invalid' : ''}}"
         value="{{plate}}"

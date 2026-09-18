@@ -123,6 +123,29 @@
   margin-top: var(--space-2);
 }
 
+.plates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: var(--space-2);
+}
+
+.plate-chip {
+  padding: 12rpx 24rpx;
+  border-radius: var(--radius-pill);
+  border: 2rpx solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--font-sub);
+  color: var(--color-text);
+  letter-spacing: 2rpx;
+}
+
+.plate-chip--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
 .plate {
   height: 88rpx;
   background: var(--color-bg);
