@@ -29,6 +29,10 @@ export interface MapMarker {
   longitude: number
   width: number
   height: number
+  /** 透明图标：marker 命中区（width×height）盖住整个气泡。label 是视觉，不参与点击 */
+  iconPath: string
+  /** 图标中心对准坐标点（默认锚点即 0.5/0.5，显式写出防将来改忘） */
+  anchor: { x: number; y: number }
   label: {
     content: string
     fontSize: number
@@ -108,8 +112,12 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     id: i,
     latitude: p.latitude,
     longitude: p.longitude,
-    width: 1,
-    height: 1,
+    // 命中区要盖住气泡：以前 width/height 是 1×1，气泡点不到（2026-09-17 组员反馈）。
+    // 透明图标只负责「点得到」，label 仍是唯一视觉
+    iconPath: '/assets/transparent.png',
+    width: 100,
+    height: 48,
+    anchor: { x: 0.5, y: 0.5 },
     label: {
       content: p.label,
       fontSize: p.selected ? PIN_FONT_SELECTED : PIN_FONT,

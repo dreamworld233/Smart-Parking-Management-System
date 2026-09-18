@@ -151,4 +151,18 @@ describe('toMarkers', () => {
     expect(selected.fontSize).toBeGreaterThan(plain.fontSize)
     expect(selected.padding).toBeGreaterThan(plain.padding)
   })
+
+  it('命中区放大：透明 iconPath + width/height 盖住气泡（气泡可点）', () => {
+    const m = toMarkers(pins)[0]
+    expect(m.iconPath).toBe('/assets/transparent.png')
+    expect(m.width).toBe(100)
+    expect(m.height).toBe(48)
+    expect(m.anchor).toEqual({ x: 0.5, y: 0.5 })
+  })
+
+  it('选中态只体现在 label 样式，命中区与默认一致', () => {
+    const [plain, selected] = toMarkers(pins)
+    expect(selected.width).toBe(plain.width)
+    expect(selected.iconPath).toBe(plain.iconPath)
+  })
 })
