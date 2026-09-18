@@ -89,7 +89,6 @@ Page({
     if (current && current._id !== stored) setCurrentLotId(current._id)
     this.lastData = { lotName, lotList, currentLotId: current ? current._id : '' }
     this.lastLoadedAt = Date.now()
-    if (silent) return
     this.setData({ state: 'ready', lotName, lotList, currentLotId: current ? current._id : '' })
   },
 
@@ -115,9 +114,11 @@ Page({
       return
     }
     setCurrentLotId(id)
-    this.setData({ lotDialog: false, currentLotId: id })
+    const picked = this.data.lotList.find(l => l.id === id)
+    // 同步 lastData，防下次 onShow 缓存命中回显旧车场/旧高亮
+    this.lastData = { lotName: picked ? picked.name : '尚未绑定车场', lotList: this.data.lotList, currentLotId: id }
+    this.setData({ lotDialog: false, currentLotId: id, lotName: picked ? picked.name : '尚未绑定车场' })
     wx.showToast({ title: '已切换车场', icon: 'success' })
-    // 其他车场页（看板/预约/车场）切 tab 时会经 resolveCurrentLotId 读到新值
   },
 
   noop() {},
