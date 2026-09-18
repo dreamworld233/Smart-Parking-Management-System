@@ -7,10 +7,18 @@
 }
 
 .page {
+  /* scroll-view 需显式高度才可滚：wrap 是 relative+overflow:hidden，
+     不绝对定位的话高度按内容算、超出屏直接被裁 */
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   /* padding-top 由 TS 算成 px 内联传入（navTop = 胶囊下沿 + 8），刘海屏不被状态栏盖住 */
   padding: 0 var(--space-4);
   /* tabBar 是 absolute 覆盖层，由页面让出它的高度 */
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .me {
@@ -58,4 +66,93 @@
   color: var(--color-text-weak);
   text-align: center;
   margin-top: var(--space-6);
+}
+
+/* ---- 我的车辆卡 ---- */
+/* 基类 .card 是水平 flex（space-between 给「切换身份」卡用的），
+   车辆卡要垂直堆叠 + 子项占满整行 */
+.vehicles {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.vehicles__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vehicles__title {
+  font-size: var(--font-body);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.vehicles__add {
+  font-size: var(--font-sub);
+  color: var(--color-primary);
+  font-weight: 600;
+  padding: 8rpx 16rpx;
+}
+
+.vehicles__list {
+  margin-top: var(--space-2);
+}
+
+.vehicles__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18rpx 0;
+  border-bottom: 2rpx solid var(--color-border);
+}
+
+.vehicles__plate {
+  font-size: var(--font-body);
+  letter-spacing: 2rpx;
+  color: var(--color-text);
+}
+
+.vehicles__del {
+  font-size: var(--font-sub);
+  color: var(--color-danger);
+  padding: 8rpx 12rpx;
+}
+
+.vehicles__empty {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  margin-top: var(--space-2);
+}
+
+.vehicles__addrow {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.vehicles__input {
+  flex: 1;
+  height: 72rpx;
+  background: var(--color-bg);
+  border: 2rpx solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 0 20rpx;
+  font-size: var(--font-body);
+  letter-spacing: 4rpx;
+}
+
+.vehicles__input--invalid {
+  border-color: var(--color-danger);
+}
+
+.vehicles__ok {
+  padding: 0 36rpx;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-card);
+  font-size: var(--font-sub);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
 }

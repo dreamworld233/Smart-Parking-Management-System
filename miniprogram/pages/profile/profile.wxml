@@ -1,9 +1,35 @@
 <view class="wrap">
-  <view class="page" style="padding-top: {{navTop}}px">
+  <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
     <view class="me">
       <view class="me__avatar">🚗</view>
       <view class="me__identity">{{identityText}}</view>
       <view class="me__plate">常用车牌 {{plateText}}</view>
+    </view>
+
+    <!-- 我的车辆：列表 + 添加（1:N，本地存储） -->
+    <view class="card vehicles">
+      <view class="vehicles__head">
+        <text class="vehicles__title">我的车辆</text>
+        <text class="vehicles__add" bindtap="onToggleAdd">{{adding ? '取消' : '+ 添加'}}</text>
+      </view>
+      <view class="vehicles__list" wx:if="{{vehicles.length}}">
+        <view wx:for="{{vehicles}}" wx:key="*this" class="vehicles__item">
+          <text class="vehicles__plate">{{item}}</text>
+          <text class="vehicles__del" data-plate="{{item}}" bindtap="onRemoveVehicle">删除</text>
+        </view>
+      </view>
+      <view class="vehicles__empty" wx:else>还没有车辆，预约时可直接输入车牌</view>
+      <view class="vehicles__addrow" wx:if="{{adding}}">
+        <input
+          class="vehicles__input {{plateInput && !plateInputValid ? 'vehicles__input--invalid' : ''}}"
+          value="{{plateInput}}"
+          placeholder="输入车牌，如 京A8F2K9"
+          maxlength="8"
+          bindinput="onVehicleInput"
+          focus
+        />
+        <view class="vehicles__ok" bindtap="onConfirmAdd">确定</view>
+      </view>
     </view>
 
     <view class="card" bindtap="onSwitchRole">
@@ -12,5 +38,5 @@
     </view>
 
     <view class="version">智慧停车 · 车主端</view>
-  </view>
+  </scroll-view>
 </view>
