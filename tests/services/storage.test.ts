@@ -7,6 +7,7 @@ import {
   pushSearchHistory,
   removeVehicle,
   setCurrentLotId,
+  VEHICLES_MAX,
 } from '../../miniprogram/services/storage'
 
 let store: Record<string, unknown> = {}
@@ -110,10 +111,11 @@ describe('addVehicle / removeVehicle', () => {
   })
 
   it('超上限丢最旧', () => {
-    for (let i = 0; i < 5; i++) addVehicle(`京C${i}000`)
+    for (let i = 0; i < VEHICLES_MAX; i++) addVehicle(`京C${i}000`)
     const next = addVehicle('京D00000')
-    expect(next).toHaveLength(5)
+    expect(next).toHaveLength(VEHICLES_MAX)
     expect(next[0]).toBe('京D00000')
+    expect(next).not.toContain('京C0000')
   })
 
   it('删除后返回剩余列表', () => {
