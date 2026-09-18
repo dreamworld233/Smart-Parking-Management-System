@@ -17,6 +17,16 @@
   padding: 0 28rpx 20rpx;
 }
 
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+  margin-right: 20rpx;
+  /* 触摸区 ≥ 88rpx：padding 扩命中、负 margin 抵消（与 confirm 页同套路） */
+  padding: 24rpx 20rpx;
+  margin: -24rpx -20rpx 0 0;
+}
+
 .bar__title {
   font-size: 32rpx;
   font-weight: 600;
