@@ -1,4 +1,13 @@
-import { getSearchHistory, pushSearchHistory } from '../../miniprogram/services/storage'
+import {
+  addVehicle,
+  getCurrentLotId,
+  getDefaultPlate,
+  getSearchHistory,
+  getVehicles,
+  pushSearchHistory,
+  removeVehicle,
+  setCurrentLotId,
+} from '../../miniprogram/services/storage'
 
 let store: Record<string, unknown> = {}
 
@@ -69,5 +78,76 @@ describe('pushSearchHistory', () => {
     // 页面若拿 this.data.history 当基准，两个入口先后写入时会互相覆盖
     store[KEY] = ['别处写的']
     expect(pushSearchHistory('万象城')).toEqual(['万象城', '别处写的'])
+  })
+})
+
+describe('getVehicles', () => {
+  beforeEach(stubWx)
+
+  it('没存过或非数组时返回空数组', () => {
+    expect(getVehicles()).toEqual([])
+    store['qnt.vehicles'] = '脏数据'
+    expect(getVehicles()).toEqual([])
+  })
+
+  it('剔除非字符串项', () => {
+    store['qnt.vehicles'] = ['京A12345', 42, null]
+    expect(getVehicles()).toEqual(['京A12345'])
+  })
+})
+
+describe('addVehicle / removeVehicle', () => {
+  beforeEach(stubWx)
+
+  it('添加置顶并去重', () => {
+    store['qnt.vehicles'] = ['京B00001']
+    expect(addVehicle('京A12345')).toEqual(['京A12345', '京B00001'])
+  })
+
+  it('重复添加提到最前不重复', () => {
+    store['qnt.vehicles'] = ['京A12345', '京B00001']
+    expect(addVehicle('京B00001')).toEqual(['京B00001', '京A12345'])
+  })
+
+  it('超上限丢最旧', () => {
+    for (let i = 0; i < 5; i++) addVehicle(`京C${i}000`)
+    const next = addVehicle('京D00000')
+    expect(next).toHaveLength(5)
+    expect(next[0]).toBe('京D00000')
+  })
+
+  it('删除后返回剩余列表', () => {
+    store['qnt.vehicles'] = ['京A12345', '京B00001']
+    expect(removeVehicle('京A12345')).toEqual(['京B00001'])
+  })
+})
+
+describe('getDefaultPlate 回退车辆列表', () => {
+  beforeEach(stubWx)
+
+  it('defaultPlate 旧值优先', () => {
+    store['qnt.defaultPlate'] = '京X00001'
+    store['qnt.vehicles'] = ['京A12345']
+    expect(getDefaultPlate()).toBe('京X00001')
+  })
+
+  it('无旧值回退车辆首条', () => {
+    store['qnt.vehicles'] = ['京A12345', '京B00001']
+    expect(getDefaultPlate()).toBe('京A12345')
+  })
+})
+
+describe('currentLotId', () => {
+  beforeEach(stubWx)
+
+  it('空或脏形状返回空串', () => {
+    expect(getCurrentLotId()).toBe('')
+    store['qnt.currentLotId'] = 42
+    expect(getCurrentLotId()).toBe('')
+  })
+
+  it('set 后能读回', () => {
+    setCurrentLotId('lot1')
+    expect(getCurrentLotId()).toBe('lot1')
   })
 })

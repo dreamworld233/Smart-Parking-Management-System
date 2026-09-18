@@ -5,6 +5,12 @@ const PLATE_KEY = 'qnt.defaultPlate'
 const SESSION_KEY = 'qnt.session'
 /** 车场数据脏标志：预约/取消后置位，首页/搜索页 onShow 消费并强制重拉（余位变了） */
 const LOT_DIRTY_KEY = 'qnt.lotDirty'
+/** 车主车辆列表（车牌数组，本地存储，换设备丢失 —— 用户拍板接受） */
+const VEHICLES_KEY = 'qnt.vehicles'
+/** 车场主当前管理的车场 id（本地存储；切换在「车场我的」） */
+const CURRENT_LOT_KEY = 'qnt.currentLotId'
+/** 车辆数上限 */
+export const VEHICLES_MAX = 5
 
 export interface Session {
   token: string
@@ -33,7 +39,9 @@ export function clearRole(): void {
  */
 export function getDefaultPlate(): string {
   const v = wx.getStorageSync(PLATE_KEY)
-  return typeof v === 'string' ? v : ''
+  if (typeof v === 'string' && v !== '') return v
+  // 兼容：老用户只有 defaultPlate；新用户走车辆列表
+  return getVehicles()[0] ?? ''
 }
 
 export function setDefaultPlate(plate: string): void {
@@ -103,4 +111,37 @@ export function pushSearchHistory(keyword: string): string[] {
     .slice(0, SEARCH_HISTORY_MAX)
   wx.setStorageSync(SEARCH_HISTORY_KEY, next)
   return next
+}
+
+/**
+ * 已存车辆列表。与 searchHistory 同规格地校验形状：非数组 → 空；
+ * 非字符串项逐条剔，一条脏数据不该让整个列表没掉
+ */
+export function getVehicles(): string[] {
+  const v = wx.getStorageSync(VEHICLES_KEY)
+  if (!Array.isArray(v)) return []
+  return v.filter((item): item is string => typeof item === 'string')
+}
+
+/** 添加车辆：去重置顶、截到上限。返回写入后的列表 */
+export function addVehicle(plate: string): string[] {
+  const next = [plate].concat(getVehicles().filter(p => p !== plate)).slice(0, VEHICLES_MAX)
+  wx.setStorageSync(VEHICLES_KEY, next)
+  return next
+}
+
+/** 删除车辆。返回写入后的列表 */
+export function removeVehicle(plate: string): string[] {
+  const next = getVehicles().filter(p => p !== plate)
+  wx.setStorageSync(VEHICLES_KEY, next)
+  return next
+}
+
+export function getCurrentLotId(): string {
+  const v = wx.getStorageSync(CURRENT_LOT_KEY)
+  return typeof v === 'string' && v !== '' ? v : ''
+}
+
+export function setCurrentLotId(id: string): void {
+  wx.setStorageSync(CURRENT_LOT_KEY, id)
 }
