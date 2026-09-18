@@ -11,10 +11,12 @@
 
 .detail__back {
   flex: none;
-  padding-bottom: var(--space-2);
   font-size: var(--font-sub);
   font-weight: 600;
   color: var(--color-primary);
+  /* 与页面返回键同套路：命中区撑大，负 margin 抵消布局 */
+  padding: 20rpx 24rpx;
+  margin: -20rpx -24rpx;
 }
 
 .detail__body {
