@@ -109,29 +109,29 @@ Page({
   async refresh(silent: boolean) {
     const r = await fetchAdminLot()
     if (!r.ok) {
-      if (silent) return
       if (r.code === 'NO_AUTH') {
         this.lastData = null
         this.lastLoadedAt = 0
-        this.setData({ state: 'no_role' })
+        if (!silent) this.setData({ state: 'no_role' })
         return
       }
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'error' })
       return
     }
     if (r.data.role !== 'lot_admin') {
-      if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
-      this.setData({ state: 'no_role' })
+      if (!silent) this.setData({ state: 'no_role' })
       return
     }
     const lots = r.data.lots
     if (!lots.length) {
-      if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
-      this.setData({ state: 'no_lot' })
+      if (!silent) this.setData({ state: 'no_lot' })
       return
     }
     // 1:N：按 storage 的当前车场取，storage 失效回退首条并写回

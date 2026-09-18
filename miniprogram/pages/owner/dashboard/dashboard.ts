@@ -96,10 +96,18 @@ Page({
   async refresh(silent: boolean) {
     let cur = await resolveCurrentLotId()
     if (!cur.ok) {
+      if (cur.code === 'no_auth' || cur.code === 'no_lot') {
+        // 角色被撤/车场解绑是权威态：静默刷新也要清缓存，下次 onShow 不再糊弄
+        this.lastData = null
+        this.lastLoadedAt = 0
+        if (!silent) this.setData({ state: cur.code === 'no_auth' ? 'no_role' : 'no_lot' })
+        return
+      }
+      // error（瞬时网络/云错）：静默保留旧缓存，非静默清缓存置错误态
       if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
-      this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+      this.setData({ state: 'error' })
       return
     }
     let r = await fetchAdminDashboard(cur.lotId)
@@ -108,10 +116,18 @@ Page({
       setCurrentLotId('')
       cur = await resolveCurrentLotId()
       if (!cur.ok) {
+        if (cur.code === 'no_auth' || cur.code === 'no_lot') {
+          // 角色被撤/车场解绑是权威态：静默刷新也要清缓存，下次 onShow 不再糊弄
+          this.lastData = null
+          this.lastLoadedAt = 0
+          if (!silent) this.setData({ state: cur.code === 'no_auth' ? 'no_role' : 'no_lot' })
+          return
+        }
+        // error（瞬时网络/云错）：静默保留旧缓存，非静默清缓存置错误态
         if (silent) return
         this.lastData = null
         this.lastLoadedAt = 0
-        this.setData({ state: cur.code === 'no_auth' ? 'no_role' : cur.code === 'no_lot' ? 'no_lot' : 'error' })
+        this.setData({ state: 'error' })
         return
       }
       r = await fetchAdminDashboard(cur.lotId)
