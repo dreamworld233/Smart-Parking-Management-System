@@ -12,15 +12,20 @@ jest.mock(
   'wx-server-sdk',
   () => {
     const mkCollection = (collName: string) => ({
-      where: (query: Record<string, unknown>) => ({
-        limit: () => ({
+      where: (query: Record<string, unknown>) => {
+        // 同时支持 where().limit()（users 取 role）与 where().orderBy().limit()（lots 多车场）
+        const makeLimit = () => ({
           get: async () => ({
             data: [...mockStore[collName].values()]
               .filter(d => Object.entries(query).every(([k, v]) => d[k] === v))
               .map(d => ({ ...d })),
           }),
-        }),
-      }),
+        })
+        return {
+          orderBy: () => ({ limit: makeLimit }),
+          limit: makeLimit,
+        }
+      },
     })
 
     return {

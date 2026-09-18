@@ -53,7 +53,7 @@ exports.main = async () => {
   // 车场主可管理多个车场（1:N）：返回全部名下车场，不再 limit(1) 取第一条
   let list = []
   try {
-    const r = await lotColl.where({ adminUserId: OPENID }).limit(20).get()
+    const r = await lotColl.where({ adminUserId: OPENID }).orderBy('_id', 'asc').limit(20).get()
     list = r.data.map(pickLot)
   } catch (e) {
     // lots 读失败：返回空列表不阻塞，前端按未绑定处理；真错误会在后续写操作暴露
