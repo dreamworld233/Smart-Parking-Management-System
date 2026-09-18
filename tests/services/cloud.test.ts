@@ -193,4 +193,11 @@ describe('resolveCurrentLotId', () => {
     respond = () => ({ result: { code: 0, data: { role: 'lot_admin', lots: [] } } })
     await expect(resolveCurrentLotId()).resolves.toEqual({ ok: false, code: 'no_lot' })
   })
+
+  it('云函数网络失败 → error', async () => {
+    respond = () => {
+      throw new Error('timeout')
+    }
+    await expect(resolveCurrentLotId()).resolves.toEqual({ ok: false, code: 'error' })
+  })
 })
