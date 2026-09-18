@@ -44,6 +44,13 @@ interface LotCache {
 /** 车场配置低频变：10 分钟内切 tab 直接用旧渲染，超过才重拉 */
 const CACHE_TTL_MS = 10 * 60 * 1000
 
+/** 收费价格上限（元）：车位数量已限量，价格无上限会出离谱值（2026-09-17 组员反馈） */
+const PRICE_MAX = 200
+const CAP_MAX = 1000
+/** 计费步长（分钟）：过小无意义、过大不合理 */
+const STEP_MIN = 5
+const STEP_MAX = 120
+
 Page({
   data: {
     state: 'loading' as ViewState,
@@ -212,6 +219,16 @@ Page({
     if (numeric) {
       const n = Number(val)
       if (!Number.isFinite(n) || n < 0) {
+        this.setData({ inputInvalid: true })
+        return
+      }
+      // 步长独立上下限；单价/夜间费率上限 PRICE_MAX；封顶上限 CAP_MAX
+      const over = field === 'stepMinutes'
+        ? (!Number.isInteger(n) || n < STEP_MIN || n > STEP_MAX)
+        : field === 'capPerDay'
+          ? n > CAP_MAX
+          : n > PRICE_MAX
+      if (over) {
         this.setData({ inputInvalid: true })
         return
       }
