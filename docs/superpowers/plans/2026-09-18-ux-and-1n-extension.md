@@ -1234,8 +1234,10 @@ describe('resolveCurrentLotId', () => {
 
 - [ ] **Step 5: 跑测试**
 
-Run: `npx jest tests/services/cloud.test.ts && npx tsc --noEmit`
-Expected: 全过 + exit 0
+Run: `npx jest tests/services/cloud.test.ts`
+Expected: 全过
+
+⚠️ **中间红态（2026-09-18 质量审查确认）：** `AdminGetLotData.lot → lots` 与两 data 函数加必填 lotId 后，`npx tsc --noEmit` 在此 commit 上**必然报错**（dashboard.ts:97 / reservations.ts:115 缺 lotId 实参；lot.ts:129,136 / profile.ts:74 读旧 `.lot` 字段）。这是计划内瞬态：Task 12 修 dashboard/reservations/lot，Task 13 修 profile，**Task 13 落地后 tsc 才绿**。不要把这个 commit 当绿色里程碑。
 
 - [ ] **Step 6: 提交**
 
