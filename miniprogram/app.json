@@ -1,7 +1,6 @@
 {
   "pages": [
     "pages/role-select/role-select",
-    "pages/spike-map/spike-map",
     "pages/home/home",
     "pages/search/search",
     "pages/confirm/confirm",
