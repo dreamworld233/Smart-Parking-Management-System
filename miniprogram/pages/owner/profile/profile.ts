@@ -1,11 +1,13 @@
 import { fetchAdminLot } from '../../../services/cloud'
-import { clearRole } from '../../../services/storage'
+import { clearRole, getCurrentLotId, setCurrentLotId } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
 /** 个人信息渲染快照（低频：身份与车场名不会每次切 tab 都变），TTL 放长 */
 interface ProfileCache {
   lotName: string
+  lotList: { id: string; name: string }[]
+  currentLotId: string
 }
 
 /** 个人信息低频变：10 分钟内切 tab 直接用旧渲染，超过才重拉 */
@@ -16,6 +18,12 @@ Page({
     state: 'loading' as ViewState,
     navTop: 100,
     lotName: '',
+    /** 名下全部车场（>1 才显示切换卡） */
+    lotList: [] as { id: string; name: string }[],
+    /** 当前选中的车场 id（高亮用） */
+    currentLotId: '',
+    /** 切换车场弹窗 */
+    lotDialog: false,
     identityText: '车场管理员',
   },
 
@@ -42,7 +50,7 @@ Page({
   async load(force = false) {
     const cached = this.lastData
     if (cached && !force && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
-      this.setData({ state: 'ready', lotName: cached.lotName })
+      this.setData({ state: 'ready', lotName: cached.lotName, lotList: cached.lotList, currentLotId: cached.currentLotId })
       void this.refresh(true)
       return
     }
@@ -54,27 +62,35 @@ Page({
   async refresh(silent: boolean) {
     const r = await fetchAdminLot()
     if (!r.ok) {
-      if (silent) return
       if (r.code === 'NO_AUTH') {
         this.lastData = null
         this.lastLoadedAt = 0
-        this.setData({ state: 'no_role' })
+        if (!silent) this.setData({ state: 'no_role' })
         return
       }
+      if (silent) return
+      this.lastData = null
+      this.lastLoadedAt = 0
       this.setData({ state: 'error' })
       return
     }
     if (r.data.role !== 'lot_admin') {
-      if (silent) return
       this.lastData = null
       this.lastLoadedAt = 0
-      this.setData({ state: 'no_role' })
+      if (!silent) this.setData({ state: 'no_role' })
       return
     }
-    const lotName = r.data.lot ? r.data.lot.name : '尚未绑定车场'
-    this.lastData = { lotName }
+    const lots = r.data.lots
+    const lotList = lots.map(l => ({ id: l._id, name: l.name }))
+    // 1:N：当前车场 = storage 值，失效回退首条
+    const stored = getCurrentLotId()
+    const current = lots.find(l => l._id === stored) ?? lots[0] ?? null
+    const lotName = current ? current.name : '尚未绑定车场'
+    if (current && current._id !== stored) setCurrentLotId(current._id)
+    this.lastData = { lotName, lotList, currentLotId: current ? current._id : '' }
     this.lastLoadedAt = Date.now()
-    this.setData({ state: 'ready', lotName })
+    if (silent) return
+    this.setData({ state: 'ready', lotName, lotList, currentLotId: current ? current._id : '' })
   },
 
   /** 切换身份：先清 role，否则 role-select onLoad 会 reLaunch 回本端首页，进不了选择页 */
@@ -82,6 +98,29 @@ Page({
     clearRole()
     wx.reLaunch({ url: '/pages/role-select/role-select' })
   },
+
+  /** 打开切换车场弹窗（名下多车场才显示入口） */
+  onShowLots() {
+    this.setData({ lotDialog: true })
+  },
+
+  onCloseLots() {
+    this.setData({ lotDialog: false })
+  },
+
+  onPickLot(e: WechatMiniprogram.TouchEvent) {
+    const id = String(e.currentTarget.dataset.id)
+    if (id === this.data.currentLotId) {
+      this.setData({ lotDialog: false })
+      return
+    }
+    setCurrentLotId(id)
+    this.setData({ lotDialog: false, currentLotId: id })
+    wx.showToast({ title: '已切换车场', icon: 'success' })
+    // 其他车场页（看板/预约/车场）切 tab 时会经 resolveCurrentLotId 读到新值
+  },
+
+  noop() {},
 
   onBindLot() {
     // 绑定会改车场归属，先失效缓存，回来时强制重拉

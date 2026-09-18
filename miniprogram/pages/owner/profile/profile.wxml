@@ -25,12 +25,36 @@
         <view class="me__lot">{{lotName}}</view>
       </view>
 
+      <view class="card" wx:if="{{lotList.length > 1}}" bindtap="onShowLots">
+        <text>切换车场</text>
+        <text class="card__arrow">›</text>
+      </view>
+
       <view class="card" bindtap="onPickRole">
         <text>切换身份</text>
         <text class="card__arrow">›</text>
       </view>
 
       <view class="version">智慧停车 · 车场端</view>
+    </view>
+
+    <view class="mask" wx:if="{{lotDialog}}" bindtap="onCloseLots">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">切换车场</view>
+        <view
+          wx:for="{{lotList}}"
+          wx:key="id"
+          class="lot-opt {{item.id === currentLotId ? 'lot-opt--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickLot"
+        >
+          <text>{{item.name}}</text>
+          <text class="lot-opt__mark" wx:if="{{item.id === currentLotId}}">✓</text>
+        </view>
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseLots">取消</view>
+        </view>
+      </view>
     </view>
   </block>
 </view>

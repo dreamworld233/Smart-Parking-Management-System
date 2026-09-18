@@ -59,3 +59,62 @@
   text-align: center;
   margin-top: var(--space-6);
 }
+
+.mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog {
+  width: 600rpx;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+}
+
+.dialog__title {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
+}
+
+.lot-opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22rpx 0;
+  border-bottom: 2rpx solid var(--color-border);
+  font-size: var(--font-body);
+  color: var(--color-text);
+}
+
+.lot-opt--on {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.lot-opt__mark {
+  color: var(--color-primary);
+}
+
+.dialog__btns {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
+.dialog__btn {
+  padding: 12rpx 32rpx;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
