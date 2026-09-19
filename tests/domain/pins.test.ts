@@ -157,7 +157,7 @@ describe('toMarkers', () => {
     expect(m.iconPath).toBe('/assets/pin-p.png')
     expect(m.width).toBe(PIN_HIT_W)
     expect(m.height).toBe(PIN_HIT_H)
-    expect(m.anchor).toEqual({ x: 0.5, y: 0.5 })
+    expect(m.anchor).toEqual({ x: 0.18, y: 0.77 })
   })
 
   it('选中态只体现在 label 样式，命中区与默认一致', () => {

@@ -15,6 +15,10 @@ const PIN_FG_OFF = '#0f172a'
  *   label 字号/格式若变，这个尺寸要一起重估 */
 export const PIN_HIT_W = 100
 export const PIN_HIT_H = 48
+/** pin-p.png 里 P 角标尖点像素坐标（100×48）：x=18,y=37。
+ *   anchor 对齐这点，缩放时地理点不漂 */
+const PIN_ANCHOR_X = 0.18
+const PIN_ANCHOR_Y = 0.77
 
 /** 一个地图图钉。首页与搜索页共用同一套结构，避免两页各写一份又慢慢漂移 */
 export interface MapPin {
@@ -122,7 +126,8 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     iconPath: '/assets/pin-p.png',
     width: PIN_HIT_W,
     height: PIN_HIT_H,
-    anchor: { x: 0.5, y: 0.5 },
+    // 地理坐标锚到 P 角标尖点，不锚命中区中心；缩放时不会看着「飘」
+    anchor: { x: PIN_ANCHOR_X, y: PIN_ANCHOR_Y },
     label: {
       content: p.label,
       fontSize: p.selected ? PIN_FONT_SELECTED : PIN_FONT,
