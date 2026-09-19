@@ -23,8 +23,8 @@
   color: var(--color-primary);
   line-height: 1;
   /* 触摸区 ≥ 88rpx：padding 扩命中、负 margin 抵消，不挤动顶栏其他项 */
-  padding: 24rpx 20rpx;
-  margin: -24rpx -20rpx;
+  padding: 32rpx 28rpx;
+  margin: -32rpx -28rpx;
 }
 
 .bar__title {

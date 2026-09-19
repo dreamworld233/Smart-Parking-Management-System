@@ -30,6 +30,11 @@
         <text class="card__arrow">›</text>
       </view>
 
+      <view class="card" bindtap="onBindLot">
+        <text>关联新停车场</text>
+        <text class="card__arrow">›</text>
+      </view>
+
       <view class="card" bindtap="onPickRole">
         <text>切换身份</text>
         <text class="card__arrow">›</text>

@@ -58,8 +58,9 @@ export interface MapMarker {
  */
 export function pinLabel(lot: ParkingLot): string {
   // 未签约没有价格：图钉只标距离，别用「¥」糊弄
-  if (!lot.signed || !lot.pricing) return formatDistance(lot.distanceM)
-  return `¥${lot.pricing.firstHour} · ${formatDistance(lot.distanceM)}`
+  const distance = formatDistance(lot.distanceM)
+  if (!lot.signed || !lot.pricing) return `P ${distance}`
+  return `P ¥${lot.pricing.firstHour} · ${distance}`
 }
 
 export function pinOf(rec: Recommendation, state: { selected: boolean }): MapPin {

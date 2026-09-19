@@ -15,8 +15,8 @@
   font-weight: 600;
   color: var(--color-primary);
   /* 与页面返回键同套路：命中区撑大，负 margin 抵消布局；底部保留原 16rpx 呼吸间距 */
-  padding: 20rpx 24rpx;
-  margin: -20rpx -24rpx -4rpx;
+  padding: 28rpx 32rpx;
+  margin: -28rpx -32rpx -12rpx;
 }
 
 .detail__body {
