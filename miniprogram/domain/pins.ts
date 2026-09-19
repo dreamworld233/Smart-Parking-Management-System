@@ -9,13 +9,13 @@ const PIN_BG_ON = '#2563eb'
 const PIN_BG_OFF = '#ffffff'
 const PIN_FG_ON = '#ffffff'
 const PIN_FG_OFF = '#0f172a'
-/** 命中区尺寸：覆盖 P 角标 + 价格气泡，保证两者都可点。 */
-export const PIN_HIT_W = 128
+/** 命中区尺寸：只包 P 角标（不覆盖价格气泡），点击以 P 为准。 */
+export const PIN_HIT_W = 56
 export const PIN_HIT_H = 72
-/** pin-p*.png 里 P 角标尖点像素坐标（128×72）：x=24,y=56。
+/** pin-p*.png 里 P 角标尖点像素坐标（56×72）：x=28,y=58。
  *   anchor 对齐这点，缩放时地理点不漂 */
-const PIN_ANCHOR_X = 24 / PIN_HIT_W
-const PIN_ANCHOR_Y = 56 / PIN_HIT_H
+const PIN_ANCHOR_X = 28 / PIN_HIT_W
+const PIN_ANCHOR_Y = 58 / PIN_HIT_H
 
 /** 一个地图图钉。首页与搜索页共用同一套结构，避免两页各写一份又慢慢漂移 */
 export interface MapPin {
@@ -118,8 +118,7 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     id: i,
     latitude: p.latitude,
     longitude: p.longitude,
-    // 命中区要盖住气泡：以前 width/height 是 1×1，气泡点不到（2026-09-17 组员反馈）。
-    // 图标左侧是独立 P 角标，其余透明扩成整块点击域，气泡与角标都能点
+    // 命中区只给 P 角标：交互统一点 P，气泡只做展示，避免点击歧义
     iconPath: p.selected ? '/assets/pin-p-selected.png' : '/assets/pin-p.png',
     width: PIN_HIT_W,
     height: PIN_HIT_H,

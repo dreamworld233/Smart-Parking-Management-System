@@ -152,17 +152,18 @@ describe('toMarkers', () => {
     expect(selected.padding).toBe(plain.padding)
   })
 
-  it('命中区放大：P 角标图标 + width/height 盖住气泡（角标与气泡都可点）', () => {
+  it('命中区绑定 P 角标：width/height 仅包角标，气泡不参与点击', () => {
     const m = toMarkers(pins)[0]
     expect(m.iconPath).toBe('/assets/pin-p.png')
     expect(m.width).toBe(PIN_HIT_W)
     expect(m.height).toBe(PIN_HIT_H)
-    expect(m.anchor).toEqual({ x: 24 / PIN_HIT_W, y: 56 / PIN_HIT_H })
+    expect(m.anchor).toEqual({ x: 28 / PIN_HIT_W, y: 58 / PIN_HIT_H })
   })
 
-  it('选中态图标放大：iconPath 切到 selected 图，命中区保持一致', () => {
+  it('选中态图标放大：iconPath 切到 selected 图，点击仍只认角标区域', () => {
     const [plain, selected] = toMarkers(pins)
     expect(selected.width).toBe(plain.width)
+    expect(selected.height).toBe(plain.height)
     expect(selected.iconPath).toBe('/assets/pin-p-selected.png')
     expect(plain.iconPath).toBe('/assets/pin-p.png')
   })
