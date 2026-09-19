@@ -80,6 +80,145 @@
   padding: var(--space-6) 0;
 }
 
+/* 详情视图（复用车主端 orders 详情的结构与配色） */
+
+/* 顶栏：返回键 + 标题，z-index 必须写（Skyline 同级按 DOM 顺序绘制） */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 0 28rpx 20rpx;
+}
+
+.bar__back {
+  font-size: 40rpx;
+  color: var(--color-primary);
+  line-height: 1;
+  /* 触摸区 ≥ 88rpx：padding 扩命中、负 margin 抵消（与 confirm 页同套路） */
+  padding: 32rpx 28rpx;
+  margin: -32rpx -28rpx;
+}
+
+.bar__title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* 详情滚动区：padding-top 由 TS 算成 px 内联传入（bodyTop = navTop + 顶栏高） */
+.page.detail-body {
+  /* 内容区让出 tabBar + 吸底核销按钮两层，否则最后一张卡被按钮盖住 */
+  padding-bottom: calc(var(--tabbar-h, 100rpx) + 140rpx + env(safe-area-inset-bottom));
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  box-shadow: var(--shadow-card);
+}
+
+.card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card__name {
+  font-size: var(--font-card-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.card__sub {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  margin-top: 8rpx;
+}
+
+.card__title {
+  font-size: var(--font-sub);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-body);
+  color: var(--color-text-sub);
+  padding: 12rpx 0;
+}
+
+.row__k {
+  color: var(--color-text-sub);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.strong {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.refund {
+  color: var(--color-success);
+  border-top: 2rpx solid var(--color-border);
+  margin-top: 8rpx;
+}
+
+.code {
+  font-size: 72rpx;
+  font-weight: 700;
+  letter-spacing: 16rpx;
+  text-align: center;
+  color: var(--color-text);
+  padding: 24rpx 0;
+}
+
+.hint {
+  font-size: var(--font-micro);
+  color: var(--color-text-weak);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.tail {
+  height: 40rpx;
+}
+
+/* 详情页吸底核销按钮：Skyline 不支持 fixed，absolute 贴页面根节点；
+   tabBar 是覆盖层，按钮要停在它上面（bottom 让出 --tabbar-h） */
+.btnbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tabbar-h, 100rpx) + env(safe-area-inset-bottom));
+  z-index: 1;
+  padding: 16rpx 24rpx;
+  background: var(--color-surface);
+  border-top: 2rpx solid var(--color-border);
+}
+
+.btn-primary {
+  padding: 20rpx 0;
+  text-align: center;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-body);
+  font-weight: 600;
+}
+
 /* 状态标签配色（与 orders 页一致） */
 .tag {
   font-size: var(--font-tag);

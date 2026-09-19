@@ -259,12 +259,30 @@ export function recognizePlate(fileID: string): Promise<CloudResult<RecognizePla
   return callFunction<RecognizePlateData>('recognizePlate', { fileID })
 }
 
+/**
+ * 车场端预约单（云函数 adminReservations 返回的全字段白名单）。
+ * 列表卡片与详情视图共用一份数据；refund* 仅在取消/超时释放单有值
+ */
 export interface AdminReservationItem {
   _id: string
+  orderNo: string
+  lotId: string
+  lotName: string
   plateNo: string
+  /** 毫秒时间戳 */
   arriveTime: number
+  /** 入场截止，毫秒时间戳 */
+  enterDeadline: number
+  prepaidParkingFee: number
+  serviceFee: number
+  totalAmount: number
   status: string
   verifyCode: string
+  createdAt?: number
+  cancelledAt?: number
+  refundParking?: number
+  refundService?: number
+  refundTotal?: number
 }
 
 export interface AdminReservationsData {

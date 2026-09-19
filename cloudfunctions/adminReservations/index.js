@@ -3,7 +3,8 @@
 // 不走前端直读 reservations（安全规则只给车主配了 doc.userId == auth.openid，
 // 车场端按 lotId 读没有对应规则），与 adminDashboard 同一理由。
 //
-// 返回字段精简：车场端核销页需要 车牌 / 到达时刻 / 状态 / 核销码。
+// 返回全字段白名单（列表卡片 + 详情视图共用一份数据，不再单拉）：
+// 车牌 / 到达与截止 / 状态 / 核销码 / 金额三笔 / 单号。refund* 仅在取消或超时释放单有值。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -52,11 +53,22 @@ exports.main = async (event) => {
       .get()
     list = r.data.map(x => ({
       _id: x._id,
+      orderNo: x.orderNo,
+      lotId: x.lotId,
+      lotName: x.lotName,
       plateNo: x.plateNo,
       arriveTime: x.arriveTime,
+      enterDeadline: x.enterDeadline,
+      prepaidParkingFee: x.prepaidParkingFee,
+      serviceFee: x.serviceFee,
+      totalAmount: x.totalAmount,
       status: x.status,
       verifyCode: x.verifyCode,
-      lotName: x.lotName,
+      createdAt: x.createdAt,
+      cancelledAt: x.cancelledAt,
+      refundParking: x.refundParking,
+      refundService: x.refundService,
+      refundTotal: x.refundTotal,
     }))
   } catch (e) { /* 读失败给空列表 */ }
 

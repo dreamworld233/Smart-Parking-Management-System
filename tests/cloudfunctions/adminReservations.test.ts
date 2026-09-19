@@ -83,10 +83,17 @@ function seedReservation(id: string, overrides: Record<string, unknown> = {}): v
   mockStore.reservations.set(id, {
     _id: id,
     lotId: 'lot1',
+    lotName: '合肥大学(南艳湖校区)停车场',
+    orderNo: `NO-${id}`,
     plateNo: '京A12345',
     arriveTime: Date.now(),
+    enterDeadline: Date.now() + 15 * 60 * 1000,
+    prepaidParkingFee: 5,
+    serviceFee: 2,
+    totalAmount: 7,
     status: 'pending_entry',
     verifyCode: '123456',
+    createdAt: Date.now(),
     ...overrides,
   })
 }
@@ -132,12 +139,12 @@ describe('adminReservations', () => {
     expect((await main({ lotId: 'lot_no_such' })).code).toBe('NOT_FOUND')
   })
 
-  it('列表按 arriveTime 升序 + 精简字段（不带订单内部字段）', async () => {
+  it('列表按 arriveTime 升序 + 全字段（列表卡片与详情视图共用）', async () => {
     seedUser()
     seedLot()
     seedReservation('r1', { arriveTime: Date.now() + 2 * 60 * 60 * 1000, totalAmount: 8 })
     seedReservation('r2', { arriveTime: Date.now() + 1 * 60 * 60 * 1000 })
-    seedReservation('r3', { arriveTime: Date.now(), status: 'entered' })
+    seedReservation('r3', { arriveTime: Date.now(), status: 'entered', refundTotal: 3 })
 
     const r = (await main({ lotId: 'lot1' })) as any
     expect(r.code).toBe(0)
@@ -146,7 +153,13 @@ describe('adminReservations', () => {
     const first = r.data.list[0]
     expect(first.plateNo).toBe('京A12345')
     expect(first.status).toBe('entered')
-    // 精简：不把 totalAmount 等无关字段带出去
-    expect(first.totalAmount).toBeUndefined()
+    // 详情视图依赖的字段必须带全（不是精简列表）
+    expect(first.orderNo).toBe('NO-r3')
+    expect(first.enterDeadline).toEqual(expect.any(Number))
+    expect(first.prepaidParkingFee).toBe(5)
+    expect(first.serviceFee).toBe(2)
+    expect(first.totalAmount).toBe(7)
+    expect(first.verifyCode).toBe('123456')
+    expect(first.refundTotal).toBe(3)
   })
 })

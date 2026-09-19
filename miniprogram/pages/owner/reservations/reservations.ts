@@ -1,4 +1,4 @@
-import { formatPlate, formatTimeRangeLabel, platesMatch, RESERVATION_STATUS_LABELS } from '../../../domain/format'
+import { formatAmount, formatPlate, formatTimeRangeLabel, platesMatch, RESERVATION_STATUS_LABELS } from '../../../domain/format'
 import { fetchAdminReservations, recognizePlate, resolveCurrentLotId, verifyReservation } from '../../../services/cloud'
 import type { AdminReservationItem, RecognizePlateData } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
@@ -17,6 +17,53 @@ interface CardVM {
   /** 待入场才显示核销码与操作 */
   pending: boolean
   verifyCode: string
+}
+
+/** 详情视图。展示字段全在这里算好，页面只渲染字符串（与车主端 orders 详情同套路） */
+interface DetailVM {
+  id: string
+  lotName: string
+  orderNo: string
+  plateText: string
+  /** 原始车牌，核销弹窗的 target 用（手动核销传云端） */
+  rawPlate: string
+  status: string
+  statusLabel: string
+  statusClass: string
+  arriveText: string
+  deadlineText: string
+  createdAtText: string
+  verifyCode: string
+  parkingText: string
+  serviceText: string
+  totalText: string
+  refundText: string
+  /** 待入场详情才显示核销码卡与「核销入场」按钮 */
+  pending: boolean
+}
+
+function toDetail(x: AdminReservationItem, now: Date): DetailVM {
+  const refund = typeof x.refundTotal === 'number'
+  return {
+    id: x._id,
+    lotName: x.lotName,
+    orderNo: x.orderNo,
+    plateText: formatPlate(x.plateNo),
+    rawPlate: String(x.plateNo || ''),
+    status: x.status,
+    statusLabel: RESERVATION_STATUS_LABELS[x.status as ReservationStatus] ?? x.status,
+    statusClass: statusClass(x.status),
+    arriveText: formatTimeRangeLabel(now, new Date(x.arriveTime)),
+    deadlineText: formatTimeRangeLabel(now, new Date(x.enterDeadline)),
+    // 老文档可能没 createdAt，给 -- 而不是把 1970 渲染出来
+    createdAtText: typeof x.createdAt === 'number' ? formatTimeRangeLabel(now, new Date(x.createdAt)) : '--',
+    verifyCode: String(x.verifyCode || '--'),
+    parkingText: formatAmount(x.prepaidParkingFee),
+    serviceText: formatAmount(x.serviceFee),
+    totalText: formatAmount(x.totalAmount),
+    refundText: refund ? `已退 ${formatAmount(x.refundTotal!)}` : '',
+    pending: x.status === 'pending_entry',
+  }
 }
 
 /**
@@ -52,7 +99,11 @@ Page({
   data: {
     state: 'loading' as ViewState,
     navTop: 100,
+    /** 内容区顶部让位（px）：navTop + 顶栏高 + 间距，详情态标题文字不压内容 */
+    bodyTop: 100,
     cards: [] as CardVM[],
+    /** 预约详情视图（覆盖列表）。null = 列表态 */
+    detail: null as DetailVM | null,
     // 核销弹窗
     verifyDialog: false,
     target: null as { id: string; plateText: string; rawPlate: string } | null,
@@ -79,8 +130,14 @@ Page({
   lastLoadedAt: 0,
 
   onLoad() {
+    // 详情态有顶栏（返回键），内容区要再让出顶栏高（80rpx）与间距（16rpx），
+    // 与车主端 orders 同套路：写死 rpx 会与胶囊下沿 px 不对齐（真机踩到）
+    const info = wx.getWindowInfo()
+    const rpx = info.windowWidth / 750
     const rect = wx.getMenuButtonBoundingClientRect()
-    this.setData({ navTop: rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100 })
+    const navTop = rect && rect.height > 0 ? Math.round(rect.bottom + 8) : 100
+    const bodyTop = navTop + Math.round(80 * rpx) + Math.round(16 * rpx)
+    this.setData({ navTop, bodyTop })
   },
 
   onShow() {
@@ -207,14 +264,39 @@ Page({
     this.load(true)
   },
 
-  /** 点待入场单 → 打开核销弹窗 */
+  /** 点任意状态卡片 → 打开预约详情（待入场详情里再进核销） */
   onCardTap(e: WechatMiniprogram.TouchEvent) {
     const id = e.currentTarget.dataset.id
-    const card = this.data.cards.find(c => c.id === id)
-    if (!card || !card.pending) return
+    if (!this.data.cards.some(c => c.id === id)) return
+    void this.openDetail(id)
+  },
+
+  /** 详情要读最新状态（可能刚被超时释放/他端取消/核销），不拿列表缓存快照，force 重拉 */
+  async openDetail(id: string) {
+    const r = await fetchAdminReservations(this.lotId)
+    if (!r.ok) {
+      wx.showToast({ title: '加载失败', icon: 'none' })
+      return
+    }
+    const x = r.data.list.find(item => item._id === id)
+    if (!x) {
+      wx.showToast({ title: '预约不存在或已删除', icon: 'none' })
+      return
+    }
+    this.setData({ detail: toDetail(x, new Date()) })
+  },
+
+  onDetailBack() {
+    this.setData({ detail: null })
+  },
+
+  /** 详情内点「核销入场」→ 复用同一套核销弹窗 */
+  onVerifyFromDetail() {
+    const d = this.data.detail
+    if (!d) return
     this.setData({
       verifyDialog: true,
-      target: { id: card.id, plateText: card.plateText, rawPlate: card.rawPlate },
+      target: { id: d.id, plateText: d.plateText, rawPlate: d.rawPlate },
       mode: 'code',
       codeInput: '',
       codeInvalid: false,
@@ -348,7 +430,8 @@ Page({
       wx.showToast({ title: r.message || '核销失败', icon: 'none' })
       return
     }
-    this.setData({ verifyDialog: false })
+    // 核销成功关掉弹窗与详情，回列表看最新状态（与 orders 取消后回列表同套路）
+    this.setData({ verifyDialog: false, detail: null })
     wx.showToast({ title: '已核销入场', icon: 'success' })
     this.load(true)
   },

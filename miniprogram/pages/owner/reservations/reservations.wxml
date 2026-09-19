@@ -26,32 +26,77 @@
   />
 
   <block wx:elif="{{state === 'ready'}}">
-    <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
-      <view class="head">
-        <view class="head__title">预约核销</view>
-        <view class="head__hint">点待入场的单，输码或按车牌核销入场</view>
+    <!-- 详情视图（覆盖列表）。任意状态可看；待入场详情有核销码与「核销入场」按钮 -->
+    <block wx:if="{{detail}}">
+      <view class="bar" style="top: {{navTop}}px">
+        <view class="bar__back" bindtap="onDetailBack">‹</view>
+        <view class="bar__title">预约详情</view>
       </view>
-
-      <block wx:if="{{cards.length}}">
-        <view
-          wx:for="{{cards}}"
-          wx:key="id"
-          class="oc {{item.pending ? 'oc--pending' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onCardTap"
-        >
-          <view class="oc__head">
-            <view class="oc__plate">{{item.plateText}}</view>
-            <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+      <scroll-view class="page detail-body" scroll-y style="padding-top: {{bodyTop}}px">
+        <view class="card">
+          <view class="card__head">
+            <view class="card__name">{{detail.lotName}}</view>
+            <view class="tag {{detail.statusClass}}">{{detail.statusLabel}}</view>
           </view>
-          <view class="oc__sub">到达 {{item.arriveText}}</view>
-          <view class="oc__code" wx:if="{{item.pending}}">核销码 {{item.verifyCode}}</view>
+          <view class="card__sub">单号 {{detail.orderNo}}</view>
+          <view class="row"><text class="row__k">车牌</text><text>{{detail.plateText}}</text></view>
+          <view class="row"><text class="row__k">到达时刻</text><text>{{detail.arriveText}}</text></view>
+          <view class="row"><text class="row__k">入场截止</text><text>{{detail.deadlineText}}</text></view>
+          <view class="row"><text class="row__k">下单时间</text><text>{{detail.createdAtText}}</text></view>
         </view>
-      </block>
-      <view wx:else class="empty">暂无预约记录</view>
-    </scroll-view>
 
-    <!-- 核销弹窗 -->
+        <view class="card" wx:if="{{detail.pending}}">
+          <view class="card__title">入场核销码</view>
+          <view class="code">{{detail.verifyCode}}</view>
+          <view class="hint">输入此码或按车牌核销入场</view>
+        </view>
+
+        <view class="card">
+          <view class="card__title">费用明细</view>
+          <view class="row"><text class="row__k">预支停车费</text><text class="tnum">¥{{detail.parkingText}}</text></view>
+          <view class="row"><text class="row__k">平台服务费</text><text class="tnum">¥{{detail.serviceText}}</text></view>
+          <view class="row"><text class="row__k">合计</text><text class="tnum strong">¥{{detail.totalText}}</text></view>
+          <view class="row refund" wx:if="{{detail.refundText}}"><text class="row__k">{{detail.refundText}}</text></view>
+        </view>
+
+        <view class="tail" />
+        <!-- 核销按钮留在详情 scroll-view 内：wx:else 紧跟 scroll-view 的 wx:if 才配对
+             （orders 页真机踩过：按钮挪出去会让 wx:else 错绑，列表盖住详情） -->
+        <view class="btnbar" wx:if="{{detail.pending}}">
+          <view class="btn-primary" bindtap="onVerifyFromDetail">核销入场</view>
+        </view>
+      </scroll-view>
+    </block>
+
+    <!-- 列表视图 -->
+    <block wx:else>
+      <scroll-view class="page" scroll-y style="padding-top: {{navTop}}px">
+        <view class="head">
+          <view class="head__title">预约核销</view>
+          <view class="head__hint">点任意预约查看详情，待入场可在详情中核销</view>
+        </view>
+
+        <block wx:if="{{cards.length}}">
+          <view
+            wx:for="{{cards}}"
+            wx:key="id"
+            class="oc {{item.pending ? 'oc--pending' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onCardTap"
+          >
+            <view class="oc__head">
+              <view class="oc__plate">{{item.plateText}}</view>
+              <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+            </view>
+            <view class="oc__sub">到达 {{item.arriveText}}</view>
+            <view class="oc__code" wx:if="{{item.pending}}">核销码 {{item.verifyCode}}</view>
+          </view>
+        </block>
+        <view wx:else class="empty">暂无预约记录</view>
+      </scroll-view>
+    </block>
+
+    <!-- 核销弹窗（覆盖列表与详情，z-index 高于 bar） -->
     <view class="mask" wx:if="{{verifyDialog}}" bindtap="onCloseVerify">
       <view class="dialog" catchtap="noop">
         <view class="dialog__title">核销入场</view>
