@@ -2,7 +2,7 @@ import { formatAmount, formatPlate, formatTimeRangeLabel, platesMatch, RESERVATI
 import { fetchAdminReservations, recognizePlate, resolveCurrentLotId, verifyReservation } from '../../../services/cloud'
 import type { AdminReservationItem, RecognizePlateData } from '../../../services/cloud'
 import type { ReservationStatus } from '../../../domain/types'
-import { clearRole, setCurrentLotId } from '../../../services/storage'
+import { clearRole, getCurrentLotId, setCurrentLotId } from '../../../services/storage'
 
 type ViewState = 'loading' | 'ready' | 'error' | 'no_role' | 'no_lot'
 
@@ -154,7 +154,9 @@ Page({
    */
   async load(force = false) {
     const cached = this.lastData
-    if (cached && !force && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
+    // 车场已在「我的」切换：旧车场缓存作废，TTL 内也不能用旧车场数据糊弄
+    const lotMismatch = !!cached && cached.lotId !== getCurrentLotId()
+    if (cached && !force && !lotMismatch && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
       this.applyCache(cached)
       void this.refresh(true)
       return

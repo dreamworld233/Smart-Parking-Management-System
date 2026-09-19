@@ -123,10 +123,23 @@ export function getVehicles(): string[] {
   return v.filter((item): item is string => typeof item === 'string')
 }
 
+/**
+ * defaultPlate 旧 key 与车辆列表的同步（2026-09-19 清遗留）：
+ * getDefaultPlate 优先读 PLATE_KEY，删车不跟着清/改，它会一直返回一辆已删除的车，
+ * 预约确认页又拿它当默认车牌预填 —— 车牌列表变了，旧 key 必须跟着变。
+ * 旧 key 为空或仍指向列表里的车则不动（getDefaultPlate 会自动回退到 list[0]）
+ */
+function syncDefaultPlate(list: string[]): void {
+  const cur = wx.getStorageSync(PLATE_KEY)
+  if (typeof cur !== 'string' || cur === '' || list.includes(cur)) return
+  setDefaultPlate(list[0] ?? '')
+}
+
 /** 添加车辆：去重置顶、截到上限。返回写入后的列表 */
 export function addVehicle(plate: string): string[] {
   const next = [plate].concat(getVehicles().filter(p => p !== plate)).slice(0, VEHICLES_MAX)
   wx.setStorageSync(VEHICLES_KEY, next)
+  syncDefaultPlate(next)
   return next
 }
 
@@ -134,6 +147,7 @@ export function addVehicle(plate: string): string[] {
 export function removeVehicle(plate: string): string[] {
   const next = getVehicles().filter(p => p !== plate)
   wx.setStorageSync(VEHICLES_KEY, next)
+  syncDefaultPlate(next)
   return next
 }
 

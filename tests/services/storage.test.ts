@@ -122,6 +122,34 @@ describe('addVehicle / removeVehicle', () => {
     store['qnt.vehicles'] = ['京A12345', '京B00001']
     expect(removeVehicle('京A12345')).toEqual(['京B00001'])
   })
+
+  it('删除默认车牌时同步 defaultPlate 旧 key', () => {
+    store['qnt.defaultPlate'] = '京A12345'
+    store['qnt.vehicles'] = ['京A12345', '京B00001']
+    removeVehicle('京A12345')
+    expect(getDefaultPlate()).toBe('京B00001')
+  })
+
+  it('删到空时 defaultPlate 清空', () => {
+    store['qnt.defaultPlate'] = '京A12345'
+    store['qnt.vehicles'] = ['京A12345']
+    removeVehicle('京A12345')
+    expect(getDefaultPlate()).toBe('')
+  })
+
+  it('删除非默认车牌不改 defaultPlate', () => {
+    store['qnt.defaultPlate'] = '京A12345'
+    store['qnt.vehicles'] = ['京A12345', '京B00001']
+    removeVehicle('京B00001')
+    expect(getDefaultPlate()).toBe('京A12345')
+  })
+
+  it('添加时旧 defaultPlate 失效（指向不存在的车）则重置到新列表首位', () => {
+    store['qnt.defaultPlate'] = '京X00001'
+    store['qnt.vehicles'] = ['京A12345']
+    addVehicle('京B00001')
+    expect(getDefaultPlate()).toBe('京B00001')
+  })
 })
 
 describe('getDefaultPlate 回退车辆列表', () => {

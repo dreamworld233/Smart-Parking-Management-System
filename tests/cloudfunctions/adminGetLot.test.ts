@@ -62,8 +62,6 @@ function seedLot(overrides: Record<string, unknown> = {}): void {
     location: { lat: 31.750924, lng: 117.25706 },
     pricing: { firstHour: 3, perHourAfter: 2, stepMinutes: 60, capPerDay: 15, nightRate: null, source: 'placeholder' },
     availability: { totalSpots: 200, source: 'placeholder' },
-    reservableQuota: 10,
-    reservedCount: 3,
     facilities: [],
     adminUserId: 'openid-test-1',
     note: '测试数据',
@@ -113,9 +111,11 @@ describe('adminGetLot', () => {
     expect(r.data.lots).toHaveLength(1)
     expect(r.data.lots[0]._id).toBe('lot1')
     expect(r.data.lots[0].name).toBe('合肥大学(南艳湖校区)停车场')
-    expect(r.data.lots[0].reservedCount).toBe(3)
     // 只返回精简字段，不把 note 等无关字段带出去（pickLot 白名单）
     expect(r.data.lots[0].note).toBeUndefined()
+    // 退役字段 reservableQuota/reservedCount 不再带出（2026-09-17 退役，清 2026-09-19）
+    expect(r.data.lots[0].reservedCount).toBeUndefined()
+    expect(r.data.lots[0].reservableQuota).toBeUndefined()
   })
 
   it('lot_admin 但没绑定车场 → lots 为空数组（不是错误）', async () => {

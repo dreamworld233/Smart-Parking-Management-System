@@ -92,8 +92,6 @@ function seedLot(overrides: Record<string, unknown> = {}): void {
     address: 'x',
     adminUserId: 'openid-test-1',
     availability: { freeSpots: 120, totalSpots: 200, reportedAt: NOW, source: 'reported' },
-    reservableQuota: 10,
-    reservedCount: 3,
     ...overrides,
   })
 }

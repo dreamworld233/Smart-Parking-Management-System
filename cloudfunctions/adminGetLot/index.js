@@ -22,8 +22,6 @@ function pickLot(lot) {
     location: lot.location || null,
     pricing: lot.pricing || null,
     availability: lot.availability || null,
-    reservableQuota: lot.reservableQuota ?? null,
-    reservedCount: lot.reservedCount ?? 0,
     facilities: lot.facilities || [],
   }
 }

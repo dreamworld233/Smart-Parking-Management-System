@@ -101,8 +101,6 @@ exports.main = async (event) => {
         name: lot.name,
         address: lot.address,
         availability: lot.availability || null,
-        reservableQuota: lot.reservableQuota ?? null,
-        reservedCount: lot.reservedCount ?? 0,
       },
       todayReservations,
       pendingEntry,
