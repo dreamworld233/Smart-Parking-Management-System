@@ -3,22 +3,19 @@ import type { ParkingLot, Recommendation } from './types'
 
 /** 图钉常态字号 / 选中时放大的字号。选中必须一眼看得出来 */
 const PIN_FONT = 12
-const PIN_FONT_SELECTED = 14
 const PIN_PADDING = 6
-const PIN_PADDING_SELECTED = 8
 /** 选中底色：主色（与 tokens.wxss 的 --color-primary 一致，marker 是原生绘制，取不到 CSS 变量） */
 const PIN_BG_ON = '#2563eb'
 const PIN_BG_OFF = '#ffffff'
 const PIN_FG_ON = '#ffffff'
 const PIN_FG_OFF = '#0f172a'
-/** 命中区尺寸：须盖住选中态（14px + padding 8）下最长 label（约 100px 宽）并留余量。
- *   label 字号/格式若变，这个尺寸要一起重估 */
-export const PIN_HIT_W = 100
-export const PIN_HIT_H = 48
-/** pin-p.png 里 P 角标尖点像素坐标（100×48）：x=18,y=37。
+/** 命中区尺寸：覆盖 P 角标 + 价格气泡，保证两者都可点。 */
+export const PIN_HIT_W = 128
+export const PIN_HIT_H = 72
+/** pin-p*.png 里 P 角标尖点像素坐标（128×72）：x=24,y=56。
  *   anchor 对齐这点，缩放时地理点不漂 */
-const PIN_ANCHOR_X = 0.18
-const PIN_ANCHOR_Y = 0.77
+const PIN_ANCHOR_X = 24 / PIN_HIT_W
+const PIN_ANCHOR_Y = 56 / PIN_HIT_H
 
 /** 一个地图图钉。首页与搜索页共用同一套结构，避免两页各写一份又慢慢漂移 */
 export interface MapPin {
@@ -123,18 +120,18 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     longitude: p.longitude,
     // 命中区要盖住气泡：以前 width/height 是 1×1，气泡点不到（2026-09-17 组员反馈）。
     // 图标左侧是独立 P 角标，其余透明扩成整块点击域，气泡与角标都能点
-    iconPath: '/assets/pin-p.png',
+    iconPath: p.selected ? '/assets/pin-p-selected.png' : '/assets/pin-p.png',
     width: PIN_HIT_W,
     height: PIN_HIT_H,
     // 地理坐标锚到 P 角标尖点，不锚命中区中心；缩放时不会看着「飘」
     anchor: { x: PIN_ANCHOR_X, y: PIN_ANCHOR_Y },
     label: {
       content: p.label,
-      fontSize: p.selected ? PIN_FONT_SELECTED : PIN_FONT,
+      fontSize: PIN_FONT,
       color: p.selected ? PIN_FG_ON : PIN_FG_OFF,
       bgColor: p.selected ? PIN_BG_ON : PIN_BG_OFF,
       borderRadius: 11,
-      padding: p.selected ? PIN_PADDING_SELECTED : PIN_PADDING,
+      padding: PIN_PADDING,
       textAlign: 'center',
     },
   }))

@@ -145,11 +145,11 @@ describe('toMarkers', () => {
     expect(toMarkers(pins)[0].label).toMatchObject({ bgColor: '#ffffff', color: '#0f172a' })
   })
 
-  it('选中的用主色蓝底白字，且比默认大一档 —— 用户点的那条必须一眼看得出来', () => {
+  it('选中的用主色蓝底白字，气泡字号与内边距保持不变', () => {
     const [plain, selected] = toMarkers(pins).map(m => m.label)
     expect(selected).toMatchObject({ bgColor: '#2563eb', color: '#ffffff' })
-    expect(selected.fontSize).toBeGreaterThan(plain.fontSize)
-    expect(selected.padding).toBeGreaterThan(plain.padding)
+    expect(selected.fontSize).toBe(plain.fontSize)
+    expect(selected.padding).toBe(plain.padding)
   })
 
   it('命中区放大：P 角标图标 + width/height 盖住气泡（角标与气泡都可点）', () => {
@@ -157,12 +157,13 @@ describe('toMarkers', () => {
     expect(m.iconPath).toBe('/assets/pin-p.png')
     expect(m.width).toBe(PIN_HIT_W)
     expect(m.height).toBe(PIN_HIT_H)
-    expect(m.anchor).toEqual({ x: 0.18, y: 0.77 })
+    expect(m.anchor).toEqual({ x: 24 / PIN_HIT_W, y: 56 / PIN_HIT_H })
   })
 
-  it('选中态只体现在 label 样式，命中区与默认一致', () => {
+  it('选中态图标放大：iconPath 切到 selected 图，命中区保持一致', () => {
     const [plain, selected] = toMarkers(pins)
     expect(selected.width).toBe(plain.width)
-    expect(selected.iconPath).toBe(plain.iconPath)
+    expect(selected.iconPath).toBe('/assets/pin-p-selected.png')
+    expect(plain.iconPath).toBe('/assets/pin-p.png')
   })
 })
