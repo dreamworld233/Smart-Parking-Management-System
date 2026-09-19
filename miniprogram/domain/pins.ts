@@ -59,8 +59,8 @@ export interface MapMarker {
 export function pinLabel(lot: ParkingLot): string {
   // 未签约没有价格：图钉只标距离，别用「¥」糊弄
   const distance = formatDistance(lot.distanceM)
-  if (!lot.signed || !lot.pricing) return `P ${distance}`
-  return `P ¥${lot.pricing.firstHour} · ${distance}`
+  if (!lot.signed || !lot.pricing) return distance
+  return `¥${lot.pricing.firstHour} · ${distance}`
 }
 
 export function pinOf(rec: Recommendation, state: { selected: boolean }): MapPin {
@@ -118,8 +118,8 @@ export function toMarkers(pins: MapPin[]): MapMarker[] {
     latitude: p.latitude,
     longitude: p.longitude,
     // 命中区要盖住气泡：以前 width/height 是 1×1，气泡点不到（2026-09-17 组员反馈）。
-    // 透明图标只负责「点得到」，label 仍是唯一视觉
-    iconPath: '/assets/transparent.png',
+    // 图标左侧是独立 P 角标，其余透明扩成整块点击域，气泡与角标都能点
+    iconPath: '/assets/pin-p.png',
     width: PIN_HIT_W,
     height: PIN_HIT_H,
     anchor: { x: 0.5, y: 0.5 },

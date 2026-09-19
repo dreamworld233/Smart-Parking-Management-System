@@ -41,7 +41,7 @@ function rec(id: string, score: number, distanceM = 320, firstHour = 6): Recomme
 
 describe('pinLabel', () => {
   it('只有价格与距离', () => {
-    expect(pinLabel(lot('A', 320, 6))).toBe('P ¥6 · 320m')
+    expect(pinLabel(lot('A', 320, 6))).toBe('¥6 · 320m')
   })
 
   it('不带任何「推荐」字样（2026-09-13 用户去掉：选中已经表达了重点，两个蓝块很怪）', () => {
@@ -50,7 +50,7 @@ describe('pinLabel', () => {
   })
 
   it('未签约车场图钉只标距离，不拿「¥」糊弄', () => {
-    expect(pinLabel(unsignedLot('U', 320))).toBe('P 320m')
+    expect(pinLabel(unsignedLot('U', 320))).toBe('320m')
   })
 
   it('车场名不进图钉 —— 名字长了必然互相压死，名字交给卡片', () => {
@@ -58,11 +58,11 @@ describe('pinLabel', () => {
   })
 
   it('距离走 formatDistance，超 1 公里换成 km', () => {
-    expect(pinLabel(lot('A', 1400, 6))).toBe('P ¥6 · 1.4km')
+    expect(pinLabel(lot('A', 1400, 6))).toBe('¥6 · 1.4km')
   })
 
   it('距离缺失时不渲染 NaN', () => {
-    expect(pinLabel(lot('A', Number.NaN, 6))).toBe('P ¥6 · --')
+    expect(pinLabel(lot('A', Number.NaN, 6))).toBe('¥6 · --')
   })
 })
 
@@ -72,7 +72,7 @@ describe('pinOf', () => {
       id: 'A',
       latitude: 31.75,
       longitude: 117.25,
-      label: 'P ¥6 · 320m',
+      label: '¥6 · 320m',
     })
   })
 
@@ -137,7 +137,7 @@ describe('toMarkers', () => {
     expect(toMarkers(pins)[0]).toMatchObject({
       latitude: 31.75,
       longitude: 117.25,
-      label: { content: 'P ¥6 · 320m' },
+      label: { content: '¥6 · 320m' },
     })
   })
 
@@ -152,9 +152,9 @@ describe('toMarkers', () => {
     expect(selected.padding).toBeGreaterThan(plain.padding)
   })
 
-  it('命中区放大：透明 iconPath + width/height 盖住气泡（气泡可点）', () => {
+  it('命中区放大：P 角标图标 + width/height 盖住气泡（角标与气泡都可点）', () => {
     const m = toMarkers(pins)[0]
-    expect(m.iconPath).toBe('/assets/transparent.png')
+    expect(m.iconPath).toBe('/assets/pin-p.png')
     expect(m.width).toBe(PIN_HIT_W)
     expect(m.height).toBe(PIN_HIT_H)
     expect(m.anchor).toEqual({ x: 0.5, y: 0.5 })
