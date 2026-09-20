@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563ff"/>
+      <stop offset="0.55" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="16" fill="black"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="15.5" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"/>
+  <text x="30" y="45" font-family="'Bahnschrift','Segoe UI',Arial,sans-serif" font-size="36" font-weight="700" fill="orange" text-anchor="middle" letter-spacing="-1">P</text>
+  <rect x="22" y="50" width="20" height="3.4" rx="1.7" fill="white"/>
+</svg>
