@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import { adminVerifyPlate } from '../api'
@@ -9,27 +9,46 @@ import PageHeader from '../components/PageHeader.vue'
 import PlateChip from '../components/PlateChip.vue'
 import ocrImg from '../assets/img/ocr-scan.png'
 
+interface VerifyCandidate {
+  reservationId: string
+  orderNo: string
+  lotName: string
+  plateNo: string
+}
+
 interface VerifyResult {
   matched?: boolean
   plate?: string
   confidence?: number | null
+  imageFileID?: string
+  candidate?: VerifyCandidate | null
+  // 核销成功后回填
   reservationId?: string
   orderNo?: string
   lotName?: string
   method?: string
 }
 
-// —— OCR 模式 ——
+// —— OCR 模式（识别与核销分离：识别 → 核对 → 确认核销，与小程序同流程）——
 const ocrLoading = ref(false)
+const ocrConfirmLoading = ref(false)
 const ocrFile = ref<File | null>(null)
 const previewUrl = ref('')
 const ocrResult = ref<VerifyResult | null>(null)
+const verified = ref(false)
+
+// 低置信度不做「猜」（与小程序同口径）：<80 仍显示结果但明确提示核对，由运营决定
+const lowConfidence = computed(() => {
+  const c = ocrResult.value?.confidence
+  return typeof c === 'number' && c < 80
+})
 
 function onFileChange(uploadFile: UploadFile) {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   ocrFile.value = (uploadFile.raw as File) || null
   previewUrl.value = ocrFile.value ? URL.createObjectURL(ocrFile.value) : ''
   ocrResult.value = null
+  verified.value = false
 }
 
 async function runOcr() {
@@ -38,6 +57,7 @@ async function runOcr() {
     return
   }
   ocrLoading.value = true
+  verified.value = false
   try {
     const up = await uploadImage(ocrFile.value)
     if (!up.ok) {
@@ -52,6 +72,37 @@ async function runOcr() {
     ocrResult.value = res.data as VerifyResult
   } finally {
     ocrLoading.value = false
+  }
+}
+
+/** 运营核对识别结果后确认核销（mode=plate，云函数校验识别车牌 == 预约车牌） */
+async function confirmVerify() {
+  const r = ocrResult.value
+  if (!r?.candidate) return
+  ocrConfirmLoading.value = true
+  try {
+    const res = await adminVerifyPlate({
+      mode: 'plate',
+      reservationId: r.candidate.reservationId,
+      plateNo: r.plate || '',
+      confidence: r.confidence ?? null,
+      imageFileID: r.imageFileID,
+    })
+    if (!res.ok) {
+      ElMessage.error(res.message)
+      // 车牌与预约不一致：识别错了车，清掉结果让重拍或转手动，别留下可误点的确认
+      if (res.code === 'PLATE_MISMATCH') {
+        ocrResult.value = null
+        verified.value = false
+      }
+      return
+    }
+    const d = res.data as VerifyResult
+    ocrResult.value = { ...r, ...d }
+    verified.value = true
+    ElMessage.success('已核销入场')
+  } finally {
+    ocrConfirmLoading.value = false
   }
 }
 
@@ -120,7 +171,7 @@ async function verifyManual() {
               <span class="card-head__icon card-head__icon--blue"><el-icon><Camera /></el-icon></span>
               <div>
                 <div class="card-head__title">车牌识别（OCR）</div>
-                <div class="card-head__sub">腾讯云 LicensePlateOCR · 命中后自动核销并留痕</div>
+                <div class="card-head__sub">腾讯云 LicensePlateOCR · 识别后核对车牌再确认核销</div>
               </div>
             </div>
           </template>
@@ -139,8 +190,8 @@ async function verifyManual() {
               <img :src="ocrImg" alt="车牌识别示意" class="ocr-illu" />
               <ol class="ocr-steps">
                 <li><b>1</b><span>上传入场停车照片</span></li>
-                <li><b>2</b><span>OCR 自动识别车牌</span></li>
-                <li><b>3</b><span>命中预约即核销入场</span></li>
+                <li><b>2</b><span>OCR 识别车牌 + 置信度</span></li>
+                <li><b>3</b><span>核对车牌后确认核销入场</span></li>
               </ol>
             </div>
           </div>
@@ -150,13 +201,14 @@ async function verifyManual() {
             <span class="filename__txt">已选：{{ ocrFile.name }}</span>
           </div>
           <el-button type="primary" :loading="ocrLoading" class="ocr-submit" @click="runOcr">
-            <el-icon><MagicStick /></el-icon><span style="margin-left: 4px">识别并核销</span>
+            <el-icon><MagicStick /></el-icon><span style="margin-left: 4px">识别车牌</span>
           </el-button>
 
-          <div v-if="ocrResult && ocrResult.matched" class="result result--ok">
+          <!-- 已核销成功 -->
+          <div v-if="verified && ocrResult" class="result result--ok">
             <span class="result__icon result__icon--ok"><el-icon><CircleCheckFilled /></el-icon></span>
             <div class="result__main">
-              <div class="result__title">识别成功，已核销入场</div>
+              <div class="result__title">已核销入场</div>
               <div class="result__rows">
                 <PlateChip :plate="ocrResult.plate || ''" />
                 <span v-if="ocrResult.confidence !== null && ocrResult.confidence !== undefined" class="conf">
@@ -171,6 +223,30 @@ async function verifyManual() {
             </div>
           </div>
 
+          <!-- 识别命中候选预约：运营核对后确认核销 -->
+          <div v-else-if="ocrResult && ocrResult.matched" class="result result--pending">
+            <span class="result__icon result__icon--pending"><el-icon><View /></el-icon></span>
+            <div class="result__main">
+              <div class="result__title">识别到车牌，请核对后确认核销</div>
+              <div class="result__rows">
+                <PlateChip :plate="ocrResult.plate || ''" />
+                <span v-if="ocrResult.confidence !== null && ocrResult.confidence !== undefined" class="conf">
+                  <span class="conf__label">置信度</span>
+                  <span class="conf__track"><span class="conf__fill" :style="{ width: (ocrResult.confidence || 0) + '%' }" /></span>
+                  <span class="num conf__val">{{ ocrResult.confidence }}%</span>
+                </span>
+                <span v-if="lowConfidence" class="conf-warn">置信度低，请核对车牌</span>
+              </div>
+              <div class="result__sub">
+                匹配预约：<b class="num">{{ ocrResult.candidate?.orderNo }}</b> · {{ ocrResult.candidate?.lotName }}（{{ formatPlate(ocrResult.candidate?.plateNo || '') }}）
+              </div>
+              <el-button type="primary" size="small" :loading="ocrConfirmLoading" class="confirm-btn" @click="confirmVerify">
+                确认核销
+              </el-button>
+            </div>
+          </div>
+
+          <!-- 未匹配：转手动核销 -->
           <div v-else-if="ocrResult && !ocrResult.matched" class="result result--warn">
             <span class="result__icon result__icon--warn"><el-icon><WarningFilled /></el-icon></span>
             <div class="result__main">
@@ -377,6 +453,10 @@ async function verifyManual() {
   background: var(--el-color-warning-light-9);
   border-color: var(--el-color-warning-light-7);
 }
+.result--pending {
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-7);
+}
 .result__icon {
   font-size: 26px;
   flex-shrink: 0;
@@ -384,6 +464,7 @@ async function verifyManual() {
 }
 .result__icon--ok { color: #059669; }
 .result__icon--warn { color: #d98600; }
+.result__icon--pending { color: var(--el-color-primary); }
 .result__title {
   font-weight: 700;
   font-size: 14.5px;
@@ -420,6 +501,14 @@ async function verifyManual() {
 .conf__val {
   font-weight: 700;
   color: #059669;
+}
+.conf-warn {
+  font-size: 12px;
+  color: #d98600;
+  font-weight: 600;
+}
+.confirm-btn {
+  margin-top: 12px;
 }
 .result__sub {
   font-size: 12.5px;

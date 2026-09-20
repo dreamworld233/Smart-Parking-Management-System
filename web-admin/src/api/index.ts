@@ -57,9 +57,14 @@ export function adminLookup(
 
 export type VerifyInput =
   | { mode: 'ocr'; imageFileID: string; lotId?: string }
+  | { mode: 'plate'; reservationId: string; plateNo: string; confidence?: number | null; imageFileID?: string }
   | { mode: 'manual'; reservationId: string }
   | { mode: 'code'; verifyCode: string; lotId?: string }
 
+/**
+ * 车牌识别复核（与小程序同流程：识别与核销分离）。
+ * 先 mode:'ocr' 识别 + 匹配候选（不核销），运营核对后 mode:'plate' 核销（车牌一致才放行）。
+ */
 export function adminVerifyPlate(input: VerifyInput): Promise<ApiResult<Record<string, unknown>>> {
   return callCloud('webVerifyPlate', withToken({ ...input }))
 }
