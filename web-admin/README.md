@@ -25,7 +25,7 @@
 ## 两个关键设计决定（任务书 §4 让我「先查官方文档定一种」）
 
 1. **登录形态 = 自签票据**（不是云开发内置用户名密码账号体系）。`webLogin` 用 `crypto.scrypt` 验证 `users.webAccount`，再签一个 HMAC-SHA256 票据（密钥在云函数环境变量 `WEB_ADMIN_SESSION_SECRET`），票据 payload 里就是 `userId`（= `users._id`）。每个 `admin*` 云函数在入口校验票据 + 判角色。理由：不依赖「安全规则里 Web 身份变量名」这个核实不了的口径，且能精确对应回 `users._id`。
-2. **`entry_logs.method` 用 `ocr` / `code` / `manual`**。数据模型 §4 表格里车牌识别那档写成 `'plate'`，与 §10 / 任务书 §3 冲突，以任务书 §3 为准。
+2. **`entry_logs.method` 用 `code` / `manual` / `plate`**。车牌识别那档用 `'plate'`（数据模型 §4，与小程序 `verifyReservation` 实际写入一致）。2026-09-20 组长口径：web 车牌识别以小程序流程和线路为准，识别与核销分离（`mode=ocr` 只识别不核销 → 核对后 `mode=plate` 核销）。
 
 ## 部署步骤（按顺序，已实测跑通）
 
@@ -41,7 +41,7 @@
 
 ### 3. 云函数环境变量（在「微信开发者工具」里配，网页控制台常为只读）
 - `WEB_ADMIN_SESSION_SECRET`：**必填，9 个函数配同一个值**，任意长随机串（如 `openssl rand -hex 32`）。登录票据的签名密钥；值不一致会「登录态无效」。
-- `TENCENTCLOUD_SECRET_ID` / `TENCENTCLOUD_SECRET_KEY`：**可选**，腾讯云 OCR 密钥。不配则车牌识别页走手动核销（任务书 §9：OCR 是增强，不是单点依赖）。
+- `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY`：**可选**，腾讯云 OCR 密钥。**与小程序 `recognizePlate` 同名**，一对密钥两线路共用。不配则车牌识别页走手动核销（任务书 §9：OCR 是增强，不是单点依赖）。
 
 > 密钥只放云函数环境变量，绝不进前端仓库。
 
@@ -53,8 +53,8 @@
 ### 5. 本地跑 / 部署静态网站
 ```bash
 cd web-admin
-cp .env.example .env.local   # 填入 VITE_CLOUD_ENV=你的环境ID
 npm install
+echo "VITE_CLOUD_ENV=你的环境ID" > .env.local   # .env.local 被 gitignore，不入库
 npm run dev                  # 本地预览 http://localhost:5173
 npm run build                # 产出 dist/，用于静态网站托管
 ```
@@ -71,5 +71,5 @@ npm run build                # 产出 dist/，用于静态网站托管
 
 ## 已知未做 / 待真机验证
 
-- OCR 签名算法照官方文档实现，但**未经真实密钥联调**（本机网络拦截腾讯云文档，无法逐字核对 LicensePlateOCR 响应字段）。部署后需用一张真车牌图联调一次，确认 `Number` / `Confidence` 字段与文档一致。识别失败不影响手动核销主链路。
+- OCR 已对齐小程序线路（官方 SDK `tencentcloud-sdk-nodejs` + 响应字段 `LicensePlateInfos`，2026-09-20）。部署后仍建议用一张真车牌图云端测试联调一次（识别 + 核销 + `entry_logs` 留痕全链）。识别失败不影响手动核销主链路。
 - 车场端（余位上报 / 核销 / 看板）在小程序，不在 Web（任务书 §9 边界）。
