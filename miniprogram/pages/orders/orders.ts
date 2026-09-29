@@ -12,11 +12,33 @@ interface CardVM {
   /** 「今天 14:30」/「9月16日 08:00」跨天正确 */
   arriveText: string
   status: ReservationStatus
+  /** 原始到达时间（epoch 毫秒），日期区间筛选用 */
+  arriveTime: number
   statusLabel: string
   /** 状态标签配色档位 */
   statusClass: string
   totalText: string
   orderNo: string
+}
+
+/** 状态筛选 tab。entered 组含 completed（页面同色，合并成「已入场」一个 tab） */
+interface FilterTab {
+  key: string
+  label: string
+}
+
+const FILTER_TABS: FilterTab[] = [
+  { key: 'all', label: '全部' },
+  { key: 'pending_entry', label: '待入场' },
+  { key: 'entered', label: '已入场' },
+  { key: 'cancelled', label: '已取消' },
+  { key: 'released', label: '已释放' },
+]
+
+/** 'YYYY-MM-DD' → 当天 0 点 epoch 毫秒。new Date('YYYY-MM-DD') 按 UTC 解析会偏 8 小时，必须本地组 */
+function parseLocalDay(s: string): number {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d).getTime()
 }
 
 /** 详情视图。展示字段全在这里算好，页面只渲染字符串 */
@@ -60,6 +82,7 @@ function toCard(r: Reservation, now: Date): CardVM {
     lotName: r.lotName,
     plateText: formatPlate(r.plateNo),
     arriveText: formatTimeRangeLabel(now, new Date(r.arriveTime)),
+    arriveTime: r.arriveTime,
     status: r.status,
     statusLabel: RESERVATION_STATUS_LABELS[r.status],
     statusClass: statusClass(r.status),
@@ -99,9 +122,20 @@ Page({
     navTop: 100,
     /** 内容区顶部让位（px）：navTop + 顶栏高 + 间距，标题文字不压内容 */
     bodyTop: 100,
+    /** 状态筛选 tab 列表 */
+    filterTabs: FILTER_TABS,
+    /** 当前选中 tab key */
+    activeTab: 'all',
+    /** 日期区间（'YYYY-MM-DD'，空 = 不限） */
+    fromDate: '',
+    toDate: '',
+    /** 日期区间弹层开关（点时钟图标弹出） */
+    datePanel: false,
   },
 
   userId: '',
+  /** 拉回来的全量卡片，筛选在它之上做（data.cards 是被筛后的视图） */
+  rawCards: [] as CardVM[],
 
   onLoad() {
     // 与 search 页同套路：胶囊下沿 + 8 是顶栏 top，内容区再让出顶栏自身高（80rpx）与间距（16rpx）
@@ -134,14 +168,64 @@ Page({
     try {
       const list = await fetchMyReservations(this.userId)
       if (list.length === 0) {
+        this.rawCards = []
         this.setData({ state: 'empty', cards: [] })
         return
       }
       const now = new Date()
-      this.setData({ state: 'ready', cards: list.map(r => toCard(r, now)) })
+      // 全量存 rawCards，筛选在它之上做（切 tab / 改日期区间不重拉）
+      this.rawCards = list.map(r => toCard(r, now))
+      this.setData({ state: 'ready' })
+      this.applyFilter()
     } catch {
       this.setData({ state: 'error' })
     }
+  },
+
+  /** 按当前状态 tab + 日期区间筛 rawCards，结果落 data.cards */
+  applyFilter() {
+    const { activeTab, fromDate, toDate } = this.data
+    const fromMs = fromDate ? parseLocalDay(fromDate) : 0
+    const toEndMs = toDate ? parseLocalDay(toDate) + 24 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
+    const cards = this.rawCards.filter(c => {
+      const tabOk =
+        activeTab === 'all' ||
+        (activeTab === 'entered'
+          ? c.status === 'entered' || c.status === 'completed'
+          : c.status === activeTab)
+      return tabOk && c.arriveTime >= fromMs && c.arriveTime < toEndMs
+    })
+    this.setData({ cards })
+  },
+
+  onTabTap(e: WechatMiniprogram.TouchEvent) {
+    const key = String(e.currentTarget.dataset.key || 'all')
+    if (key === this.data.activeTab) return
+    this.setData({ activeTab: key })
+    this.applyFilter()
+  },
+
+  onFromDate(e: WechatMiniprogram.PickerChange) {
+    this.setData({ fromDate: String(e.detail.value || '') })
+    this.applyFilter()
+  },
+
+  onToDate(e: WechatMiniprogram.PickerChange) {
+    this.setData({ toDate: String(e.detail.value || '') })
+    this.applyFilter()
+  },
+
+  onDateTap() {
+    this.setData({ datePanel: !this.data.datePanel })
+  },
+
+  onCloseDate() {
+    this.setData({ datePanel: false })
+  },
+
+  onClearDate() {
+    this.setData({ fromDate: '', toDate: '' })
+    this.applyFilter()
   },
 
   onCardTap(e: WechatMiniprogram.TouchEvent) {

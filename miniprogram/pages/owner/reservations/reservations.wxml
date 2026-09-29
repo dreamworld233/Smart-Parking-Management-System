@@ -76,6 +76,24 @@
           <view class="head__hint">点任意预约查看详情，待入场可在详情中核销</view>
         </view>
 
+        <!-- 状态 tab 一行横滑 + 右侧时钟图标（点击弹日期区间） -->
+        <view class="filter">
+          <scroll-view class="filter__tabs" scroll-x enhanced show-scrollbar="{{false}}">
+            <view class="filter__chips">
+              <view
+                class="chip {{activeTab === item.key ? 'chip--on' : ''}}"
+                wx:for="{{filterTabs}}"
+                wx:key="key"
+                data-key="{{item.key}}"
+                bindtap="onTabTap"
+              >{{item.label}}</view>
+            </view>
+          </scroll-view>
+          <view class="filter__date {{fromDate || toDate ? 'filter__date--on' : ''}}" bindtap="onDateTap">
+            <text class="filter__date-icon">🕐</text>
+          </view>
+        </view>
+
         <block wx:if="{{cards.length}}">
           <view
             wx:for="{{cards}}"
@@ -92,8 +110,29 @@
             <view class="oc__code" wx:if="{{item.pending}}">核销码 {{item.verifyCode}}</view>
           </view>
         </block>
-        <view wx:else class="empty">暂无预约记录</view>
+        <view wx:else class="empty">当前筛选下暂无预约</view>
       </scroll-view>
+
+      <!-- 日期区间弹层：点时钟图标弹出，选开始/结束日期 -->
+      <view class="mask" wx:if="{{datePanel}}" bindtap="onCloseDate">
+        <view class="dialog" catchtap="noop">
+          <view class="dialog__title">按到达日期筛选</view>
+          <view class="dialog__row">
+            <picker mode="date" value="{{fromDate}}" bindchange="onFromDate">
+              <view class="dialog__pick {{fromDate ? 'dialog__pick--set' : ''}}">{{fromDate || '开始日期'}}</view>
+            </picker>
+            <text class="dialog__sep">至</text>
+            <picker mode="date" value="{{toDate}}" bindchange="onToDate">
+              <view class="dialog__pick {{toDate ? 'dialog__pick--set' : ''}}">{{toDate || '结束日期'}}</view>
+            </picker>
+          </view>
+          <view class="dialog__hint">选同一天即查单日；都留空则不限日期</view>
+          <view class="dialog__btns">
+            <view class="dialog__btn" bindtap="onCloseDate">完成</view>
+            <view class="dialog__btn ghost" wx:if="{{fromDate || toDate}}" bindtap="onClearDate">清除筛选</view>
+          </view>
+        </view>
+      </view>
     </block>
 
     <!-- 核销弹窗（覆盖列表与详情，z-index 高于 bar） -->

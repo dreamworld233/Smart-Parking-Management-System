@@ -36,6 +36,70 @@
   margin-top: 8rpx;
 }
 
+/* 筛选区：状态 tab 一行横滑 + 右侧时钟图标 */
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: var(--space-3);
+}
+
+.filter__tabs {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  /* Skyline 的 scroll-view scroll-x 不靠内容撑高：不给高度会被压成 0，chips 全裁掉 */
+  height: 64rpx;
+}
+
+.filter__chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 14rpx;
+  height: 100%;
+  padding-right: 8rpx;
+}
+
+.filter .chip {
+  display: inline-block;
+  padding: 10rpx 26rpx;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  font-size: var(--font-tag);
+  color: var(--color-text-sub);
+}
+
+.filter .chip--on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* 时钟图标按钮：有区间时高亮 */
+.filter__date {
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 2rpx solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filter__date--on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.filter__date-icon {
+  font-size: 32rpx;
+  line-height: 1;
+}
+
 /* 预约卡片 */
 .oc {
   background: var(--color-surface);
@@ -383,4 +447,40 @@
   background: var(--color-primary);
   color: #fff;
   font-weight: 600;
+}
+
+/* 日期区间弹层追加：开始/结束 picker */
+.dialog__row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: var(--space-3);
+}
+
+.dialog__pick {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  border: 2rpx solid var(--color-border);
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
+
+.dialog__pick--set {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+}
+
+.dialog__sep {
+  font-size: var(--font-sub);
+  color: var(--color-text-weak);
+}
+
+.dialog__btn.ghost {
+  flex: 1.2;
+  background: var(--color-bg);
+  color: var(--color-danger);
+  font-weight: 400;
 }

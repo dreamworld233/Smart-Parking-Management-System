@@ -11,12 +11,38 @@ interface CardVM {
   plateText: string
   /** 原始车牌（手动核销传云端的值，格式化的 plateText 可能带空格） */
   rawPlate: string
+  /** 排序锚点（epoch 毫秒）：前端兜底按下单时间倒序，不依赖云侧索引 */
+  createdAt: number
+  /** 原始状态，筛选 tab 用 */
+  status: string
+  /** 原始到达时间（epoch 毫秒），日期区间筛选用 */
+  arriveTime: number
   arriveText: string
   statusLabel: string
   statusClass: string
   /** 待入场才显示核销码与操作 */
   pending: boolean
   verifyCode: string
+}
+
+/** 状态筛选 tab。entered 组含 completed（页面同色，合并成「已入场」一个 tab） */
+interface FilterTab {
+  key: string
+  label: string
+}
+
+const FILTER_TABS: FilterTab[] = [
+  { key: 'all', label: '全部' },
+  { key: 'pending_entry', label: '待入场' },
+  { key: 'entered', label: '已入场' },
+  { key: 'cancelled', label: '已取消' },
+  { key: 'released', label: '已释放' },
+]
+
+/** 'YYYY-MM-DD' → 当天 0 点 epoch 毫秒。new Date('YYYY-MM-DD') 按 UTC 解析会偏 8 小时，必须本地组 */
+function parseLocalDay(s: string): number {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d).getTime()
 }
 
 /** 详情视图。展示字段全在这里算好，页面只渲染字符串（与车主端 orders 详情同套路） */
@@ -104,6 +130,15 @@ Page({
     cards: [] as CardVM[],
     /** 预约详情视图（覆盖列表）。null = 列表态 */
     detail: null as DetailVM | null,
+    /** 状态筛选 tab 列表 */
+    filterTabs: FILTER_TABS,
+    /** 当前选中 tab key */
+    activeTab: 'all',
+    /** 日期区间（'YYYY-MM-DD'，空 = 不限） */
+    fromDate: '',
+    toDate: '',
+    /** 日期区间弹层开关（点时钟图标弹出） */
+    datePanel: false,
     // 核销弹窗
     verifyDialog: false,
     target: null as { id: string; plateText: string; rawPlate: string } | null,
@@ -124,6 +159,8 @@ Page({
 
   /** 当前车场 id（data 外实例字段） */
   lotId: '',
+  /** 拉回来的全量卡片（100 条内），筛选在它之上做 */
+  rawCards: [] as CardVM[],
   /** 上次成功渲染的列表快照（缓存命中时先显示它，不闪 loading） */
   lastData: null as ReservationCache | null,
   /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
@@ -231,16 +268,23 @@ Page({
     const now = new Date()
     const cache: ReservationCache = {
       lotId: cur.lotId,
-      cards: r.data.list.map((x: AdminReservationItem) => ({
-        id: x._id,
-        plateText: formatPlate(x.plateNo),
-        rawPlate: String(x.plateNo || ''),
-        arriveText: formatTimeRangeLabel(now, new Date(x.arriveTime)),
-        statusLabel: RESERVATION_STATUS_LABELS[x.status as ReservationStatus] ?? x.status,
-        statusClass: statusClass(x.status),
-        pending: x.status === 'pending_entry',
-        verifyCode: String(x.verifyCode || ''),
-      })),
+      cards: r.data.list
+        .map((x: AdminReservationItem) => ({
+          id: x._id,
+          plateText: formatPlate(x.plateNo),
+          rawPlate: String(x.plateNo || ''),
+          createdAt: typeof x.createdAt === 'number' ? x.createdAt : 0,
+          status: String(x.status || ''),
+          arriveTime: typeof x.arriveTime === 'number' ? x.arriveTime : 0,
+          arriveText: formatTimeRangeLabel(now, new Date(x.arriveTime)),
+          statusLabel: RESERVATION_STATUS_LABELS[x.status as ReservationStatus] ?? x.status,
+          statusClass: statusClass(x.status),
+          pending: x.status === 'pending_entry',
+          verifyCode: String(x.verifyCode || ''),
+        }))
+        // 按下单时间倒序兜底：即便云侧 (lotId, createdAt) 组合索引没建、orderBy 没生效，
+        // 界面也要保证最新在前（老师 2026-09-29：订单页日期降序）
+        .sort((a, b) => b.createdAt - a.createdAt),
     }
     this.lastData = cache
     this.lastLoadedAt = Date.now()
@@ -250,7 +294,56 @@ Page({
   /** 把（缓存的）渲染快照落到 data。lotId 依赖 load 成功赋值，缓存命中分支也要正确设置 */
   applyCache(c: ReservationCache) {
     this.lotId = c.lotId
-    this.setData({ state: 'ready', cards: c.cards })
+    // 全量存 rawCards，再按当前筛选生成 data.cards（缓存命中也要过筛选，不能绕过）
+    this.rawCards = c.cards
+    this.setData({ state: 'ready' })
+    this.applyFilter()
+  },
+
+  /** 按当前状态 tab + 日期区间筛 rawCards，结果落 data.cards */
+  applyFilter() {
+    const { activeTab, fromDate, toDate } = this.data
+    const fromMs = fromDate ? parseLocalDay(fromDate) : 0
+    const toEndMs = toDate ? parseLocalDay(toDate) + 24 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY
+    const cards = this.rawCards.filter(c => {
+      const tabOk =
+        activeTab === 'all' ||
+        (activeTab === 'entered'
+          ? c.status === 'entered' || c.status === 'completed'
+          : c.status === activeTab)
+      return tabOk && c.arriveTime >= fromMs && c.arriveTime < toEndMs
+    })
+    this.setData({ cards })
+  },
+
+  onTabTap(e: WechatMiniprogram.TouchEvent) {
+    const key = String(e.currentTarget.dataset.key || 'all')
+    if (key === this.data.activeTab) return
+    this.setData({ activeTab: key })
+    this.applyFilter()
+  },
+
+  onFromDate(e: WechatMiniprogram.PickerChange) {
+    this.setData({ fromDate: String(e.detail.value || '') })
+    this.applyFilter()
+  },
+
+  onToDate(e: WechatMiniprogram.PickerChange) {
+    this.setData({ toDate: String(e.detail.value || '') })
+    this.applyFilter()
+  },
+
+  onDateTap() {
+    this.setData({ datePanel: !this.data.datePanel })
+  },
+
+  onCloseDate() {
+    this.setData({ datePanel: false })
+  },
+
+  onClearDate() {
+    this.setData({ fromDate: '', toDate: '' })
+    this.applyFilter()
   },
 
   onPickRole() {

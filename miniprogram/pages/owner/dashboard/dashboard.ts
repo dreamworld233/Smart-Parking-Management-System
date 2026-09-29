@@ -29,6 +29,15 @@ interface DashboardCache {
   stat: StatVM
   spotsText: string
   pendingList: PendingItemVM[]
+  /** 近 7 日趋势（旧→新），canvas 折线图 */
+  trend: TrendPoint[]
+}
+
+/** 趋势单点。income 单位元 */
+interface TrendPoint {
+  date: string
+  reservations: number
+  income: number
 }
 
 /** 缓存有效期：60 秒内的旧数据允许先渲染，超过则走完整 loading。
@@ -44,6 +53,10 @@ Page({
     spotsText: '待上报',
     /** 待核销列表（只显示车牌 + 到达 + 核销码） */
     pendingList: [] as PendingItemVM[],
+    /** 近 7 日趋势，折线图数据源 */
+    trend: [] as TrendPoint[],
+    /** 折线图点击浮层（点某数据点显示该日详情），null = 不显示 */
+    trendTip: null as { x: number; y: number; date: string; reservations: number; incomeText: string } | null,
     // 余位上报弹窗
     reportDialog: false,
     reportInput: '',
@@ -56,6 +69,8 @@ Page({
 
   /** 当前车场 id（load 成功后赋值，data 外的实例字段） */
   lotId: '',
+  /** 折线图绘制参数，点击命中检测用（drawTrend 里赋值） */
+  trendGeo: null as { trend: TrendPoint[]; PAD: { l: number; r: number; t: number; b: number }; pw: number; w: number; left: number } | null,
   /** 上次成功渲染的看板快照（缓存命中时先显示它，不闪 loading） */
   lastData: null as DashboardCache | null,
   /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
@@ -177,6 +192,12 @@ Page({
         arriveText: formatTimeRangeLabel(new Date(), new Date(x.arriveTime)),
         verifyCode: String(x.verifyCode || '--'),
       })),
+      // 旧云函数没 trend：兜底空数组，折线图不画、显示「暂无趋势数据」
+      trend: (d.trend || []).map(x => ({
+        date: String(x.date || ''),
+        reservations: Number(x.reservations) || 0,
+        income: Number(x.income) || 0,
+      })),
     }
     this.lastData = cache
     this.lastLoadedAt = Date.now()
@@ -186,13 +207,193 @@ Page({
   /** 把（缓存的）渲染快照落到 data。lotId 依赖 load 成功赋值，缓存命中分支也要正确设置 */
   applyCache(c: DashboardCache) {
     this.lotId = c.lotId
+    this.setData(
+      {
+        state: 'ready',
+        lotName: c.lotName,
+        lotAddress: c.lotAddress,
+        stat: c.stat,
+        spotsText: c.spotsText,
+        pendingList: c.pendingList,
+        trend: c.trend,
+      },
+      // setData 回调里 canvas 节点刚可用，此时 query 尺寸才拿得到
+      () => this.drawTrend(c.trend),
+    )
+  },
+
+  /**
+   * 近 7 日趋势折线图（canvas 2d）。两条线各自归一化到各自最大值：
+   * 预约数（个位~几十）与收入（几十~几百元）量级差太多，共用刻度会压成一条线。
+   * 左侧只标收入 0/max，预约数靠图例区分颜色。
+   */
+  drawTrend(trend: TrendPoint[]) {
+    const query = this.createSelectorQuery()
+    query
+      .select('#trendChart')
+      .fields({ node: true, size: true, rect: true })
+      .exec(res => {
+        const f = res && res[0]
+        const node = f && (f.node as WechatMiniprogram.Canvas | undefined)
+        const w = f && (f.width as number)
+        const h = f && (f.height as number)
+        if (!node || !w || !h) return
+        const dpr = wx.getWindowInfo().pixelRatio || 2
+        node.width = w * dpr
+        node.height = h * dpr
+        const ctx = node.getContext('2d')
+        ctx.scale(dpr, dpr)
+        ctx.clearRect(0, 0, w, h)
+
+        const PAD = { l: 44, r: 12, t: 16, b: 28 }
+        const pw = w - PAD.l - PAD.r
+        const ph = h - PAD.t - PAD.b
+        if (pw <= 0 || ph <= 0) return
+
+        // 命中检测需要同样的几何参数：存下来供 onTrendTap 用（left = canvas 相对页面左侧，clientX 换算用）
+        this.trendGeo = { trend, PAD, pw, w, left: f.left || 0 }
+
+        // 空数据：画空网格即可，文案由 wxml 的 trend__empty 盖在上面
+        if (!trend.length) {
+          this.drawGrid(ctx, PAD, pw, ph, [])
+          return
+        }
+
+        const maxInc = Math.max(...trend.map(p => p.income), 0.0001)
+        const maxRes = Math.max(...trend.map(p => p.reservations), 0.0001)
+        const xAt = (i: number) => PAD.l + (trend.length === 1 ? pw / 2 : (i * pw) / (trend.length - 1))
+        const yInc = (v: number) => PAD.t + ph - (v / maxInc) * ph
+        const yRes = (v: number) => PAD.t + ph - (v / maxRes) * ph
+
+        // 网格 + 收入刻度（左轴标 0 与 max）
+        this.drawGrid(ctx, PAD, pw, ph, trend.map(p => p.date))
+        ctx.fillStyle = '#94a3b8'
+        ctx.font = '10px sans-serif'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('0', PAD.l - 6, PAD.t + ph)
+        ctx.fillText(this.incomeLabel(maxInc), PAD.l - 6, PAD.t + 2)
+
+        this.drawSeries(ctx, trend, xAt, p => p.reservations, yRes, '#2563eb')
+        this.drawSeries(ctx, trend, xAt, p => p.income, yInc, '#f59e0b')
+
+        // x 轴日期标签（只画首/中/末，7 个全画会挤）
+        ctx.fillStyle = '#94a3b8'
+        ctx.font = '10px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        const labelIdx = [0, Math.floor((trend.length - 1) / 2), trend.length - 1]
+        labelIdx.forEach(i => {
+          ctx.fillText(trend[i].date, xAt(i), PAD.t + ph + 8)
+        })
+      })
+  },
+
+  /**
+   * 折线图点击：命中最近数据点（水平距离 < 24px 才算），在画布上方弹浮层显示该日详情。
+   * 再点空白处关闭。tip 用相对 .trend 容器的 px 定位——canvas 占满容器同宽同起点，
+   * canvas 内坐标就是容器内坐标
+   */
+  onTrendTap(e: WechatMiniprogram.TouchEvent) {
+    const geo = this.trendGeo
+    if (!geo || geo.trend.length === 0) return
+    // 触摸点相对页面 → 相对 canvas：TouchDetail 给 clientX（页面可视区），减 canvas 左侧偏移
+    const clientX = (e.detail as { clientX: number }).clientX
+    if (typeof clientX !== 'number') return
+    const x = clientX - geo.left
+
+    const { trend, PAD, pw, w } = geo
+    const xAt = (i: number) => PAD.l + (trend.length === 1 ? pw / 2 : (i * pw) / (trend.length - 1))
+
+    let best = -1
+    let bestD = Infinity
+    for (let i = 0; i < trend.length; i++) {
+      const d = Math.abs(xAt(i) - x)
+      if (d < bestD) {
+        bestD = d
+        best = i
+      }
+    }
+    if (best < 0 || bestD > 24) {
+      // 点空白：关闭浮层
+      if (this.data.trendTip) this.setData({ trendTip: null })
+      return
+    }
+    const p = trend[best]
+    const px = xAt(best)
+    const tipW = Math.min(190, w * 0.5)
+    const left = Math.max(4, Math.min(px + 12, w - tipW - 4))
     this.setData({
-      state: 'ready',
-      lotName: c.lotName,
-      lotAddress: c.lotAddress,
-      stat: c.stat,
-      spotsText: c.spotsText,
-      pendingList: c.pendingList,
+      trendTip: {
+        x: left,
+        y: 4,
+        date: p.date,
+        reservations: p.reservations,
+        incomeText: formatAmount(p.income),
+      },
+    })
+  },
+
+  /** 收入刻度文案：>= 100 省小数（¥120），否则一位小数（¥3.5） */
+  incomeLabel(v: number): string {
+    const yuan = v >= 100 ? Math.round(v) : Math.round(v * 10) / 10
+    return `¥${yuan}`
+  },
+
+  /** 水平网格 + 底部 x 轴底线 */
+  drawGrid(
+    ctx: WechatMiniprogram.CanvasRenderingContext.CanvasRenderingContext2D,
+    PAD: { l: number; r: number; t: number; b: number },
+    pw: number,
+    ph: number,
+    labels: string[],
+  ) {
+    ctx.strokeStyle = '#e2e8f0'
+    ctx.lineWidth = 1
+    ctx.setLineDash([3, 3])
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.t + (ph * i) / 4
+      ctx.beginPath()
+      ctx.moveTo(PAD.l, y)
+      ctx.lineTo(PAD.l + pw, y)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    if (labels.length > 0) {
+      ctx.beginPath()
+      ctx.moveTo(PAD.l, PAD.t + ph)
+      ctx.lineTo(PAD.l + pw, PAD.t + ph)
+      ctx.stroke()
+    }
+  },
+
+  /** 画一条折线 + 数据点。valOf 取该系列的值（预约数 or 收入），yOf 做归一化 */
+  drawSeries(
+    ctx: WechatMiniprogram.CanvasRenderingContext.CanvasRenderingContext2D,
+    trend: TrendPoint[],
+    xAt: (i: number) => number,
+    valOf: (p: TrendPoint) => number,
+    yOf: (v: number) => number,
+    color: string,
+  ) {
+    const ys = trend.map(p => yOf(valOf(p)))
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ys.forEach((y, i) => {
+      const x = xAt(i)
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+    // 数据点
+    ys.forEach((y, i) => {
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.arc(xAt(i), y, 3, 0, Math.PI * 2)
+      ctx.fill()
     })
   },
 

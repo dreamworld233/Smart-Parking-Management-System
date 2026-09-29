@@ -182,6 +182,12 @@ export interface AdminDashboardData {
     verifyCode: string
     lotName: string
   }[]
+  /** 近 7 日趋势（旧→新），折线图用。旧云函数可能没这字段，前端兜底空数组 */
+  trend?: {
+    date: string
+    reservations: number
+    income: number
+  }[]
 }
 
 /** 车场端看板：统计 + 待核销列表（云函数 adminDashboard）。lotId 由调用方传入当前车场 */

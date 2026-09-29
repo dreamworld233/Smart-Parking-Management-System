@@ -48,6 +48,33 @@
         </view>
       </view>
 
+      <!-- 近 7 日趋势折线图（canvas 2d，Skyline 兼容；TS 内绘制） -->
+      <view class="card">
+        <view class="card__row card__row--head">
+          <view class="card__title">近 7 日预约与收入</view>
+          <view class="trend__legend">
+            <view class="legend legend--blue">预约</view>
+            <view class="legend legend--orange">收入</view>
+          </view>
+        </view>
+        <view class="trend">
+          <canvas type="2d" id="trendChart" class="trend__canvas" bindtouchstart="onTrendTap"></canvas>
+          <!-- 点击数据点浮层：显示该日预约数与收入 -->
+          <view class="trend__tip" wx:if="{{trendTip}}" style="left: {{trendTip.x}}px; top: {{trendTip.y}}px">
+            <view class="trend__tip-date">{{trendTip.date}}</view>
+            <view class="trend__tip-row">
+              <view class="dot dot--blue"></view>
+              <text>预约 {{trendTip.reservations}} 单</text>
+            </view>
+            <view class="trend__tip-row">
+              <view class="dot dot--orange"></view>
+              <text>收入 ¥{{trendTip.incomeText}}</text>
+            </view>
+          </view>
+          <view class="trend__empty" wx:if="{{!trend.length}}">暂无趋势数据</view>
+        </view>
+      </view>
+
       <!-- 余位上报卡 -->
       <view class="card">
         <view class="card__row">

@@ -71,24 +71,66 @@
     />
 
     <scroll-view class="body list-body" wx:if="{{state === 'ready'}}" scroll-y style="padding-top: {{bodyTop}}px">
-      <view
-        class="oc"
-        wx:for="{{cards}}"
-        wx:key="id"
-        data-id="{{item.id}}"
-        bindtap="onCardTap"
-      >
-        <view class="oc__head">
-          <view class="oc__name">{{item.lotName}}</view>
-          <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
-        </view>
-        <view class="oc__sub">{{item.plateText}} · {{item.arriveText}}</view>
-        <view class="oc__foot">
-          <view class="oc__no">{{item.orderNo}}</view>
-          <view class="oc__amount tnum">¥{{item.totalText}}</view>
+      <!-- 状态 tab 一行横滑 + 右侧时钟图标（点击弹日期区间） -->
+      <view class="filter">
+        <scroll-view class="filter__tabs" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="filter__chips">
+            <view
+              class="chip {{activeTab === item.key ? 'chip--on' : ''}}"
+              wx:for="{{filterTabs}}"
+              wx:key="key"
+              data-key="{{item.key}}"
+              bindtap="onTabTap"
+            >{{item.label}}</view>
+          </view>
+        </scroll-view>
+        <view class="filter__date {{fromDate || toDate ? 'filter__date--on' : ''}}" bindtap="onDateTap">
+          <text class="filter__date-icon">🕐</text>
         </view>
       </view>
-      <view class="tail" />
+
+      <view class="filter-empty" wx:if="{{!cards.length}}">当前筛选下暂无订单</view>
+      <block wx:else>
+        <view
+          class="oc"
+          wx:for="{{cards}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onCardTap"
+        >
+          <view class="oc__head">
+            <view class="oc__name">{{item.lotName}}</view>
+            <view class="tag {{item.statusClass}}">{{item.statusLabel}}</view>
+          </view>
+          <view class="oc__sub">{{item.plateText}} · {{item.arriveText}}</view>
+          <view class="oc__foot">
+            <view class="oc__no">{{item.orderNo}}</view>
+            <view class="oc__amount tnum">¥{{item.totalText}}</view>
+          </view>
+        </view>
+        <view class="tail" />
+      </block>
     </scroll-view>
+
+    <!-- 日期区间弹层：点时钟图标弹出，选开始/结束日期 -->
+    <view class="mask" wx:if="{{datePanel}}" bindtap="onCloseDate">
+      <view class="dialog" catchtap="noop">
+        <view class="dialog__title">按到达日期筛选</view>
+        <view class="dialog__row">
+          <picker mode="date" value="{{fromDate}}" bindchange="onFromDate">
+            <view class="dialog__pick {{fromDate ? 'dialog__pick--set' : ''}}">{{fromDate || '开始日期'}}</view>
+          </picker>
+          <text class="dialog__sep">至</text>
+          <picker mode="date" value="{{toDate}}" bindchange="onToDate">
+            <view class="dialog__pick {{toDate ? 'dialog__pick--set' : ''}}">{{toDate || '结束日期'}}</view>
+          </picker>
+        </view>
+        <view class="dialog__hint">选同一天即查单日；都留空则不限日期</view>
+        <view class="dialog__btns">
+          <view class="dialog__btn" bindtap="onCloseDate">完成</view>
+          <view class="dialog__btn ghost" wx:if="{{fromDate || toDate}}" bindtap="onClearDate">清除筛选</view>
+        </view>
+      </view>
+    </view>
   </block>
 </view>

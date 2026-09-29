@@ -1,4 +1,5 @@
-// 车场端预约核销列表：当前车场全部预约单，按到达时间升序。
+// 车场端预约核销列表：当前车场全部预约单，按下单时间倒序（老师 2026-09-29：
+// 订单页日期降序，最新在前，与车主端 orders 同口径）。
 //
 // 不走前端直读 reservations（安全规则只给车主配了 doc.userId == auth.openid，
 // 车场端按 lotId 读没有对应规则），与 adminDashboard 同一理由。
@@ -48,7 +49,7 @@ exports.main = async (event) => {
   try {
     const r = await reservations
       .where({ lotId })
-      .orderBy('arriveTime', 'asc')
+      .orderBy('createdAt', 'desc')
       .limit(100)
       .get()
     list = r.data.map(x => ({

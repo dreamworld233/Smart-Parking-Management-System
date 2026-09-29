@@ -1,4 +1,4 @@
-// 车场端看板数据：一次返回今日预约 / 待核销 / 今日收入 / 待核销列表。
+// 车场端看板数据：一次返回今日预约 / 待核销 / 今日收入 / 待核销列表 / 近 7 日趋势。
 //
 // 不前端直读 reservations/orders：安全规则只给车主配了 `doc.userId == auth.openid`，
 // 车场端读自己车场的单（where lotId）没有对应规则，走云函数规避规则缺口
@@ -7,15 +7,31 @@
 // 收入口径：orders 的 type prepaid/service 相加，refund 为负值天然相抵
 // （数据模型 §4：车场结算按同一张流水聚合，正负相抵天然正确）。
 // 今日 = paidAt >= 今日 0 点（epoch 毫秒）。
+//
+// trend：近 7 日（含今日）每日预约数 + 收入，供看板折线图（老师 2026-09-29 要求）。
+// 按天两段查询（gte dayStart / lt nextDayStart），不用 sum 聚合 API。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const ROLE_WHITELIST = ['driver', 'lot_admin', 'ops_admin']
+const TREND_DAYS = 7
 
 function startOfToday(now) {
   const d = new Date(now)
   d.setHours(0, 0, 0, 0)
   return d.getTime()
+}
+
+function startOfDay(dayOffset, now) {
+  return startOfToday(now) - dayOffset * 24 * 60 * 60 * 1000
+}
+
+/** '09-23' 格式，折线图 x 轴标签（本地时区，不 UTC） */
+function dayLabel(dayStart) {
+  const d = new Date(dayStart)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${mm}-${dd}`
 }
 
 exports.main = async (event) => {
@@ -93,6 +109,27 @@ exports.main = async (event) => {
     }))
   } catch (e) { /* 读失败给空列表 */ }
 
+  // 近 7 日趋势：每天一个点（旧→新），预约数按 createdAt、收入按 paidAt。
+  // 单日 count / sum 失败按 0 —— 折线图宁可少一点，不让整个看板挂
+  const trend = []
+  const now = Date.now()
+  for (let i = TREND_DAYS - 1; i >= 0; i--) {
+    const dayStart = startOfDay(i, now)
+    const dayEnd = startOfDay(i - 1, now)
+    const point = { date: dayLabel(dayStart), reservations: 0, income: 0 }
+    try {
+      const r = await reservations
+        .where({ lotId, createdAt: _.gte(dayStart).and(_.lt(dayEnd)) })
+        .count()
+      point.reservations = r.total
+    } catch (e) { /* 按 0 */ }
+    try {
+      const r = await orders.where({ lotId, paidAt: _.gte(dayStart).and(_.lt(dayEnd)) }).get()
+      point.income = r.data.reduce((acc, o) => acc + (Number(o.amount) || 0), 0)
+    } catch (e) { /* 按 0 */ }
+    trend.push(point)
+  }
+
   return {
     code: 0,
     data: {
@@ -106,6 +143,7 @@ exports.main = async (event) => {
       pendingEntry,
       todayIncome,
       pendingList,
+      trend,
     },
   }
 }
