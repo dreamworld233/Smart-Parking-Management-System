@@ -34,15 +34,62 @@
 ## 目录结构
 
 ```
-miniprogram/         小程序源码（pages / components / domain / services / styles）
-tests/               Jest 测试，与 miniprogram/domain 一一对应
-backend/             旧 Spring Boot 后端，未接入，仅留痕
-docs/
-  superpowers/plans/ 实现计划（按任务拆分，含验收标准）
-  superpowers/specs/ 设计与数据模型规格 —— **开发以这里为准**
-  ui-mockups/        视觉稿
-  setup/             第三方服务配置说明
+├── miniprogram/        微信小程序源码（TypeScript + Skyline）
+├── cloudfunctions/     微信云函数 27 个 —— 全部后端业务逻辑
+├── tests/              Jest 测试（434 个用例）
+├── web-admin/          组员 Web 运营后台（Vue 3 独立工程，组长复核）
+├── backend/            Spring Boot 3 + MySQL 展示后端
+├── docs/               设计稿、实现计划、答辩稿
+└── 工单素材/           每日工作记录
 ```
+
+### miniprogram/ —— 小程序端
+
+| 路径 | 作用 |
+|---|---|
+| `app.json` | 页面注册 + tabBar + 全局配置（11 页，Skyline 渲染器） |
+| `app.ts` / `app.wxss` | 启动逻辑 / 全局样式 |
+| `config.ts` | 全局常量：腾讯地图 Key、云环境 ID、搜索半径、兜底定位点 |
+| `config.local.ts` | 真实 Key / 环境 ID（已 gitignore，**不得提交**） |
+| `pages/` | 11 个页面，每个 4 文件（ts + wxml + wxss + json） |
+| `components/` | 复用组件：车场卡片、详情弹层、导航栏、排序标签、空态视图 |
+| `domain/` | **纯逻辑层**：推荐评分、计费、格式化、地理、图钉筛选、排序、时间。与 UI 无关，全部单测覆盖 |
+| `services/` | 数据服务层：封装云函数调用（cloud.ts 为核心）、车场、预约、定位、腾讯地图、本地缓存 |
+| `custom-tab-bar/` | 自定义 tabBar |
+| `styles/` | 设计令牌 tokens.wxss + 标签样式 tags.wxss |
+| `utils/` | 杂项工具 |
+| `assets/` | 图片（地图图钉等） |
+
+页面一览：
+
+- 车主端：`role-select`（选身份）、`home`（周边推荐）、`search`（搜索）、`confirm`（预约确认）、`orders`（订单）、`profile`（我的）
+- 车场端：`owner/dashboard`（看板）、`owner/reservations`（核销）、`owner/lot`（车场维护）、`owner/profile`、`owner/bind-lot`（绑定车场）
+
+### cloudfunctions/ —— 27 个云函数
+
+> **架构口径：业务逻辑必须在云函数，前端不直写数据库。** 每个函数 = 一个目录（index.js + package.json，定时/超时函数带 config.json，口令函数带 auth.js）。
+
+- **用户 / 车场端**：`login`（微信身份）、`switchRole`（角色切换）、`bindLot`（绑定车场）、`createReservation` / `cancelReservation` / `verifyReservation`（预约闭环 + 核销）、`reportAvailability`（余位上报）、`recognizePlate`（OCR 车牌识别）
+- **定时任务**：`dailyReconcile`（每日对账）、`sampleAvailability`（余位采样）、`releaseExpiredReservations`（清理过期预约）
+- **初始化**：`initDb`、`seedLots`（种签约车场，**不种余位**）
+- **车场端管理**：`adminDashboard`、`adminGetLot`、`adminListLots`、`adminReservations`、`adminUpdateLot`
+- **Web 后台（组员）**：`webLogin`、`webCreateUser`、`webListLots`、`webUpsertLot`、`webDeleteLot`、`webPriceChange`、`webLookup`、`webStats`、`webVerifyPlate`
+
+### 其他目录
+
+- `tests/` —— Jest 单测，镜像被测模块：`domain/`、`services/`、`cloudfunctions/`、`live/`（真 Key 联调）
+- `web-admin/` —— 组员 Web 运营后台（Vue 3 + Vite），职责见 `docs/web-admin-assignment.md`
+- `backend/` —— Spring Boot 3 + MyBatis-Plus 展示后端（JWT + BCrypt），**演示 MySQL 数据库时用**，与小程序两条线
+- `docs/` —— 设计与规格：`superpowers/specs/`（设计稿与数据模型）、`superpowers/plans/`（实现计划）、`ui-mockups/`（视觉稿）、`setup/`（配置说明）、`答辩-prep-小程序端-STAR.md`（答辩讲稿）、`答辩-prep-小程序端.md`（技术梳理全文）
+- `工单素材/` —— 每日工作记录
+
+### 架构要点（答辩口径）
+
+1. **前端不直写 DB**：业务全在 27 个云函数。安全规则只配「车主读自己的单」，车场端按 lotId 读没有规则，走云函数规避（数据模型 §5.6）
+2. **domain/ 纯逻辑层** + 434 个 Jest 用例，逻辑可测、可复用
+3. **不许模拟数据红线**：`seedLots` 不种余位，余位只由车场端上报；兜底定位坐标留来源注释
+4. **Skyline 渲染** + 自定义导航栏 + 自定义 tabBar，界面均为手写
+5. **车牌识别三级降级链**：OCR 自动核销 → 扫 / 输核销码 → 车场端手动确认；识别与核销拆两个函数，防「识别即核销」误放行（2026-09-20 口径，web 端同此流程）
 
 ## 本地运行
 
@@ -59,6 +106,8 @@ docs/
 
 ## 文档入口
 
+- 答辩讲稿（口头陈述，S-T-A-R）：`docs/答辩-prep-小程序端-STAR.md`
+- 答辩技术梳理（实现细节全文）：`docs/答辩-prep-小程序端.md`
 - 界面与流程规格：`docs/superpowers/specs/2026-09-11-smart-parking-miniprogram-ui-design.md`
 - 数据模型与关键机制：`docs/superpowers/specs/2026-09-14-smart-parking-data-model-design.md`
 - 实现计划：`docs/superpowers/plans/2026-09-11-free-tier-and-foundation.md`

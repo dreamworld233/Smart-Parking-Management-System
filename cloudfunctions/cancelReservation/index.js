@@ -1,4 +1,5 @@
-// 取消预约云函数（设计稿 §5.2 / §5.8）。
+//读单价、还余位 
+//取消预约云函数（设计稿 §5.2 / §5.8）。
 // 三条路：退款（金额公式在 ./pricing 的 cancelRefund）→ 回补车场额度 →
 // 晚于到达时刻取消则记违约（violations + users.credit.violationCount++）。
 //

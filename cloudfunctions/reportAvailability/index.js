@@ -1,4 +1,4 @@
-// 车场端余位上报。
+// 车场端报余位
 //
 // 实时余位只由车场端上报（数据模型 §4：seedLots 不种 freeSpots，种了就是编的）。
 // 写入 lots.availability = { freeSpots, totalSpots, reportedAt, source: 'reported' }，

@@ -1,4 +1,4 @@
-// 超时释放定时云函数（数据模型 §5.5「要写的三个任务」之 2）。
+//  超时还位
 //
 // 每 5 分钟（config.json 的 timer 触发器）跑一次：把过 enterDeadline 仍 pending_entry
 // 的预约置 released → 回补车场额度 → 写 violations('no_show') → users.credit.violationCount++

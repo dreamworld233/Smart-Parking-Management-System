@@ -1,4 +1,4 @@
-// 每日对账定时云函数（数据模型 §5.5「要写的三个任务」之 3）。
+// 对账校正余位
 //
 // 2026-09-17 改职责：reservedCount 已退役（余位统一为 availability.freeSpots 单数：
 // 预约扣 -1、取消/逾期返还 +1、核销不动），原「按 reservations 重算 reservedCount」
