@@ -51,12 +51,6 @@
     </view>
 
     <view class="tail" />
-    <!-- 取消按钮必须留在详情 scroll-view 内：<block wx:else> 紧跟 scroll-view 的
-         wx:if 才配对；按钮挪到外面会让 wx:else 绑到按钮的 wx:if 上，详情打开且
-         订单不可取消时列表（wx:else）也渲染、盖住详情（真机踩到） -->
-    <view class="btnbar" wx:if="{{detail.cancellable}}">
-      <view class="btn-danger" data-id="{{detail.id}}" bindtap="onCancel">取消预约</view>
-    </view>
   </scroll-view>
 
   <!-- 列表视图 -->
@@ -133,4 +127,12 @@
       </view>
     </view>
   </block>
+
+  <!-- 详情吸底取消按钮。必须在 scroll-view 外：scroll-view 内的 absolute 锚到
+       **滚动内容**（不是页面根），bottom 一算就浮在最后一张卡片中间，和内容重叠。
+       位置也必须在 <block wx:else> 之后 —— 紧跟 scroll-view 的 wx:if 才是配对的
+       wx:else，插在中间会让 wx:else 绑到按钮的 wx:if 上，列表反把详情盖住（真机踩到） -->
+  <view class="btnbar" wx:if="{{detail && detail.cancellable}}">
+    <view class="btn-danger" data-id="{{detail.id}}" bindtap="onCancel">取消预约</view>
+  </view>
 </view>

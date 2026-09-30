@@ -60,12 +60,14 @@
         </view>
 
         <view class="tail" />
-        <!-- 核销按钮留在详情 scroll-view 内：wx:else 紧跟 scroll-view 的 wx:if 才配对
-             （orders 页真机踩过：按钮挪出去会让 wx:else 错绑，列表盖住详情） -->
-        <view class="btnbar" wx:if="{{detail.pending}}">
-          <view class="btn-primary" bindtap="onVerifyFromDetail">核销入场</view>
-        </view>
       </scroll-view>
+
+      <!-- 核销按钮放在 scroll-view 外：scroll-view 内的 absolute 锚到**滚动内容**
+           （不是页面根），bottom 一算就浮在最后一张卡片中间，和内容重叠。
+           本页 scroll-view 没有配对的 wx:else（外层是 block wx:if），挪出来安全 -->
+      <view class="btnbar" wx:if="{{detail.pending}}">
+        <view class="btn-primary" bindtap="onVerifyFromDetail">核销入场</view>
+      </view>
     </block>
 
     <!-- 列表视图 -->

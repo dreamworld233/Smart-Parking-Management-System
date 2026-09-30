@@ -43,23 +43,35 @@
           <view class="stat__k">待核销</view>
         </view>
         <view class="stat">
-          <view class="stat__v">{{stat.todayIncome}}</view>
-          <view class="stat__k">今日收入</view>
+          <view class="stat__v">¥{{stat.todayIncome}}</view>
+          <view class="stat__k">今日收益</view>
         </view>
       </view>
 
-      <!-- 近 7 日趋势折线图（canvas 2d，Skyline 兼容；TS 内绘制） -->
+      <!-- 趋势折线图（canvas 2d，Skyline 兼容；TS 内绘制）。范围与下方收益卡共用 rangeDays -->
       <view class="card">
         <view class="card__row card__row--head">
-          <view class="card__title">近 7 日预约与收入</view>
+          <view class="card__title">近 {{rangeDays}} 日预约与收益</view>
           <view class="trend__legend">
             <view class="legend legend--blue">预约</view>
-            <view class="legend legend--orange">收入</view>
+            <view class="legend legend--orange">收益</view>
           </view>
+        </view>
+        <view class="range">
+          <view
+            class="range__chip {{rangeDays === 7 ? 'range__chip--on' : ''}}"
+            data-days="7"
+            bindtap="onRangeTap"
+          >近 7 日</view>
+          <view
+            class="range__chip {{rangeDays === 30 ? 'range__chip--on' : ''}}"
+            data-days="30"
+            bindtap="onRangeTap"
+          >近 30 日</view>
         </view>
         <view class="trend">
           <canvas type="2d" id="trendChart" class="trend__canvas" bindtouchstart="onTrendTap"></canvas>
-          <!-- 点击数据点浮层：显示该日预约数与收入 -->
+          <!-- 点击数据点浮层：显示该日预约数与净收益 -->
           <view class="trend__tip" wx:if="{{trendTip}}" style="left: {{trendTip.x}}px; top: {{trendTip.y}}px">
             <view class="trend__tip-date">{{trendTip.date}}</view>
             <view class="trend__tip-row">
@@ -68,11 +80,40 @@
             </view>
             <view class="trend__tip-row">
               <view class="dot dot--orange"></view>
-              <text>收入 ¥{{trendTip.incomeText}}</text>
+              <text>收益 ¥{{trendTip.incomeText}}</text>
             </view>
           </view>
           <view class="trend__empty" wx:if="{{!trend.length}}">暂无趋势数据</view>
         </view>
+      </view>
+
+      <!-- 小程序收益明细：车场主最关心「用了小程序到手多少钱」。
+           口径 = 预支停车费 − 退款；平台服务费归平台，单列一行注明，不计入净收益 -->
+      <view class="card">
+        <view class="card__row card__row--head">
+          <view class="card__title">近 {{income.days}} 日小程序收益</view>
+        </view>
+        <view class="earn">
+          <view class="earn__v">{{income.netSign}}¥{{income.netText}}</view>
+          <view class="earn__k">净收益 · 预支停车费 − 退款</view>
+        </view>
+        <view class="row">
+          <text class="row__k">预支停车费</text>
+          <text class="tnum">¥{{income.prepaidText}}</text>
+        </view>
+        <view class="row">
+          <text class="row__k">退款扣减</text>
+          <text class="tnum">−¥{{income.refundText}}</text>
+        </view>
+        <view class="row">
+          <text class="row__k">平台服务费（归平台）</text>
+          <text class="tnum weak">¥{{income.serviceText}}</text>
+        </view>
+        <view class="row">
+          <text class="row__k">区间预约 / 已核销</text>
+          <text>{{income.reservationCount}} 单 / {{income.verifiedCount}} 单</text>
+        </view>
+        <view class="card__sub" wx:if="{{income.truncated}}">区间流水超过 1000 条，以上统计已截断</view>
       </view>
 
       <!-- 余位上报卡 -->

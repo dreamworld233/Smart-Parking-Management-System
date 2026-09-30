@@ -18,6 +18,41 @@ interface PendingItemVM {
   verifyCode: string
 }
 
+/** 收益明细卡渲染数据。金额一律走 formatAmount 成 "12.00" 文本，¥ 由 wxml 加 */
+interface IncomeVM {
+  /** 与折线图共用的范围天数 */
+  days: number
+  /** 净收益金额（正数，无符号）。符号单独放 netSign，避免渲染成「¥-5.00」 */
+  netText: string
+  /** 净收益符号：正常 ''，为负时 '−'（区间退款多于预支，跨期退款时会碰上） */
+  netSign: string
+  prepaidText: string
+  refundText: string
+  serviceText: string
+  reservationCount: string
+  verifiedCount: string
+  /** 云侧取数截断：如实提示，不假装是全量 */
+  truncated: boolean
+}
+
+/** 收益明细的零值。云函数没返回 income（旧版本）时兜底显示 0，不留空白卡 */
+const EMPTY_INCOME: IncomeVM = {
+  days: 7,
+  netText: '0.00',
+  netSign: '',
+  prepaidText: '0.00',
+  refundText: '0.00',
+  serviceText: '0.00',
+  reservationCount: '0',
+  verifiedCount: '0',
+  truncated: false,
+}
+
+/** 净收益拆成「符号 + 正数金额」两段。负数时模板渲染成「−¥5.00」而不是「¥-5.00」 */
+function splitSign(yuan: number): { sign: string; text: string } {
+  return { sign: yuan < 0 ? '−' : '', text: formatAmount(Math.abs(yuan)) }
+}
+
 /**
  * 看板渲染快照缓存（内存，data 外的实例字段）。
  * 切 tab 回来先显示这份旧数据、后台静默刷新；不落 wx.setStorageSync —— 车场端要新鲜
@@ -29,7 +64,10 @@ interface DashboardCache {
   stat: StatVM
   spotsText: string
   pendingList: PendingItemVM[]
-  /** 近 7 日趋势（旧→新），canvas 折线图 */
+  /** 快照对应的范围天数。与当前 rangeDays 不符时缓存作废（7 日的数据不能拿去渲染 30 日） */
+  days: number
+  income: IncomeVM
+  /** 近 N 日趋势（旧→新），canvas 折线图 */
   trend: TrendPoint[]
 }
 
@@ -44,16 +82,26 @@ interface TrendPoint {
  *  看板高频变（余位/额度/待核销），一分钟拉一次足够新，别用更长 */
 const CACHE_TTL_MS = 60 * 1000
 
+/** 折线图数据点多于这个数就不画点（30 日档），只画线 */
+const DOT_MAX_POINTS = 14
+
+/** 折线图点击命中半径（px）。canvas 内坐标，与 dpr 无关 */
+const TAP_HIT_PX = 24
+
 Page({
   data: {
     state: 'loading' as ViewState,
     lotName: '',
     lotAddress: '',
-    stat: { todayReservations: '0', pendingEntry: '0', todayIncome: '¥0' } as StatVM,
+    stat: { todayReservations: '0', pendingEntry: '0', todayIncome: '0.00' } as StatVM,
     spotsText: '待上报',
     /** 待核销列表（只显示车牌 + 到达 + 核销码） */
     pendingList: [] as PendingItemVM[],
-    /** 近 7 日趋势，折线图数据源 */
+    /** 趋势 / 收益明细的统计范围（天）。折线图与收益卡共用同一个值 */
+    rangeDays: 7,
+    /** 收益明细卡 */
+    income: EMPTY_INCOME as IncomeVM,
+    /** 近 N 日趋势，折线图数据源 */
     trend: [] as TrendPoint[],
     /** 折线图点击浮层（点某数据点显示该日详情），null = 不显示 */
     trendTip: null as { x: number; y: number; date: string; reservations: number; incomeText: string } | null,
@@ -71,6 +119,8 @@ Page({
   lotId: '',
   /** 折线图绘制参数，点击命中检测用（drawTrend 里赋值） */
   trendGeo: null as { trend: TrendPoint[]; PAD: { l: number; r: number; t: number; b: number }; pw: number; w: number; left: number } | null,
+  /** 折线图当前选中的点下标，-1 = 未选中。选中时画竖线高亮（data 外，避免无谓 setData） */
+  trendSel: -1,
   /** 上次成功渲染的看板快照（缓存命中时先显示它，不闪 loading） */
   lastData: null as DashboardCache | null,
   /** 缓存落库时刻（毫秒时间戳），超 CACHE_TTL_MS 视为过期 */
@@ -94,9 +144,9 @@ Page({
    */
   async load(force = false) {
     const cached = this.lastData
-    // 车场已在「我的」切换：旧车场缓存作废，TTL 内也不能用旧车场数据糊弄
-    const lotMismatch = !!cached && cached.lotId !== getCurrentLotId()
-    if (cached && !force && !lotMismatch && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
+    // 车场已在「我的」切换 / 统计范围已改：旧缓存作废，TTL 内也不能用旧车场或旧范围的数据糊弄
+    const stale = !!cached && (cached.lotId !== getCurrentLotId() || cached.days !== this.data.rangeDays)
+    if (cached && !force && !stale && Date.now() - this.lastLoadedAt < CACHE_TTL_MS) {
       this.applyCache(cached)
       void this.refresh(true)
       return
@@ -127,7 +177,8 @@ Page({
       this.setData({ state: 'error' })
       return
     }
-    let r = await fetchAdminDashboard(cur.lotId)
+    const days = this.data.rangeDays
+    let r = await fetchAdminDashboard(cur.lotId, days)
     if (!r.ok && (r.code === 'FORBIDDEN' || r.code === 'NOT_FOUND')) {
       // storage 里的车场被解绑/删除：清掉重解析再试一次
       setCurrentLotId('')
@@ -147,7 +198,7 @@ Page({
         this.setData({ state: 'error' })
         return
       }
-      r = await fetchAdminDashboard(cur.lotId)
+      r = await fetchAdminDashboard(cur.lotId, days)
     }
     if (!r.ok) {
       if (silent) return
@@ -176,6 +227,9 @@ Page({
         ? `${avail.freeSpots} / ${avail.totalSpots}`
         : '待上报'
 
+    // 旧云函数没 income：兜底零值，卡片显示 0 而不是空白
+    const inc = d.income
+    const net = splitSign(inc ? inc.net : 0)
     const cache: DashboardCache = {
       lotId: lot._id,
       lotName: lot.name,
@@ -192,6 +246,21 @@ Page({
         arriveText: formatTimeRangeLabel(new Date(), new Date(x.arriveTime)),
         verifyCode: String(x.verifyCode || '--'),
       })),
+      // 云侧回显归一后的天数（白名单）。缺字段说明是旧云函数，用请求值兜底
+      days: inc && Number(inc.days) ? Number(inc.days) : days,
+      income: inc
+        ? {
+            days: Number(inc.days) || days,
+            netText: net.text,
+            netSign: net.sign,
+            prepaidText: formatAmount(inc.prepaid),
+            refundText: formatAmount(inc.refund),
+            serviceText: formatAmount(inc.service),
+            reservationCount: String(inc.reservationCount || 0),
+            verifiedCount: String(inc.verifiedCount || 0),
+            truncated: !!inc.truncated,
+          }
+        : { ...EMPTY_INCOME, days },
       // 旧云函数没 trend：兜底空数组，折线图不画、显示「暂无趋势数据」
       trend: (d.trend || []).map(x => ({
         date: String(x.date || ''),
@@ -207,6 +276,8 @@ Page({
   /** 把（缓存的）渲染快照落到 data。lotId 依赖 load 成功赋值，缓存命中分支也要正确设置 */
   applyCache(c: DashboardCache) {
     this.lotId = c.lotId
+    // 换范围 / 换车场后旧选中的下标在新趋势里没有意义，先清掉
+    this.trendSel = -1
     this.setData(
       {
         state: 'ready',
@@ -215,17 +286,31 @@ Page({
         stat: c.stat,
         spotsText: c.spotsText,
         pendingList: c.pendingList,
+        rangeDays: c.days,
+        income: c.income,
         trend: c.trend,
+        trendTip: null,
       },
       // setData 回调里 canvas 节点刚可用，此时 query 尺寸才拿得到
       () => this.drawTrend(c.trend),
     )
   },
 
+  /** 切统计范围（近 7 日 / 近 30 日）。范围变了缓存必作废，直接强刷 */
+  onRangeTap(e: WechatMiniprogram.TouchEvent) {
+    const days = Number((e.currentTarget.dataset as { days?: string }).days)
+    if (days !== 7 && days !== 30) return
+    if (days === this.data.rangeDays) return
+    this.lastLoadedAt = 0
+    this.lastData = null
+    this.setData({ rangeDays: days, trendTip: null })
+    void this.load(true)
+  },
+
   /**
-   * 近 7 日趋势折线图（canvas 2d）。两条线各自归一化到各自最大值：
-   * 预约数（个位~几十）与收入（几十~几百元）量级差太多，共用刻度会压成一条线。
-   * 左侧只标收入 0/max，预约数靠图例区分颜色。
+   * 近 N 日趋势折线图（canvas 2d）。两条线各自归一化到各自最大值：
+   * 预约数（个位~几十）与收益（几十~几百元）量级差太多，共用刻度会压成一条线。
+   * 左侧只标收益 0/max，预约数靠图例区分颜色。
    */
   drawTrend(trend: TrendPoint[]) {
     const query = this.createSelectorQuery()
@@ -274,8 +359,26 @@ Page({
         ctx.fillText('0', PAD.l - 6, PAD.t + ph)
         ctx.fillText(this.incomeLabel(maxInc), PAD.l - 6, PAD.t + 2)
 
-        this.drawSeries(ctx, trend, xAt, p => p.reservations, yRes, '#2563eb')
-        this.drawSeries(ctx, trend, xAt, p => p.income, yInc, '#f59e0b')
+        // 30 日时每点都画会糊成一条粗线，只画线；选中点由下面的高亮补上
+        const dots = trend.length <= DOT_MAX_POINTS
+        this.drawSeries(ctx, trend, xAt, p => p.reservations, yRes, '#2563eb', dots)
+        this.drawSeries(ctx, trend, xAt, p => p.income, yInc, '#f59e0b', dots)
+
+        // 选中点高亮：竖虚线 + 两条线上的放大点。给点击一个看得见的落点
+        const sel = this.trendSel
+        if (sel >= 0 && sel < trend.length) {
+          const x = xAt(sel)
+          ctx.strokeStyle = '#94a3b8'
+          ctx.lineWidth = 1
+          ctx.setLineDash([3, 3])
+          ctx.beginPath()
+          ctx.moveTo(x, PAD.t)
+          ctx.lineTo(x, PAD.t + ph)
+          ctx.stroke()
+          ctx.setLineDash([])
+          this.drawDot(ctx, x, yRes(trend[sel].reservations), '#2563eb', 5)
+          this.drawDot(ctx, x, yInc(trend[sel].income), '#f59e0b', 5)
+        }
 
         // x 轴日期标签（只画首/中/末，7 个全画会挤）
         ctx.fillStyle = '#94a3b8'
@@ -290,17 +393,25 @@ Page({
   },
 
   /**
-   * 折线图点击：命中最近数据点（水平距离 < 24px 才算），在画布上方弹浮层显示该日详情。
+   * 折线图点击：命中最近数据点（水平距离 < TAP_HIT_PX 才算），在画布上方弹浮层显示该日详情。
    * 再点空白处关闭。tip 用相对 .trend 容器的 px 定位——canvas 占满容器同宽同起点，
    * canvas 内坐标就是容器内坐标
+   *
+   * 坐标口径：canvas 的触摸事件给的是**画布内坐标**（`touches[].x`，见
+   * miniprogram-api-typings 的 TouchCanvasDetail），不是页面坐标。旧代码读
+   * `e.detail.clientX` 恒为 undefined，整段命中检测直接 return —— 真机上节点点不动。
+   * clientX 兜底保留：若某基础库只给页面坐标，减 canvas 左偏移仍能算对
    */
-  onTrendTap(e: WechatMiniprogram.TouchEvent) {
+  onTrendTap(e: WechatMiniprogram.TouchCanvas) {
     const geo = this.trendGeo
     if (!geo || geo.trend.length === 0) return
-    // 触摸点相对页面 → 相对 canvas：TouchDetail 给 clientX（页面可视区），减 canvas 左侧偏移
-    const clientX = (e.detail as { clientX: number }).clientX
-    if (typeof clientX !== 'number') return
-    const x = clientX - geo.left
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+    if (!t) return
+    const rawX = (t as { x?: number }).x
+    const clientX = (t as { clientX?: number }).clientX
+    const x =
+      typeof rawX === 'number' ? rawX : typeof clientX === 'number' ? clientX - geo.left : NaN
+    if (!Number.isFinite(x)) return
 
     const { trend, PAD, pw, w } = geo
     const xAt = (i: number) => PAD.l + (trend.length === 1 ? pw / 2 : (i * pw) / (trend.length - 1))
@@ -314,8 +425,12 @@ Page({
         best = i
       }
     }
-    if (best < 0 || bestD > 24) {
-      // 点空白：关闭浮层
+    if (best < 0 || bestD > TAP_HIT_PX) {
+      // 点空白：关浮层 + 撤掉选中高亮
+      if (this.trendSel !== -1) {
+        this.trendSel = -1
+        this.drawTrend(trend)
+      }
       if (this.data.trendTip) this.setData({ trendTip: null })
       return
     }
@@ -323,6 +438,7 @@ Page({
     const px = xAt(best)
     const tipW = Math.min(190, w * 0.5)
     const left = Math.max(4, Math.min(px + 12, w - tipW - 4))
+    this.trendSel = best
     this.setData({
       trendTip: {
         x: left,
@@ -332,6 +448,8 @@ Page({
         incomeText: formatAmount(p.income),
       },
     })
+    // 重画一次把选中点的竖线 / 放大点画上，点下去看得见落点
+    this.drawTrend(trend)
   },
 
   /** 收入刻度文案：>= 100 省小数（¥120），否则一位小数（¥3.5） */
@@ -367,7 +485,10 @@ Page({
     }
   },
 
-  /** 画一条折线 + 数据点。valOf 取该系列的值（预约数 or 收入），yOf 做归一化 */
+  /**
+   * 画一条折线 + 数据点。valOf 取该系列的值（预约数 or 收入），yOf 做归一化。
+   * dots=false 时只画线不画点（30 日档，点太密）
+   */
   drawSeries(
     ctx: WechatMiniprogram.CanvasRenderingContext.CanvasRenderingContext2D,
     trend: TrendPoint[],
@@ -375,6 +496,7 @@ Page({
     valOf: (p: TrendPoint) => number,
     yOf: (v: number) => number,
     color: string,
+    dots: boolean,
   ) {
     const ys = trend.map(p => yOf(valOf(p)))
     ctx.strokeStyle = color
@@ -388,13 +510,22 @@ Page({
       else ctx.lineTo(x, y)
     })
     ctx.stroke()
-    // 数据点
-    ys.forEach((y, i) => {
-      ctx.fillStyle = color
-      ctx.beginPath()
-      ctx.arc(xAt(i), y, 3, 0, Math.PI * 2)
-      ctx.fill()
-    })
+    if (!dots) return
+    ys.forEach((y, i) => this.drawDot(ctx, xAt(i), y, color, 3))
+  },
+
+  /** 一个实心圆点 */
+  drawDot(
+    ctx: WechatMiniprogram.CanvasRenderingContext.CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    color: string,
+    r: number,
+  ) {
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
   },
 
   onPickRole() {

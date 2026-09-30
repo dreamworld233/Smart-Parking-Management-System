@@ -1,7 +1,8 @@
 // adminDashboard 云函数（CommonJS .js）的离线测试。
 //
 // 复用 adminGetLot 的 stub 手法，加 count() / orderBy().limit().get() / _.gte()。
-// 测试重点是：权限、未绑定车场、三统计（今日/待核销/收入）、待核销列表排序截断。
+// 测试重点是：权限、未绑定车场、三统计（今日/待核销/净收益）、待核销列表排序截断、
+// 收益明细口径（净收益 = 预支 − 退款，服务费不计入）、days 范围白名单。
 
 // 标记为模块：顶层声明（Store/mockStore/main 等）不落入全局作用域，避免与其它
 // stub 式测试文件在同一 jest worker 里被 ts-jest 合并编译时撞名（全局脚本无 import/export）。
@@ -164,25 +165,88 @@ describe('adminDashboard', () => {
     expect((await main({ lotId: 'lot_no_such' })).code).toBe('NOT_FOUND')
   })
 
-  it('统计：今日预约 / 待核销 / 今日收入（refund 负值相抵）', async () => {
+  it('统计：今日预约 / 待核销 / 今日净收益（预支 − 退款，服务费不计入）', async () => {
     seedUser()
     seedLot()
     // 今日 2 单（1 待入场 1 已入场），昨天 1 单不计今日
     seedReservation('r1', { status: 'pending_entry', createdAt: NOW })
     seedReservation('r2', { status: 'entered', createdAt: NOW })
     seedReservation('r3', { status: 'pending_entry', createdAt: NOW - DAY })
-    // 今日流水：prepaid 6 + service 2 + refund -4 = 4
+    // 今日流水：prepaid 6、service 2（归平台）、refund -4 → 净收益 6-4 = 2
     seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
     seedOrder({ amount: 2, type: 'service', paidAt: NOW })
     seedOrder({ amount: -4, type: 'refund', paidAt: NOW })
-    seedOrder({ amount: 99, type: 'prepaid', paidAt: NOW - DAY }) // 昨天不算
+    seedOrder({ amount: 99, type: 'prepaid', paidAt: NOW - DAY }) // 昨天不算今日
 
     const r = await main({ lotId: 'lot1' })
     expect(r.code).toBe(0)
     expect(r.data.todayReservations).toBe(2) // r1+r2（r3 是昨天）
     // pendingEntry 是全量 status 计数，不看 createdAt → r1 + r3 = 2
     expect(r.data.pendingEntry).toBe(2)
-    expect(r.data.todayIncome).toBe(4) // 6+2-4，昨天的 99 不算
+    expect(r.data.todayIncome).toBe(2) // 6-4；service 2 不归车场
+  })
+
+  it('收益明细：净收益 = 预支 − 退款，服务费单列不计入', async () => {
+    seedUser()
+    seedLot()
+    seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
+    seedOrder({ amount: 2, type: 'service', paidAt: NOW })
+    seedOrder({ amount: -4, type: 'refund', paidAt: NOW })
+    seedOrder({ amount: 99, type: 'unknown_type', paidAt: NOW }) // 未知科目不计入
+
+    const r = await main({ lotId: 'lot1' })
+    expect(r.data.income.days).toBe(7)
+    expect(r.data.income.prepaid).toBe(6)
+    expect(r.data.income.refund).toBe(4) // 翻成正数存「扣减了多少」
+    expect(r.data.income.service).toBe(2)
+    expect(r.data.income.net).toBe(2)
+    expect(r.data.income.truncated).toBe(false)
+  })
+
+  it('趋势：长度 = days，末点是今日，收入为当日净收益', async () => {
+    seedUser()
+    seedLot()
+    seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
+    seedOrder({ amount: 2, type: 'service', paidAt: NOW })
+    seedOrder({ amount: 3, type: 'prepaid', paidAt: NOW - DAY })
+
+    const r = await main({ lotId: 'lot1' })
+    expect(r.data.trend.length).toBe(7)
+    expect(r.data.trend[6].income).toBe(6) // 今日：service 不算
+    expect(r.data.trend[5].income).toBe(3) // 昨日
+    expect(r.data.trend[0].income).toBe(0)
+  })
+
+  it('days=30 收进 7 日窗口外的流水；非法 days 落回 7', async () => {
+    seedUser()
+    seedLot()
+    seedOrder({ amount: 50, type: 'prepaid', paidAt: NOW - 10 * DAY })
+
+    const d7 = await main({ lotId: 'lot1' })
+    expect(d7.data.trend.length).toBe(7)
+    expect(d7.data.income.prepaid).toBe(0) // 10 天前在 7 日窗口外
+
+    const d30 = await main({ lotId: 'lot1', days: 30 })
+    expect(d30.data.trend.length).toBe(30)
+    expect(d30.data.income.prepaid).toBe(50)
+
+    expect((await main({ lotId: 'lot1', days: 999 })).data.income.days).toBe(7)
+    expect((await main({ lotId: 'lot1', days: 'abc' })).data.income.days).toBe(7)
+  })
+
+  it('区间单量：预约数按 createdAt 落在范围内，已核销按 entered/completed 计', async () => {
+    seedUser()
+    seedLot()
+    seedReservation('r1', { status: 'pending_entry', createdAt: NOW })
+    seedReservation('r2', { status: 'entered', createdAt: NOW - DAY })
+    seedReservation('r3', { status: 'completed', createdAt: NOW - 2 * DAY })
+    seedReservation('r4', { status: 'cancelled', createdAt: NOW - 3 * DAY })
+    seedReservation('r5', { status: 'entered', createdAt: NOW - 40 * DAY }) // 30 日窗外
+
+    const r = await main({ lotId: 'lot1', days: 30 })
+    expect(r.data.income.reservationCount).toBe(4)
+    expect(r.data.income.verifiedCount).toBe(2) // r2 + r3
+    expect(r.data.trend[29].reservations).toBe(1) // 今日 r1
   })
 
   it('待核销列表：按 arriveTime 升序 + 最多 5 条', async () => {

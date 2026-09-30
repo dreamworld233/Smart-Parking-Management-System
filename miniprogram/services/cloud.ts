@@ -164,6 +164,29 @@ export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
   return callFunction<AdminGetLotData>('adminGetLot')
 }
 
+/**
+ * 车场收益明细（adminDashboard 的 income 字段）。
+ * 口径：净收益 = 预支停车费 − 退款。service 是平台服务费，归平台、不计入 net，仅作展示
+ */
+export interface AdminIncomeSummary {
+  /** 统计范围天数（7 或 30），云侧白名单归一后的值 */
+  days: number
+  /** 区间预支停车费合计（元） */
+  prepaid: number
+  /** 区间退款扣减合计（元，正数表示扣掉了多少） */
+  refund: number
+  /** 区间平台服务费合计（元，归平台） */
+  service: number
+  /** 区间净收益 = prepaid − refund */
+  net: number
+  /** 区间预约单量 */
+  reservationCount: number
+  /** 区间已核销单量（entered + completed） */
+  verifiedCount: number
+  /** 区间流水超过云函数取数上限，统计已截断 */
+  truncated: boolean
+}
+
 /** adminDashboard 返回的看板数据 */
 export interface AdminDashboardData {
   lot: {
@@ -174,7 +197,10 @@ export interface AdminDashboardData {
   } | null
   todayReservations: number
   pendingEntry: number
+  /** 今日净收益（预支停车费 − 退款）。服务费不归车场，不含在内 */
   todayIncome: number
+  /** 收益明细。旧云函数可能没这字段，前端兜底空态 */
+  income?: AdminIncomeSummary
   pendingList: {
     _id: string
     plateNo: string
@@ -182,7 +208,7 @@ export interface AdminDashboardData {
     verifyCode: string
     lotName: string
   }[]
-  /** 近 7 日趋势（旧→新），折线图用。旧云函数可能没这字段，前端兜底空数组 */
+  /** 近 N 日趋势（旧→新），折线图用。旧云函数可能没这字段，前端兜底空数组 */
   trend?: {
     date: string
     reservations: number
@@ -190,9 +216,15 @@ export interface AdminDashboardData {
   }[]
 }
 
-/** 车场端看板：统计 + 待核销列表（云函数 adminDashboard）。lotId 由调用方传入当前车场 */
-export function fetchAdminDashboard(lotId: string): Promise<CloudResult<AdminDashboardData>> {
-  return callFunction<AdminDashboardData>('adminDashboard', { lotId })
+/**
+ * 车场端看板：统计 + 收益明细 + 待核销列表（云函数 adminDashboard）。
+ * lotId 由调用方传入当前车场；days 是趋势/收益的范围天数（7 或 30）
+ */
+export function fetchAdminDashboard(
+  lotId: string,
+  days: number,
+): Promise<CloudResult<AdminDashboardData>> {
+  return callFunction<AdminDashboardData>('adminDashboard', { lotId, days })
 }
 
 export interface ReportAvailabilityData {
