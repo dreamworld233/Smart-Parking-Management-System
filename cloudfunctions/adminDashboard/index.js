@@ -18,6 +18,10 @@
 // 主档的 refundParking / refundService 是同一时刻算出来的两笔拆分，取它才对得上账。
 // 退款的时间轴用 refundAt（与 refund 流水的 paidAt 是同一个 now），不是 createdAt。
 //
+// 2026-09-30 起 refund 流水也带上了 refundParking / refundService 两个字段（cancelReservation），
+// 但本函数**仍读主档**：拆分字段是后补的，之前的历史流水没有，读主档才能把老数据一起算对。
+// 流水上的拆分是给对账 / 运营查询用的，不是这里的取数来源。
+//
 // 收益与趋势：一次按时间范围取 orders + reservations，在函数内按本地日分组求和。
 // 不再逐天两段查询 —— 30 天要 60 次查询，冷启动下必然超时。
 // 不押 sum 聚合 API：取回上限 FETCH_LIMIT 条，超出时 `income.truncated` 置 true，

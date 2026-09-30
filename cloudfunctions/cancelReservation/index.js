@@ -11,6 +11,12 @@
 // 主档（reservations 状态 + 退款字段）与 CAS 是一笔原子更新，先落它再落 orders/
 // 额度/violations —— 后面三笔失败不撤销主档，交给每日对账兜底（设计稿 §5.2）：
 // 退款已经发生在主档里了，orders 流水缺一条是账能对回来的，别为了流水回滚主档。
+//
+// 退款金额的两个口径（2026-09-30 补）：主档写 refundParking / refundService / refundTotal，
+// refund 流水写合并的 amount 之外**同时写 refundParking / refundService 两笔拆分**。
+// 起因：看板按「预支停车费 − 退款」算车场收益，拿合并的 amount 去减，
+// 免费取消窗口内那笔会把平台该退的服务费算成车场亏损（区间内免费取消占多数时净收益为负）。
+// 拆分字段是同一时刻算出来的同一组数，两边必须一致。
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -89,7 +95,10 @@ exports.main = async (event) => {
     return { code: 'ALREADY_CANCELLED', message: '该预约已被处理' }
   }
 
-  // 5. 退款流水（type refund，amount 负值）。失败不撤销主档，对账兜底
+  // 5. 退款流水（type refund，amount 负值）。失败不撤销主档，对账兜底。
+  //    amount 是**车主实收的合并退款**，两种分支口径不同（见文件头与 pricing.cancelRefund）：
+  //    免费窗口内 = 预支停车费 + 服务费，窗口外 = 只有停车费。所以同时把两笔拆分写进流水，
+  //    否则这条流水单独看分不清哪一半是车场的、哪一半是平台的 —— 看板收益就是这么算错过一次
   try {
     await orders.add({
       data: {
@@ -100,6 +109,8 @@ exports.main = async (event) => {
         type: 'refund',
         status: 'refunded',
         paidAt: now,
+        refundParking,
+        refundService,
       },
     })
   } catch (e) {

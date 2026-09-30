@@ -209,11 +209,13 @@ describe('cancelReservation 正常取消', () => {
 
     // 额度回补
     expect((mockStore.lots.get('lot1')!.availability as { freeSpots: number }).freeSpots).toBe(2)
-    // 退款流水一条（amount 负）
+    // 退款流水一条（amount 负 = 车主实收合计；另带停车费/服务费两笔拆分，供看板按车场口径取数）
     expect(mockStore.orders.size).toBe(1)
     const o = [...mockStore.orders.values()][0]
     expect(o.type).toBe('refund')
     expect(o.amount).toBe(-8)
+    expect(o.refundParking).toBe(6)
+    expect(o.refundService).toBe(2)
     expect(o.reservationId).toBe('res1')
     // 免费窗口内不违约
     expect(mockStore.violations.size).toBe(0)
@@ -236,6 +238,11 @@ describe('cancelReservation 正常取消', () => {
       refundTotal: 12,
       isBreach: false,
     })
+    // 流水拆分与主档同口径：窗口外服务费不退，refundService 必须是 0
+    const o = [...mockStore.orders.values()][0]
+    expect(o.amount).toBe(-12)
+    expect(o.refundParking).toBe(12)
+    expect(o.refundService).toBe(0)
     expect(mockStore.violations.size).toBe(0)
     expect((mockStore.users.get('openid-test-1')!.credit as { violationCount: number }).violationCount).toBe(0)
   })
