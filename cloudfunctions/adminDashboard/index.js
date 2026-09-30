@@ -4,11 +4,19 @@
 // 车场端读自己车场的单（where lotId）没有对应规则，走云函数规避规则缺口
 // （数据模型 §5.6 分工：前端只读自己的，车场端读走云函数）。
 //
-// 收入口径（2026-09-30 改）：**净收益 = 预支停车费 − 退款**。
-// 预支停车费是车场锁位收入，退款是取消时按已占用时长扣下来的部分，两者相抵即车场真实到手。
+// 收入口径（2026-09-30 定）：**车场净收益 = 预支停车费 − 退还的预支停车费**。
+// 预支停车费是车场锁位收入；取消时按已占用时长退掉的那部分是车场的支出，两者相抵即车场到手。
 // 平台服务费（¥2，见 domain/pricing.ts）是平台唯一收入来源，**不归车场**，
-// 只作 `income.service` 单列返回，供看板注明「归平台」。旧口径把 service 也算进 todayIncome，
-// 车场主看到的是平台流水不是自己的收益，已弃用。
+// 作 `income.service` / `income.serviceNet` 单列返回，供看板注明「归平台」。
+//
+// **退款必须取 reservations 主档的拆分，不能取 orders 的 refund 流水**（2026-09-30 用户发现）：
+// cancelReservation 写的那条 refund 流水是**一条合并金额** ——
+//   免费取消窗口内 refundTotal = 预支停车费 + 服务费（pricing.js 的 cancelRefund）
+//   窗口外         refundTotal = parkingRefund
+// 拿这条流水去减车场收益，免费取消那笔会把平台该退的 ¥2 算成车场的亏损，
+// 区间内只要免费取消占多数，「净收益」就会变成负数（9/16 实际出现过）。
+// 主档的 refundParking / refundService 是同一时刻算出来的两笔拆分，取它才对得上账。
+// 退款的时间轴用 refundAt（与 refund 流水的 paidAt 是同一个 now），不是 createdAt。
 //
 // 收益与趋势：一次按时间范围取 orders + reservations，在函数内按本地日分组求和。
 // 不再逐天两段查询 —— 30 天要 60 次查询，冷启动下必然超时。
@@ -145,10 +153,18 @@ exports.main = async (event) => {
   const trend = dayStarts.map(s => ({ date: dayLabel(s), reservations: 0, income: 0 }))
   const income = {
     days,
+    /** 区间预支停车费（车场收入侧） */
     prepaid: 0,
-    refund: 0,
+    /** 区间退还的预支停车费（车场支出侧，正数） */
+    refundParking: 0,
+    /** 区间平台服务费（平台收入侧，不归车场） */
     service: 0,
+    /** 区间退还的平台服务费（平台支出侧，正数） */
+    refundService: 0,
+    /** 车场净收益 = prepaid − refundParking */
     net: 0,
+    /** 平台服务费净额 = service − refundService */
+    serviceNet: 0,
     reservationCount: 0,
     verifiedCount: 0,
     truncated: false,
@@ -168,7 +184,9 @@ exports.main = async (event) => {
     }
   } catch (e) { /* 读失败：趋势与区间单量保持 0 */ }
 
-  // 区间流水：prepaid / refund 计入净收益，service 只单列不计入
+  // 区间收入流水：只认 prepaid / service 两笔正流水。
+  // refund 流水**故意不在这里减** —— 它是合并金额，减了会把平台该退的服务费算到车场头上，
+  // 改由下面按主档拆分的那段处理
   try {
     const r = await orders.where({ lotId, paidAt: _.gte(rangeStart) }).limit(FETCH_LIMIT).get()
     if (r.data.length >= FETCH_LIMIT) income.truncated = true
@@ -178,18 +196,29 @@ exports.main = async (event) => {
       if (o.type === 'prepaid') {
         income.prepaid += amt
         if (i >= 0) trend[i].income += amt
-      } else if (o.type === 'refund') {
-        // 退款流水 amount 为负（cancelReservation 写入），这里翻成正数存「扣减了多少」
-        income.refund += -amt
-        if (i >= 0) trend[i].income += amt
       } else if (o.type === 'service') {
         income.service += amt
       }
-      // 其余类型不计入：宁可少算，不把平台侧科目当车场收入
+      // 其余类型（含 refund）不计入：宁可少算，不把平台侧科目当车场收入
     }
   } catch (e) { /* 读失败：收益保持 0 */ }
 
-  income.net = income.prepaid - income.refund
+  // 区间退款：按 refundAt 取预约主档，直接读 refundParking / refundService 两笔拆分
+  // （cancelReservation 的 CAS 更新与退款流水同一时刻写入）。理由见文件头。
+  try {
+    const r = await reservations.where({ lotId, refundAt: _.gte(rangeStart) }).limit(FETCH_LIMIT).get()
+    if (r.data.length >= FETCH_LIMIT) income.truncated = true
+    for (const x of r.data) {
+      const park = Number(x.refundParking) || 0
+      income.refundParking += park
+      income.refundService += Number(x.refundService) || 0
+      const i = bucketIndex(Number(x.refundAt))
+      if (i >= 0) trend[i].income -= park
+    }
+  } catch (e) { /* 读失败：退款按 0 —— 宁可高估收益，也不编一个数出来 */ }
+
+  income.net = income.prepaid - income.refundParking
+  income.serviceNet = income.service - income.refundService
   // 今日 = 趋势最后一个点。今日预约用上面的精确 count 覆盖，避免取数截断时两处对不上
   trend[days - 1].reservations = todayReservations
   const todayIncome = trend[days - 1].income

@@ -165,17 +165,16 @@ describe('adminDashboard', () => {
     expect((await main({ lotId: 'lot_no_such' })).code).toBe('NOT_FOUND')
   })
 
-  it('统计：今日预约 / 待核销 / 今日净收益（预支 − 退款，服务费不计入）', async () => {
+  it('统计：今日预约 / 待核销 / 今日净收益（预支 − 退还的预支停车费）', async () => {
     seedUser()
     seedLot()
     // 今日 2 单（1 待入场 1 已入场），昨天 1 单不计今日
     seedReservation('r1', { status: 'pending_entry', createdAt: NOW })
     seedReservation('r2', { status: 'entered', createdAt: NOW })
     seedReservation('r3', { status: 'pending_entry', createdAt: NOW - DAY })
-    // 今日流水：prepaid 6、service 2（归平台）、refund -4 → 净收益 6-4 = 2
+    // 今日收入流水：prepaid 6、service 2（归平台）
     seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
     seedOrder({ amount: 2, type: 'service', paidAt: NOW })
-    seedOrder({ amount: -4, type: 'refund', paidAt: NOW })
     seedOrder({ amount: 99, type: 'prepaid', paidAt: NOW - DAY }) // 昨天不算今日
 
     const r = await main({ lotId: 'lot1' })
@@ -183,24 +182,68 @@ describe('adminDashboard', () => {
     expect(r.data.todayReservations).toBe(2) // r1+r2（r3 是昨天）
     // pendingEntry 是全量 status 计数，不看 createdAt → r1 + r3 = 2
     expect(r.data.pendingEntry).toBe(2)
-    expect(r.data.todayIncome).toBe(2) // 6-4；service 2 不归车场
+    expect(r.data.todayIncome).toBe(6) // 6；service 2 不归车场
   })
 
-  it('收益明细：净收益 = 预支 − 退款，服务费单列不计入', async () => {
+  it('收益明细：车场净收益只扣停车费那一半，服务费净额单列', async () => {
     seedUser()
     seedLot()
+    // 两单各 prepaid 6 / service 2：
+    //   r1 免费窗口内全退 → 车场退 6、平台退 2
+    //   r2 窗口外退一半停车费 → 车场退 3、服务费不退
     seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
     seedOrder({ amount: 2, type: 'service', paidAt: NOW })
-    seedOrder({ amount: -4, type: 'refund', paidAt: NOW })
+    seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
+    seedOrder({ amount: 2, type: 'service', paidAt: NOW })
+    seedReservation('r1', { status: 'cancelled', refundAt: NOW, refundParking: 6, refundService: 2 })
+    seedReservation('r2', { status: 'cancelled', refundAt: NOW, refundParking: 3, refundService: 0 })
     seedOrder({ amount: 99, type: 'unknown_type', paidAt: NOW }) // 未知科目不计入
 
     const r = await main({ lotId: 'lot1' })
     expect(r.data.income.days).toBe(7)
-    expect(r.data.income.prepaid).toBe(6)
-    expect(r.data.income.refund).toBe(4) // 翻成正数存「扣减了多少」
-    expect(r.data.income.service).toBe(2)
-    expect(r.data.income.net).toBe(2)
+    expect(r.data.income.prepaid).toBe(12)
+    expect(r.data.income.refundParking).toBe(9)
+    expect(r.data.income.service).toBe(4)
+    expect(r.data.income.refundService).toBe(2)
+    // 12 − 9。若照 orders 的合并退款流水减（−8 与 −3）会算成 1，把平台那 2 元算成车场亏损
+    expect(r.data.income.net).toBe(3)
+    expect(r.data.income.serviceNet).toBe(2) // 4 − 2
+    expect(r.data.todayIncome).toBe(3)
     expect(r.data.income.truncated).toBe(false)
+  })
+
+  it('orders 的 refund 合并流水不参与扣减（口径唯一来源是主档拆分）', async () => {
+    seedUser()
+    seedLot()
+    seedOrder({ amount: 6, type: 'prepaid', paidAt: NOW })
+    seedOrder({ amount: 2, type: 'service', paidAt: NOW })
+    // 免费取消的合并退款流水（停车费 6 + 服务费 2），但没有对应主档
+    seedOrder({ amount: -8, type: 'refund', paidAt: NOW })
+
+    const r = await main({ lotId: 'lot1' })
+    expect(r.data.income.prepaid).toBe(6)
+    expect(r.data.income.refundParking).toBe(0)
+    expect(r.data.income.net).toBe(6) // 不被那条流水影响
+    expect(r.data.todayIncome).toBe(6)
+  })
+
+  it('跨期退款：区间内只有退款没有预支时，净收益如实为负', async () => {
+    seedUser()
+    seedLot()
+    // 20 天前下的单今天才取消：预支落在区间外，退款落在区间内
+    seedReservation('r1', {
+      status: 'cancelled',
+      createdAt: NOW - 20 * DAY,
+      refundAt: NOW,
+      refundParking: 6,
+      refundService: 0,
+    })
+
+    const r = await main({ lotId: 'lot1', days: 30 })
+    expect(r.data.income.prepaid).toBe(0)
+    expect(r.data.income.refundParking).toBe(6)
+    expect(r.data.income.net).toBe(-6)
+    expect(r.data.trend[29].income).toBe(-6) // 趋势当日也按同一口径
   })
 
   it('趋势：长度 = days，末点是今日，收入为当日净收益', async () => {

@@ -102,11 +102,11 @@
           <text class="tnum">¥{{income.prepaidText}}</text>
         </view>
         <view class="row">
-          <text class="row__k">退款扣减</text>
+          <text class="row__k">退款扣减（停车费）</text>
           <text class="tnum">−¥{{income.refundText}}</text>
         </view>
         <view class="row">
-          <text class="row__k">平台服务费（归平台）</text>
+          <text class="row__k">平台服务费净额（归平台）</text>
           <text class="tnum weak">¥{{income.serviceText}}</text>
         </view>
         <view class="row">

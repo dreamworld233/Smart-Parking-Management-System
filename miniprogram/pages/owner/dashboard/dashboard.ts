@@ -27,7 +27,9 @@ interface IncomeVM {
   /** 净收益符号：正常 ''，为负时 '−'（区间退款多于预支，跨期退款时会碰上） */
   netSign: string
   prepaidText: string
+  /** 退还的预支停车费（车场支出侧） */
   refundText: string
+  /** 平台服务费净额（归平台，已扣掉免费取消退还的那部分） */
   serviceText: string
   reservationCount: string
   verifiedCount: string
@@ -254,8 +256,9 @@ Page({
             netText: net.text,
             netSign: net.sign,
             prepaidText: formatAmount(inc.prepaid),
-            refundText: formatAmount(inc.refund),
-            serviceText: formatAmount(inc.service),
+            // 只扣车场那一半：退还的服务费是平台出的，不算车场亏损（见 services/cloud.ts）
+            refundText: formatAmount(inc.refundParking),
+            serviceText: formatAmount(inc.serviceNet),
             reservationCount: String(inc.reservationCount || 0),
             verifiedCount: String(inc.verifiedCount || 0),
             truncated: !!inc.truncated,

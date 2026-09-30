@@ -166,19 +166,27 @@ export function fetchAdminLot(): Promise<CloudResult<AdminGetLotData>> {
 
 /**
  * 车场收益明细（adminDashboard 的 income 字段）。
- * 口径：净收益 = 预支停车费 − 退款。service 是平台服务费，归平台、不计入 net，仅作展示
+ *
+ * 口径：**车场净收益 = 预支停车费 − 退还的预支停车费**。
+ * 退款只扣车场那一半 —— 免费取消窗口内退款是「停车费 + 服务费」的合并金额，
+ * 服务费那半是平台出的，不能算成车场亏损（见 adminDashboard 文件头）。
+ * 服务费归平台，service / serviceNet 单列仅供展示
  */
 export interface AdminIncomeSummary {
   /** 统计范围天数（7 或 30），云侧白名单归一后的值 */
   days: number
-  /** 区间预支停车费合计（元） */
+  /** 区间预支停车费合计（元，车场收入侧） */
   prepaid: number
-  /** 区间退款扣减合计（元，正数表示扣掉了多少） */
-  refund: number
+  /** 区间退还的预支停车费合计（元，正数，车场支出侧） */
+  refundParking: number
   /** 区间平台服务费合计（元，归平台） */
   service: number
-  /** 区间净收益 = prepaid − refund */
+  /** 区间退还的平台服务费合计（元，正数，归平台） */
+  refundService: number
+  /** 车场净收益 = prepaid − refundParking */
   net: number
+  /** 平台服务费净额 = service − refundService */
+  serviceNet: number
   /** 区间预约单量 */
   reservationCount: number
   /** 区间已核销单量（entered + completed） */
@@ -197,7 +205,7 @@ export interface AdminDashboardData {
   } | null
   todayReservations: number
   pendingEntry: number
-  /** 今日净收益（预支停车费 − 退款）。服务费不归车场，不含在内 */
+  /** 今日车场净收益（预支停车费 − 退还的预支停车费）。服务费不归车场，不含在内 */
   todayIncome: number
   /** 收益明细。旧云函数可能没这字段，前端兜底空态 */
   income?: AdminIncomeSummary
