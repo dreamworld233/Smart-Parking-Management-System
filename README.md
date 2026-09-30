@@ -36,11 +36,12 @@
 ```
 ├── miniprogram/        微信小程序源码（TypeScript + Skyline）
 ├── cloudfunctions/     微信云函数 27 个 —— 全部后端业务逻辑
-├── tests/              Jest 测试（434 个用例）
+├── tests/              Jest 测试（458 个用例）
 ├── web-admin/          组员 Web 运营后台（Vue 3 独立工程，组长复核）
 ├── backend/            Spring Boot 3 + MySQL 展示后端
-├── docs/               设计稿、实现计划、答辩稿
-└── 工单素材/           每日工作记录
+├── docs/               设计稿、实现计划、测试指南
+├── 工单素材/           每日工作记录（本地，不入库）
+└── 答辩素材/           答辩讲稿 / 技术梳理 / 速记卡（本地，不入库）
 ```
 
 ### miniprogram/ —— 小程序端
@@ -106,8 +107,6 @@
 
 ## 文档入口
 
-- 答辩讲稿（口头陈述，S-T-A-R）：`docs/答辩-prep-小程序端-STAR.md`
-- 答辩技术梳理（实现细节全文）：`docs/答辩-prep-小程序端.md`
 - 界面与流程规格：`docs/superpowers/specs/2026-09-11-smart-parking-miniprogram-ui-design.md`
 - 数据模型与关键机制：`docs/superpowers/specs/2026-09-14-smart-parking-data-model-design.md`
 - 实现计划：`docs/superpowers/plans/2026-09-11-free-tier-and-foundation.md`
